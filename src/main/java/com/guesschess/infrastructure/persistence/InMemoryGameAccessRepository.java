@@ -4,17 +4,17 @@ import com.guesschess.application.GameAccess;
 import com.guesschess.application.GameAccessRepository;
 import com.guesschess.application.PlayerToken;
 import com.guesschess.domain.game.GameId;
-import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Stockage en memoire. Ecrit une seule fois par partie (a la creation) puis
- * seulement lu : une ConcurrentHashMap simple suffit, pas besoin de la
- * synchronisation par cle de InMemoryGameRepository.
+ * Doublure de test pure (stockage en memoire) : remplacee en production par
+ * JpaGameAccessRepository depuis l'etape 4, plus annotee @Repository pour ne pas
+ * entrer en conflit de bean avec l'implementation JPA. Ecrit une seule fois par
+ * partie (a la creation) puis seulement lu : une ConcurrentHashMap simple suffit,
+ * pas besoin de la synchronisation par cle de InMemoryGameRepository.
  */
-@Repository
 public class InMemoryGameAccessRepository implements GameAccessRepository {
 
     private final ConcurrentHashMap<PlayerToken, GameAccess> byToken = new ConcurrentHashMap<>();

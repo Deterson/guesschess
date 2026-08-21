@@ -51,6 +51,22 @@ public final class Board {
         return new Board(new Piece[64], Color.WHITE, CastlingRights.none(), null, 0, 1);
     }
 
+    /**
+     * Reconstruit un plateau a l'identique depuis ses champs bruts (persistance
+     * uniquement). squares est copie defensivement.
+     */
+    public static Board reconstruct(Piece[] squares, Color sideToMove, CastlingRights castlingRights,
+                                     Position enPassantTarget, int halfmoveClock, int fullmoveNumber) {
+        return new Board(squares.clone(), sideToMove, castlingRights, enPassantTarget, halfmoveClock, fullmoveNumber);
+    }
+
+    /**
+     * Photo defensive des 64 cases, index = rank * 8 + file (persistance uniquement).
+     */
+    public Piece[] squaresSnapshot() {
+        return squares.clone();
+    }
+
     private static int index(int file, int rank) {
         return rank * 8 + file;
     }

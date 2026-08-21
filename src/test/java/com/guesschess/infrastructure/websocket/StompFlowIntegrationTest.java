@@ -9,13 +9,16 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.context.annotation.Import;
 import org.springframework.messaging.converter.JacksonJsonMessageConverter;
 import org.springframework.messaging.simp.stomp.StompFrameHandler;
 import org.springframework.messaging.simp.stomp.StompHeaders;
 import org.springframework.messaging.simp.stomp.StompSession;
 import org.springframework.messaging.simp.stomp.StompSessionHandlerAdapter;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.web.socket.client.standard.StandardWebSocketClient;
 import org.springframework.web.socket.messaging.WebSocketStompClient;
+import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.lang.reflect.Type;
 import java.util.concurrent.BlockingQueue;
@@ -35,6 +38,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * resolution (seul /topic est observe ici, jamais le contenu de pendingGuess).
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@Testcontainers
+@Import(com.guesschess.support.PostgresTestContainerConfig.class)
+@ActiveProfiles("test")
 class StompFlowIntegrationTest {
 
     @LocalServerPort

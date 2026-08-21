@@ -31,3 +31,8 @@ bin/
 
 ### Maven ###
 target/
+
+### Secrets ###
+.env
+.env.*
+!.env.example

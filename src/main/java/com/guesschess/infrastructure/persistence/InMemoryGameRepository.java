@@ -4,19 +4,20 @@ import com.guesschess.domain.game.Game;
 import com.guesschess.domain.game.GameId;
 import com.guesschess.domain.game.GameNotFoundException;
 import com.guesschess.domain.game.GameRepository;
-import org.springframework.stereotype.Repository;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
 /**
- * Stockage en memoire, remplace par une vraie persistance a l'etape 4. compute()
- * serialise l'acces par gameId (verrou par bucket de la ConcurrentHashMap), ce qui
- * suffit a rendre withGame atomique sans structure de verrous separee : necessaire
- * car Game est mutable et plusieurs connexions WebSocket peuvent viser la meme
- * partie en meme temps.
+ * Doublure de test pure (stockage en memoire) : remplacee en production par
+ * JpaGameRepository depuis l'etape 4, plus annotee @Repository pour ne pas entrer
+ * en conflit de bean avec l'implementation JPA. Toujours utilisee directement (sans
+ * contexte Spring) par GameLifecycleServiceTest et testee par
+ * InMemoryGameRepositoryTest comme specification comportementale de withGame.
+ * compute() serialise l'acces par gameId (verrou par bucket de la
+ * ConcurrentHashMap), ce qui suffit a rendre withGame atomique sans structure de
+ * verrous separee.
  */
-@Repository
 public class InMemoryGameRepository implements GameRepository {
 
     private final ConcurrentHashMap<GameId, Game> games = new ConcurrentHashMap<>();

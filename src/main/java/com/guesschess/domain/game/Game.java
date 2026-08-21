@@ -54,6 +54,21 @@ public final class Game {
         this.positionHistory.add(initialBoard);
     }
 
+    private Game(GameId id, Board board, List<Board> positionHistory, List<Move> moveHistory,
+                 GameStatus status, GameResult result, Move pendingMove, boolean guessSubmitted,
+                 Move pendingGuess, RoundResult lastRoundResult) {
+        this.id = id;
+        this.board = board;
+        this.positionHistory.addAll(positionHistory);
+        this.moveHistory.addAll(moveHistory);
+        this.status = status;
+        this.result = result;
+        this.pendingMove = pendingMove;
+        this.guessSubmitted = guessSubmitted;
+        this.pendingGuess = pendingGuess;
+        this.lastRoundResult = lastRoundResult;
+    }
+
     public static Game newGame() {
         return newGame(GameId.random());
     }
@@ -68,6 +83,16 @@ public final class Game {
 
     public static Game fromPosition(GameId id, Board board) {
         return new Game(id, board);
+    }
+
+    /**
+     * Reconstruit une partie a l'identique depuis un memento (persistance uniquement -
+     * ne pas utiliser dans le flux de jeu normal, qui passe par newGame/fromPosition).
+     */
+    public static Game fromMemento(Memento memento) {
+        return new Game(memento.id(), memento.board(), memento.positionHistory(), memento.moveHistory(),
+                memento.status(), memento.result(), memento.pendingMove(), memento.guessSubmitted(),
+                memento.pendingGuess(), memento.lastRoundResult());
     }
 
     public GameId id() {
@@ -243,5 +268,29 @@ public final class Game {
             }
         }
         return count;
+    }
+
+    /**
+     * Photo complete de l'etat interne, y compris le round en cours (persistance
+     * uniquement - a la difference de GameSnapshot, cote application, qui cache
+     * volontairement la devinette en attente).
+     */
+    public Memento toMemento() {
+        return new Memento(id, board, List.copyOf(positionHistory), List.copyOf(moveHistory),
+                status, result, pendingMove, guessSubmitted, pendingGuess, lastRoundResult);
+    }
+
+    public record Memento(
+            GameId id,
+            Board board,
+            List<Board> positionHistory,
+            List<Move> moveHistory,
+            GameStatus status,
+            GameResult result,
+            Move pendingMove,
+            boolean guessSubmitted,
+            Move pendingGuess,
+            RoundResult lastRoundResult
+    ) {
     }
 }

@@ -41,5 +41,25 @@ pas un bug : le tour ne progresse jamais tant que l'autre moitie n'a pas ete
 soumise (`03 - Submit guess` avec from/to vides = "pas de devinette", une soumission
 valable qui compte quand meme).
 
-Les jetons et l'id de partie sont ephemeres (pas de comptes joueurs avant l'etape 4
-de la roadmap) : il faut relancer l'etape 1 a chaque nouvelle partie.
+Les jetons et l'id de partie sont ephemeres (le flux de jeu WebSocket n'est pas lie
+aux comptes joueurs, voir plus bas) : il faut relancer l'etape 1 a chaque nouvelle
+partie.
+
+## Comptes joueurs (etape 4 de la roadmap)
+
+L'authentification est OAuth uniquement (Google/GitHub), separee du flux de jeu
+ci-dessus. Le flux de login (redirections navigateur reelles vers Google/GitHub)
+**ne peut pas etre pilote par Bruno** - contrairement au probleme STOMP ci-dessus,
+c'est un vrai flux OAuth2 interactif, pas un bug d'outil :
+
+1. Configurer les variables d'environnement `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`
+   (ou `GITHUB_CLIENT_ID`/`GITHUB_CLIENT_SECRET`) et `JWT_SECRET` avant de lancer le
+   serveur (voir CLAUDE.md, section "Variables d'environnement").
+2. Se connecter via un navigateur sur `http://localhost:8080/oauth2/authorization/google`
+   (ou `.../github`).
+3. Apres authentification, le navigateur est redirige vers
+   `app.oauth.post-login-redirect-uri` avec le JWT dans le fragment d'URL
+   (`#token=...`) - le copier.
+4. Reporter ce token dans la variable de collection `jwt`, puis ouvrir
+   **04 - Account me** pour verifier `GET /api/account/me` (401 sans le header
+   `Authorization`, 200 avec).

@@ -1,0 +1,14 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: guesschess
+      POSTGRES_USER: ${POSTGRES_USER:-guesschess}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-guesschess}
+    ports:
+      - "5432:5432"
+    volumes:
+      - guesschess-postgres-data:/var/lib/postgresql/data
+
+volumes:
+  guesschess-postgres-data:
