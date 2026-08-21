@@ -1,0 +1,90 @@
+package com.guesschess.infrastructure.websocket;
+
+import com.guesschess.application.GameSnapshot;
+import com.guesschess.application.MoveIntent;
+import com.guesschess.domain.board.Board;
+import com.guesschess.domain.board.Position;
+import com.guesschess.domain.game.GameResult;
+import com.guesschess.domain.game.RoundResult;
+import com.guesschess.domain.piece.Color;
+import com.guesschess.domain.piece.Piece;
+import com.guesschess.domain.piece.PieceType;
+import com.guesschess.infrastructure.websocket.dto.GameStateMessage;
+import com.guesschess.infrastructure.websocket.dto.ResultMessage;
+import com.guesschess.infrastructure.websocket.dto.RoundSummaryMessage;
+import org.springframework.stereotype.Component;
+
+/**
+ * Traduction entre le protocole fil (chaines algebriques, codes piece) et les types
+ * du domaine. Isole les DTO de la structure interne de Board/Move/Piece.
+ */
+@Component
+public class GameMessageMapper {
+
+    public GameStateMessage toGameStateMessage(GameSnapshot snapshot) {
+        return new GameStateMessage(
+                snapshot.id().toString(),
+                toBoardCells(snapshot.board()),
+                snapshot.sideToMove().name(),
+                snapshot.status().name(),
+                toResultMessage(snapshot.result()),
+                toRoundSummaryMessage(snapshot.lastRoundResult())
+        );
+    }
+
+    public MoveIntent toMoveIntent(String from, String to, String promotion) {
+        Position fromPosition = Position.fromAlgebraic(from);
+        Position toPosition = Position.fromAlgebraic(to);
+        if (promotion == null) {
+            return MoveIntent.of(fromPosition, toPosition);
+        }
+        return MoveIntent.promotingTo(fromPosition, toPosition, PieceType.valueOf(promotion));
+    }
+
+    private ResultMessage toResultMessage(GameResult result) {
+        if (result == null) {
+            return null;
+        }
+        return new ResultMessage(result.winner() == null ? null : result.winner().name(), result.cause().name());
+    }
+
+    private RoundSummaryMessage toRoundSummaryMessage(RoundResult roundResult) {
+        if (roundResult == null) {
+            return null;
+        }
+        return new RoundSummaryMessage(
+                roundResult.mover().name(),
+                roundResult.guesser().name(),
+                roundResult.actualMove().from().toAlgebraic(),
+                roundResult.actualMove().to().toAlgebraic(),
+                roundResult.guessedMove() == null ? null : roundResult.guessedMove().from().toAlgebraic(),
+                roundResult.guessedMove() == null ? null : roundResult.guessedMove().to().toAlgebraic(),
+                roundResult.guessedCorrectly(),
+                roundResult.movePlayed()
+        );
+    }
+
+    private String[][] toBoardCells(Board board) {
+        String[][] cells = new String[8][8];
+        for (int rank = 0; rank < 8; rank++) {
+            for (int file = 0; file < 8; file++) {
+                Piece piece = board.pieceAt(Position.of(file, rank));
+                cells[rank][file] = piece == null ? null : toCode(piece);
+            }
+        }
+        return cells;
+    }
+
+    private String toCode(Piece piece) {
+        char colorCode = piece.color() == Color.WHITE ? 'w' : 'b';
+        char typeCode = switch (piece.type()) {
+            case PAWN -> 'P';
+            case KNIGHT -> 'N';
+            case BISHOP -> 'B';
+            case ROOK -> 'R';
+            case QUEEN -> 'Q';
+            case KING -> 'K';
+        };
+        return "" + colorCode + typeCode;
+    }
+}

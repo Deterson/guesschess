@@ -33,6 +33,7 @@ public final class Game {
     private static final int FIFTY_MOVE_HALFMOVE_LIMIT = 100;
     private static final int REPETITION_LIMIT = 3;
 
+    private final GameId id;
     private Board board;
     private final List<Board> positionHistory = new ArrayList<>();
     private final List<Move> moveHistory = new ArrayList<>();
@@ -41,17 +42,30 @@ public final class Game {
     private Move pendingGuess;
     private RoundResult lastRoundResult;
 
-    private Game(Board initialBoard) {
+    private Game(GameId id, Board initialBoard) {
+        this.id = id;
         this.board = initialBoard;
         this.positionHistory.add(initialBoard);
     }
 
     public static Game newGame() {
-        return new Game(Board.initial());
+        return newGame(GameId.random());
+    }
+
+    public static Game newGame(GameId id) {
+        return new Game(id, Board.initial());
     }
 
     public static Game fromPosition(Board board) {
-        return new Game(board);
+        return fromPosition(GameId.random(), board);
+    }
+
+    public static Game fromPosition(GameId id, Board board) {
+        return new Game(id, board);
+    }
+
+    public GameId id() {
+        return id;
     }
 
     public Board board() {
