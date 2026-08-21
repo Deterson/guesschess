@@ -148,6 +148,16 @@ public final class Board {
         return new Board(newSquares, newSideToMove, newRights, newEnPassantTarget, newHalfmoveClock, newFullmoveNumber);
     }
 
+    /**
+     * Passe le trait sans deplacer aucune piece (devinette correcte qui annule le coup
+     * reel). La case en passant tombe, comme apres n'importe quel autre coup : son
+     * exploitation n'est valable que pour la reponse immediate qui vient d'etre sautee.
+     */
+    public Board pass() {
+        int newFullmoveNumber = sideToMove == Color.BLACK ? fullmoveNumber + 1 : fullmoveNumber;
+        return new Board(squares.clone(), sideToMove.opposite(), castlingRights, null, halfmoveClock + 1, newFullmoveNumber);
+    }
+
     private CastlingRights updatedCastlingRights(Position from, Position to, Piece moved) {
         boolean whiteKingside = castlingRights.whiteKingside();
         boolean whiteQueenside = castlingRights.whiteQueenside();
