@@ -1,8 +1,8 @@
 package com.guesschess.infrastructure.websocket;
 
+import com.guesschess.infrastructure.websocket.dto.AckMessage;
 import com.guesschess.infrastructure.websocket.dto.CreateGameResponse;
 import com.guesschess.infrastructure.websocket.dto.GameStateMessage;
-import com.guesschess.infrastructure.websocket.dto.GuessAckMessage;
 import com.guesschess.infrastructure.websocket.dto.SubmitGuessRequest;
 import com.guesschess.infrastructure.websocket.dto.SubmitMoveRequest;
 import org.junit.jupiter.api.BeforeEach;
@@ -55,8 +55,8 @@ class StompFlowIntegrationTest {
 
         BlockingQueue<GameStateMessage> broadcasts = new LinkedBlockingQueue<>();
         session.subscribe("/topic/games/" + game.gameId(), handlerFor(GameStateMessage.class, broadcasts));
-        BlockingQueue<GuessAckMessage> guessAcks = new LinkedBlockingQueue<>();
-        session.subscribe("/user/queue/guess.ack", handlerFor(GuessAckMessage.class, guessAcks));
+        BlockingQueue<AckMessage> guessAcks = new LinkedBlockingQueue<>();
+        session.subscribe("/user/queue/guess.ack", handlerFor(AckMessage.class, guessAcks));
 
         session.send("/app/games/" + game.gameId() + "/guess",
                 new SubmitGuessRequest(game.blackToken(), "e2", "e4", null));
@@ -77,14 +77,39 @@ class StompFlowIntegrationTest {
     }
 
     @Test
+    void moveArrivingFirstOnlyAcksPrivatelyUntilTheGuessArrives() throws Exception {
+        StompSession session = connect();
+        CreateGameResponse game = createGame(session);
+
+        BlockingQueue<GameStateMessage> broadcasts = new LinkedBlockingQueue<>();
+        session.subscribe("/topic/games/" + game.gameId(), handlerFor(GameStateMessage.class, broadcasts));
+        BlockingQueue<AckMessage> moveAcks = new LinkedBlockingQueue<>();
+        session.subscribe("/user/queue/move.ack", handlerFor(AckMessage.class, moveAcks));
+
+        session.send("/app/games/" + game.gameId() + "/move",
+                new SubmitMoveRequest(game.whiteToken(), "e2", "e4", null));
+        assertNotNull(moveAcks.poll(5, TimeUnit.SECONDS));
+        assertNull(broadcasts.poll(500, TimeUnit.MILLISECONDS));
+
+        session.send("/app/games/" + game.gameId() + "/guess",
+                new SubmitGuessRequest(game.blackToken(), null, null, null));
+        GameStateMessage state = broadcasts.poll(5, TimeUnit.SECONDS);
+
+        assertNotNull(state);
+        assertEquals("BLACK", state.sideToMove());
+        assertTrue(state.lastRound().movePlayed());
+        assertFalse(state.lastRound().guessedCorrectly());
+    }
+
+    @Test
     void incorrectGuessPlaysTheMoveAndBroadcastsIt() throws Exception {
         StompSession session = connect();
         CreateGameResponse game = createGame(session);
 
         BlockingQueue<GameStateMessage> broadcasts = new LinkedBlockingQueue<>();
         session.subscribe("/topic/games/" + game.gameId(), handlerFor(GameStateMessage.class, broadcasts));
-        BlockingQueue<GuessAckMessage> guessAcks = new LinkedBlockingQueue<>();
-        session.subscribe("/user/queue/guess.ack", handlerFor(GuessAckMessage.class, guessAcks));
+        BlockingQueue<AckMessage> guessAcks = new LinkedBlockingQueue<>();
+        session.subscribe("/user/queue/guess.ack", handlerFor(AckMessage.class, guessAcks));
 
         session.send("/app/games/" + game.gameId() + "/guess",
                 new SubmitGuessRequest(game.blackToken(), "d2", "d4", null));
@@ -100,6 +125,30 @@ class StompFlowIntegrationTest {
         assertTrue(state.lastRound().movePlayed());
         assertNull(state.board()[1][4]);
         assertEquals("wP", state.board()[3][4]);
+    }
+
+    @Test
+    void broadcastReachesASeparateConnectionThatOnlySubmittedTheMove() throws Exception {
+        StompSession creatorSession = connect();
+        CreateGameResponse game = createGame(creatorSession);
+
+        StompSession guesserSession = connect();
+        BlockingQueue<AckMessage> guessAcks = new LinkedBlockingQueue<>();
+        guesserSession.subscribe("/user/queue/guess.ack", handlerFor(AckMessage.class, guessAcks));
+        guesserSession.send("/app/games/" + game.gameId() + "/guess",
+                new SubmitGuessRequest(game.blackToken(), "e2", "e4", null));
+        assertNotNull(guessAcks.poll(5, TimeUnit.SECONDS));
+
+        StompSession moverSession = connect();
+        BlockingQueue<GameStateMessage> broadcasts = new LinkedBlockingQueue<>();
+        moverSession.subscribe("/topic/games/" + game.gameId(), handlerFor(GameStateMessage.class, broadcasts));
+        moverSession.send("/app/games/" + game.gameId() + "/move",
+                new SubmitMoveRequest(game.whiteToken(), "e2", "e4", null));
+
+        GameStateMessage state = broadcasts.poll(5, TimeUnit.SECONDS);
+
+        assertNotNull(state);
+        assertTrue(state.lastRound().guessedCorrectly());
     }
 
     private CreateGameResponse createGame(StompSession session) throws Exception {

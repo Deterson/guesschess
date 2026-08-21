@@ -9,23 +9,30 @@ import com.guesschess.application.PlayerToken;
 import com.guesschess.application.UnknownPlayerTokenException;
 import com.guesschess.application.WrongTurnException;
 import com.guesschess.domain.game.GameNotFoundException;
+import com.guesschess.infrastructure.websocket.dto.AckMessage;
 import com.guesschess.infrastructure.websocket.dto.CreateGameResponse;
 import com.guesschess.infrastructure.websocket.dto.ErrorMessage;
-import com.guesschess.infrastructure.websocket.dto.GuessAckMessage;
 import com.guesschess.infrastructure.websocket.dto.SubmitGuessRequest;
 import com.guesschess.infrastructure.websocket.dto.SubmitMoveRequest;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
+import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.MessageExceptionHandler;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.Payload;
+import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
+import org.springframework.messaging.simp.SimpMessageType;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.messaging.simp.annotation.SendToUser;
 import org.springframework.stereotype.Controller;
 
+import java.util.Optional;
+
 /**
- * Endpoints STOMP du cycle de vie d'une partie. Le coup soumis declenche une
- * diffusion publique de l'etat resultant (le round vient de se resoudre) ; la
- * devinette ne declenche qu'un accuse prive, jamais de diffusion publique.
+ * Endpoints STOMP du cycle de vie d'une partie. Un round attend obligatoirement les
+ * deux soumissions (coup reel + devinette, celle-ci pouvant etre "aucune") avant de
+ * se resoudre : quelle que soit celle des deux qui arrive en second, elle declenche
+ * la diffusion publique de l'etat resultant sur /topic ; celle qui arrive en premier
+ * ne recoit qu'un accuse prive, le round n'etant pas encore resolu.
  */
 @Controller
 public class GameController {
@@ -52,22 +59,29 @@ public class GameController {
     }
 
     @MessageMapping("/games/{gameId}/move")
-    public void submitMove(@DestinationVariable String gameId, @Payload SubmitMoveRequest request) {
+    public void submitMove(@DestinationVariable String gameId, @Payload SubmitMoveRequest request,
+                            @Header("simpSessionId") String sessionId) {
         MoveIntent intent = mapper.toMoveIntent(request.from(), request.to(), request.promotion());
-        GameSnapshot snapshot = gameLifecycleService.submitMove(PlayerToken.fromString(request.token()), intent);
-        messagingTemplate.convertAndSend(
-                "/topic/games/" + snapshot.id(),
-                mapper.toGameStateMessage(snapshot));
+        Optional<GameSnapshot> resolved = gameLifecycleService.submitMove(PlayerToken.fromString(request.token()), intent);
+        if (resolved.isPresent()) {
+            broadcast(resolved.get());
+        } else {
+            sendToUser(sessionId, "/queue/move.ack", new AckMessage("recorded_waiting_for_guess"));
+        }
     }
 
     @MessageMapping("/games/{gameId}/guess")
-    @SendToUser("/queue/guess.ack")
-    public GuessAckMessage submitGuess(@DestinationVariable String gameId, @Payload SubmitGuessRequest request) {
+    public void submitGuess(@DestinationVariable String gameId, @Payload SubmitGuessRequest request,
+                             @Header("simpSessionId") String sessionId) {
         MoveIntent intent = request.from() == null || request.to() == null
                 ? null
                 : mapper.toMoveIntent(request.from(), request.to(), request.promotion());
-        gameLifecycleService.submitGuess(PlayerToken.fromString(request.token()), intent);
-        return new GuessAckMessage("recorded");
+        Optional<GameSnapshot> resolved = gameLifecycleService.submitGuess(PlayerToken.fromString(request.token()), intent);
+        if (resolved.isPresent()) {
+            broadcast(resolved.get());
+        } else {
+            sendToUser(sessionId, "/queue/guess.ack", new AckMessage("recorded_waiting_for_move"));
+        }
     }
 
     @MessageExceptionHandler({
@@ -81,5 +95,22 @@ public class GameController {
     @SendToUser("/queue/errors")
     public ErrorMessage handleError(Exception exception) {
         return new ErrorMessage(exception.getClass().getSimpleName(), exception.getMessage());
+    }
+
+    private void broadcast(GameSnapshot snapshot) {
+        messagingTemplate.convertAndSend("/topic/games/" + snapshot.id(), mapper.toGameStateMessage(snapshot));
+    }
+
+    /**
+     * Envoie un message prive a l'expediteur du message en cours de traitement.
+     * Sans comptes joueurs, il n'y a pas de Principal authentifie : l'id de session
+     * WebSocket sert directement de "user" pour le routage /user, comme documente
+     * par Spring pour les sessions anonymes.
+     */
+    private void sendToUser(String sessionId, String destination, Object payload) {
+        SimpMessageHeaderAccessor headerAccessor = SimpMessageHeaderAccessor.create(SimpMessageType.MESSAGE);
+        headerAccessor.setSessionId(sessionId);
+        headerAccessor.setLeaveMutable(true);
+        messagingTemplate.convertAndSendToUser(sessionId, destination, payload, headerAccessor.getMessageHeaders());
     }
 }

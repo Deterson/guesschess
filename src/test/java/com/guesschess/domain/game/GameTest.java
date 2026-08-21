@@ -91,6 +91,7 @@ class GameTest {
         List<Move> whiteMoves = game.legalMoves();
         Move enPassant = findMove(whiteMoves, "e5", "d6");
         game.submitMove(enPassant);
+        game.submitGuess(null);
 
         assertNull(game.board().pieceAt(Position.fromAlgebraic("d5")));
         assertEquals(Piece.of(PieceType.PAWN, Color.WHITE), game.board().pieceAt(Position.fromAlgebraic("d6")));
@@ -109,6 +110,7 @@ class GameTest {
                 .findFirst()
                 .orElseThrow();
         game.submitMove(promotion);
+        game.submitGuess(null);
 
         assertEquals(Piece.of(PieceType.QUEEN, Color.WHITE), game.board().pieceAt(Position.fromAlgebraic("a8")));
     }
@@ -125,6 +127,7 @@ class GameTest {
         Game game = Game.fromPosition(nearLimit);
         Move anyMove = game.legalMoves().get(0);
         game.submitMove(anyMove);
+        game.submitGuess(null);
 
         assertEquals(GameStatus.FINISHED, game.status());
         assertEquals(GameResultCause.DRAW_FIFTY_MOVE_RULE, game.result().cause());
@@ -164,6 +167,7 @@ class GameTest {
 
         Move kingShuffle = findMove(game.legalMoves(), "e1", "d1");
         game.submitMove(kingShuffle);
+        game.submitGuess(null);
 
         assertEquals(GameStatus.FINISHED, game.status());
         assertEquals(GameResultCause.DRAW_INSUFFICIENT_MATERIAL, game.result().cause());
@@ -177,12 +181,14 @@ class GameTest {
         play(game, "g2", "g4");
         Move mate = findMove(game.legalMoves(), "d8", "h4");
         game.submitMove(mate);
+        game.submitGuess(null);
 
         assertThrows(IllegalStateException.class, () -> game.submitMove(mate));
     }
 
     private static void play(Game game, String from, String to) {
         game.submitMove(findMove(game.legalMoves(), from, to));
+        game.submitGuess(null);
     }
 
     private static Move findMove(List<Move> moves, String from, String to) {

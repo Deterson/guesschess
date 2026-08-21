@@ -9,6 +9,8 @@ import com.guesschess.infrastructure.persistence.InMemoryGameRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.Optional;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -38,11 +40,14 @@ class GameLifecycleServiceTest {
     }
 
     @Test
-    void submitMoveByTheWhiteTokenPlaysAWhiteMoveWhenUnguessed() {
+    void moveWaitsForTheGuessBeforeResolving() {
         CreatedGame game = service.createGame();
         MoveIntent e4 = MoveIntent.of(Position.fromAlgebraic("e2"), Position.fromAlgebraic("e4"));
 
-        GameSnapshot snapshot = service.submitMove(game.whiteToken(), e4);
+        Optional<GameSnapshot> immediate = service.submitMove(game.whiteToken(), e4);
+        assertTrue(immediate.isEmpty());
+
+        GameSnapshot snapshot = service.submitGuess(game.blackToken(), null).orElseThrow();
 
         assertEquals(Color.BLACK, snapshot.sideToMove());
         assertTrue(snapshot.lastRoundResult().movePlayed());
@@ -88,7 +93,7 @@ class GameLifecycleServiceTest {
         MoveIntent e4 = MoveIntent.of(Position.fromAlgebraic("e2"), Position.fromAlgebraic("e4"));
 
         service.submitGuess(game.blackToken(), e4);
-        GameSnapshot snapshot = service.submitMove(game.whiteToken(), e4);
+        GameSnapshot snapshot = service.submitMove(game.whiteToken(), e4).orElseThrow();
 
         assertFalse(snapshot.lastRoundResult().movePlayed());
         assertTrue(snapshot.lastRoundResult().guessedCorrectly());

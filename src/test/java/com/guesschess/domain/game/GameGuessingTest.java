@@ -9,18 +9,57 @@ import com.guesschess.domain.piece.PieceType;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Mecanique de devinette (etape 2 de la roadmap) : soumission du coup reel et de la
- * devinette, resolution du round, et cas particulier du roi laisse en echec.
+ * Mecanique de devinette (etape 2 de la roadmap) : un round attend obligatoirement
+ * les deux soumissions (coup reel + devinette, celle-ci pouvant valoir "aucune")
+ * avant de se resoudre, quel que soit leur ordre d'arrivee ; et cas particulier du
+ * roi laisse en echec.
  */
 class GameGuessingTest {
+
+    @Test
+    void moveWaitsForTheGuessWhenItArrivesFirst() {
+        Game game = Game.newGame();
+        Move e4 = findMove(game.legalMoves(), "e2", "e4");
+
+        Optional<RoundResult> result = game.submitMove(e4);
+
+        assertTrue(result.isEmpty());
+        assertEquals(GameStatus.ONGOING, game.status());
+        assertEquals(Color.WHITE, game.sideToMove());
+        assertTrue(game.moveHistory().isEmpty());
+    }
+
+    @Test
+    void guessWaitsForTheMoveWhenItArrivesFirst() {
+        Game game = Game.newGame();
+        Move e4 = findMove(game.legalMoves(), "e2", "e4");
+
+        Optional<RoundResult> result = game.submitGuess(e4);
+
+        assertTrue(result.isEmpty());
+        assertEquals(GameStatus.ONGOING, game.status());
+    }
+
+    @Test
+    void explicitNoGuessStillCompletesTheRoundOnceTheMoveArrives() {
+        Game game = Game.newGame();
+        Move e4 = findMove(game.legalMoves(), "e2", "e4");
+
+        assertTrue(game.submitMove(e4).isEmpty());
+        RoundResult result = game.submitGuess(null).orElseThrow();
+
+        assertTrue(result.movePlayed());
+        assertFalse(result.guessedCorrectly());
+        assertEquals(Piece.of(PieceType.PAWN, Color.WHITE), game.board().pieceAt(Position.fromAlgebraic("e4")));
+    }
 
     @Test
     void correctGuessCancelsTheMoveAndPassesTurnWithoutChangingTheBoard() {
@@ -28,18 +67,16 @@ class GameGuessingTest {
         Move e4 = findMove(game.legalMoves(), "e2", "e4");
         game.submitGuess(e4);
 
-        RoundResult result = game.submitMove(e4);
+        RoundResult result = game.submitMove(e4).orElseThrow();
 
         assertFalse(result.movePlayed());
         assertTrue(result.guessedCorrectly());
         assertEquals(Color.WHITE, result.mover());
         assertEquals(Color.BLACK, result.guesser());
         assertEquals(Piece.of(PieceType.PAWN, Color.WHITE), game.board().pieceAt(Position.fromAlgebraic("e2")));
-        assertNull(game.board().pieceAt(Position.fromAlgebraic("e4")));
         assertEquals(Color.BLACK, game.sideToMove());
         assertTrue(game.moveHistory().isEmpty());
         assertEquals(GameStatus.ONGOING, game.status());
-        assertNull(game.pendingGuess());
     }
 
     @Test
@@ -49,55 +86,52 @@ class GameGuessingTest {
         Move wrongGuess = findMove(game.legalMoves(), "d2", "d4");
         game.submitGuess(wrongGuess);
 
-        RoundResult result = game.submitMove(e4);
+        RoundResult result = game.submitMove(e4).orElseThrow();
 
         assertTrue(result.movePlayed());
         assertFalse(result.guessedCorrectly());
-        assertNull(game.board().pieceAt(Position.fromAlgebraic("e2")));
         assertEquals(Piece.of(PieceType.PAWN, Color.WHITE), game.board().pieceAt(Position.fromAlgebraic("e4")));
         assertEquals(Color.BLACK, game.sideToMove());
         assertEquals(1, game.moveHistory().size());
     }
 
     @Test
-    void noGuessSubmittedPlaysTheMoveNormally() {
-        Game game = Game.newGame();
-        Move e4 = findMove(game.legalMoves(), "e2", "e4");
-
-        RoundResult result = game.submitMove(e4);
-
-        assertTrue(result.movePlayed());
-        assertFalse(result.guessedCorrectly());
-        assertNull(result.guessedMove());
-    }
-
-    @Test
-    void guessCanBeOverriddenUntilMoveIsSubmitted() {
+    void guessCanBeOverriddenUntilTheMoveArrives() {
         Game game = Game.newGame();
         Move e4 = findMove(game.legalMoves(), "e2", "e4");
         Move d4 = findMove(game.legalMoves(), "d2", "d4");
         game.submitGuess(d4);
         game.submitGuess(e4);
 
-        RoundResult result = game.submitMove(e4);
+        RoundResult result = game.submitMove(e4).orElseThrow();
 
         assertTrue(result.guessedCorrectly());
         assertEquals(e4, result.guessedMove());
     }
 
     @Test
-    void pendingGuessResetsAfterRoundResolvesAndIsNotCarriedOver() {
+    void moveCannotBeResubmittedForTheSameRound() {
+        Game game = Game.newGame();
+        Move e4 = findMove(game.legalMoves(), "e2", "e4");
+        Move d4 = findMove(game.legalMoves(), "d2", "d4");
+        game.submitMove(e4);
+
+        assertThrows(IllegalStateException.class, () -> game.submitMove(d4));
+    }
+
+    @Test
+    void guessDoesNotCarryOverToTheNextRound() {
         Game game = Game.newGame();
         Move e4 = findMove(game.legalMoves(), "e2", "e4");
         game.submitGuess(e4);
         game.submitMove(e4);
 
-        assertNull(game.pendingGuess());
         Move blackMove = findMove(game.legalMoves(), "e7", "e5");
-        RoundResult result = game.submitMove(blackMove);
+        assertTrue(game.submitMove(blackMove).isEmpty());
+        RoundResult result = game.submitGuess(null).orElseThrow();
 
         assertTrue(result.movePlayed());
-        assertNull(result.guessedMove());
+        assertFalse(result.guessedCorrectly());
     }
 
     @Test
@@ -132,7 +166,7 @@ class GameGuessingTest {
 
         Move escape = findMove(game.legalMoves(), "a1", "b1");
         game.submitGuess(escape);
-        RoundResult result = game.submitMove(escape);
+        RoundResult result = game.submitMove(escape).orElseThrow();
 
         assertFalse(result.movePlayed());
         assertEquals(GameStatus.ONGOING, game.status());
@@ -141,7 +175,8 @@ class GameGuessingTest {
         assertTrue(game.isInCheck(Color.WHITE));
 
         Move captureKing = findMove(game.legalMoves(), "a8", "a1");
-        RoundResult second = game.submitMove(captureKing);
+        game.submitMove(captureKing);
+        RoundResult second = game.submitGuess(null).orElseThrow();
 
         assertTrue(second.movePlayed());
         assertEquals(GameStatus.FINISHED, game.status());
@@ -157,7 +192,8 @@ class GameGuessingTest {
         game.submitMove(escape);
 
         Move harmless = findMove(game.legalMoves(), "h8", "h7");
-        RoundResult result = game.submitMove(harmless);
+        game.submitMove(harmless);
+        RoundResult result = game.submitGuess(null).orElseThrow();
 
         assertTrue(result.movePlayed());
         assertEquals(GameStatus.ONGOING, game.status());
@@ -166,7 +202,8 @@ class GameGuessingTest {
         assertTrue(game.legalMoves().stream().allMatch(m -> m.from().equals(Position.fromAlgebraic("a1"))));
 
         Move finalEscape = findMove(game.legalMoves(), "a1", "b1");
-        RoundResult third = game.submitMove(finalEscape);
+        game.submitMove(finalEscape);
+        RoundResult third = game.submitGuess(null).orElseThrow();
 
         assertTrue(third.movePlayed());
         assertEquals(GameStatus.ONGOING, game.status());
@@ -182,7 +219,7 @@ class GameGuessingTest {
 
         Move captureKing = findMove(game.legalMoves(), "a8", "a1");
         game.submitGuess(captureKing);
-        RoundResult result = game.submitMove(captureKing);
+        RoundResult result = game.submitMove(captureKing).orElseThrow();
 
         assertFalse(result.movePlayed());
         assertEquals(GameStatus.ONGOING, game.status());
@@ -203,8 +240,13 @@ class GameGuessingTest {
                 .withPiece(Position.fromAlgebraic("h8"), Piece.of(PieceType.KING, Color.BLACK));
     }
 
+    /**
+     * Joue un coup sans devinette (round resolu par un submitGuess(null) explicite),
+     * pour les tests qui n'ont besoin que de faire avancer la partie normalement.
+     */
     private static void play(Game game, String from, String to) {
         game.submitMove(findMove(game.legalMoves(), from, to));
+        game.submitGuess(null);
     }
 
     private static Move findMove(List<Move> moves, String from, String to) {
