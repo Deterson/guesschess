@@ -30,7 +30,7 @@ Jeu d'échecs classique avec une règle additionnelle :
 - Chaque "round" (coup réel + devinette) est modélisé comme un petit état à deux soumissions cachées, résolu seulement quand les deux sont arrivées. Le serveur ne doit jamais exposer une soumission avant que les deux soient là (anti-triche).
 - Cet état de round doit être **persisté en base**, pas seulement gardé en mémoire, pour fonctionner aussi bien en temps réel qu'en asynchrone (un joueur peut soumettre puis se déconnecter, l'autre soumet plus tard).
 - Java 25 + threads virtuels pour bien encaisser les connexions WebSocket concurrentes sans trop peser sur les 4 Go du Pi.
-- Base de données : PostgreSQL en conteneur léger (tranché à l'étape 4), cohérent avec le docker-compose complet prévu à l'étape 6. Migrations gérées par Flyway.
+- Base de données : privilégier une option légère (SQLite ou Postgres en conteneur léger) — pas encore tranché.
 - **Architecture : Domain-Driven Design (DDD)**, cohérente avec le monolithe modulaire à trois couches ci-dessus :
   - **Bounded contexts** : séparer le contexte "Partie" (moteur d'échecs + mécanique de devinette) du contexte "Compte joueur" (identité, auth, OAuth) — ils n'ont pas de raison de partager leur modèle.
   - **Aggregate root** : `Game` encapsule tout l'état d'une partie (plateau, historique des coups, round en cours, résultat) et garantit ses invariants.
@@ -44,6 +44,36 @@ Jeu d'échecs classique avec une règle additionnelle :
 - **Asynchrone** : REST classique (ex. `POST /games/{id}/moves`), sans connexion persistante — logique vu que les deux joueurs ne sont pas connectés en même temps et que la fréquence est naturellement faible.
 - **Dimensionnement** : même à 1000 joueurs simultanés (~500 parties), le volume de messages reste faible (quelques dizaines à centaines par seconde, sur des connexions déjà ouvertes) — le vrai axe de dimensionnement, ce sont les connexions WebSocket maintenues ouvertes, pas le débit de requêtes. C'est ce que les threads virtuels de Java 25 encaissent bien.
 - Seule la soumission finale (coup ou devinette validé) part vers le serveur — les interactions UI (déplacer une pièce, hésiter) restent côté client. Le serveur revalide systématiquement chaque soumission (jamais confiance dans le client).
+
+## Performance et scalabilité
+
+### Moteur d'échecs — pièges classiques à surveiller
+
+- **Détection d'échec par simulation complète** : jouer chaque coup candidat puis rescanner tout le plateau pour voir si le roi est attaqué, répété pour chaque coup candidat, peut coûter cher si la détection d'attaque elle-même n'est pas ciblée (éviter les scans imbriqués évitables sur les 64 cases).
+- **Recalcul systématique de "tous les coups légaux"** à chaque appel plutôt que mise en cache pour la durée du round — un round peut durer plusieurs secondes voire minutes (surtout en asynchrone), pas la peine de tout recalculer si la position n'a pas changé entre deux appels.
+- **Recherche de pièces par balayage complet du plateau** à chaque fois plutôt qu'une structure indexée (liste des pièces par couleur/type) maintenue à jour incrémentalement à chaque coup.
+- Les Value Objects immuables (choix DDD ci-dessus) sont voulus pour la clarté du domaine — vérifier que la copie de plateau à chaque coup reste bon marché (tableau simple), pas un clonage profond de structures lourdes.
+- **Mesurer avant d'optimiser** : un benchmark (JMH) plutôt qu'une intuition — ce qui semble lent à la lecture n'est pas toujours le vrai goulot d'étranglement, et l'inverse est vrai aussi.
+- **Point identifié en pratique (étape 4)** : certains algorithmes basiques de validation sont actuellement peu efficaces — à profiler et corriger en utilisant la liste ci-dessus comme grille de lecture, avant de considérer la montée en charge.
+
+### Réseau à grande échelle
+
+- Une seule instance Spring Boot + threads virtuels tient bien plusieurs milliers de connexions WebSocket ouvertes — le débit de messages n'est pas le problème (voir section Communication frontend-backend), la mémoire par connexion l'est davantage.
+- **Si un jour plusieurs instances backend sont nécessaires** (Pi seul insuffisant, ou migration cloud) : le vrai défi du WebSocket multi-instance, c'est qu'un message pour le joueur B doit atteindre l'instance qui tient *sa* connexion, potentiellement différente de celle de A. Deux options : sessions collantes (sticky sessions, simple mais rigide) ou un bus pub/sub entre instances (Redis pub/sub par exemple) pour diffuser les événements de résolution de round. L'état des rounds déjà persisté en base facilite cette transition, car les instances restent sans état applicatif.
+- Le reverse proxy (étape 7 de la roadmap) doit être configuré spécifiquement pour le WebSocket : upgrade de connexion géré correctement, timeouts assez longs pour ne pas couper des connexions ouvertes mais inactives.
+- Prévoir une limite de connexions concurrentes et une dégradation propre (plutôt qu'un crash) si un pic dépasse la capacité.
+- Limitation de débit (rate limiting) par joueur/IP sur les soumissions, pour se protéger d'un client abusif ou buggé plutôt que de faire confiance à la fréquence naturelle du jeu.
+
+### Scaling Docker
+
+- `docker-compose` sur un seul hôte permet de multiplier les réplicas du backend (`--scale`), mais seulement si l'application est suffisamment sans état pour ça — voir le point pub/sub ci-dessus.
+- Au-delà d'un seul hôte, il faudra un orchestrateur (Docker Swarm ou Kubernetes) — pas la peine d'y penser avant d'en avoir réellement besoin, mais la conteneurisation actuelle rend cette migration possible sans réécrire l'application.
+- Configurer la JVM pour qu'elle respecte les limites mémoire du conteneur (`-XX:MaxRAMPercentage` ou équivalent) plutôt que de laisser Java deviner — sinon risque d'OOM kill par Docker/le Pi sans message d'erreur clair.
+- Health checks et arrêt propre (graceful shutdown) des conteneurs, pour qu'un redéploiement ne coupe pas brutalement les parties en cours — l'état déjà persisté en base permet aux clients de reprendre après reconnexion.
+
+### Observabilité
+
+- Mettre en place des métriques basiques dès que possible (connexions actives, parties en cours, latence de résolution d'un round) — c'est ce qui permet de savoir objectivement quand le Raspberry Pi devient réellement insuffisant, plutôt que de le deviner.
 
 ## Tests
 
@@ -62,7 +92,7 @@ Jeu d'échecs classique avec une règle additionnelle :
 
 ### ⚠️ Points de vigilance pour la v1 (à cause de ces fonctionnalités futures)
 
-- **Authentification** : tranché à l'étape 4 — OAuth uniquement (Google/GitHub), pas d'email/mot de passe. Sessions JWT stateless (pas de session stockée côté serveur au-delà de la poignée de main OAuth2 elle-même).
+- **Authentification** : décider *maintenant* le principe (OAuth, email/mot de passe, ou les deux) avant l'étape 4, car ce choix façonne directement le modèle `User` et la config Spring Security. Le redéfinir après coup implique de retoucher le modèle utilisateur et tout ce qui en dépend (sessions, permissions...).
 - **Résultat d'une partie** : structurer dès l'étape 2/3 l'agrégat `Game` pour qu'il enregistre le résultat **et sa cause** (mat classique, abandon, roi capturé via devinette...) plutôt qu'un simple gagnant/perdant. Ça évite de devoir réparer les données a posteriori quand on branchera l'historique et l'ELO.
 
 ## Roadmap (ordre des prompts à donner à Claude Code)
@@ -70,30 +100,14 @@ Jeu d'échecs classique avec une règle additionnelle :
 1. Modéliser le moteur d'échecs pur en Java 25 (domaine, sans Spring ni réseau)
 2. Modéliser la règle de devinette comme extension du moteur (état du round, résolution)
 3. Architecture applicative Spring Boot (couches, WebSocket vs STOMP, cycle de vie d'une partie)
-4. ✅ Persistance et comptes joueurs (fait) : PostgreSQL (Spring Data JPA, migrations Flyway),
-   comptes joueurs en OAuth uniquement (Google/GitHub), sessions JWT stateless pour les
-   endpoints REST du contexte "Compte joueur". Game/GameAccess sont passés de l'implémentation
-   en mémoire à Postgres (voir `infrastructure/persistence/jpa`) ; le flux WebSocket/
-   `PlayerToken` du contexte "Partie" reste inchangé et non authentifié pour l'instant — le
-   lien compte↔partie (historique) est une fonctionnalité future, pas encore implémentée.
+4. Persistance et comptes joueurs (choix DB, Spring Data, auth simple)
 5. Frontend VueJS 3 (échiquier interactif, client WebSocket, UI de devinette)
 6. Dockerisation (images arm64/multi-arch pour le backend, build Vue servi par nginx, docker-compose)
 7. Déploiement sur le Raspberry Pi (reverse proxy, HTTPS, limites mémoire/CPU, dimensionnement JVM)
 8. Tests et peaufinage (tests unitaires du moteur, tests de la mécanique de devinette, UX)
 
-## Variables d'environnement (depuis l'étape 4)
-
-⚠️ Toutes celles marquées **obligatoire** doivent être définies pour que l'application démarre
-tout court (échec rapide voulu au boot Spring, pas seulement au moment du login) :
-
-- `POSTGRES_USER` / `POSTGRES_PASSWORD` — identifiants Postgres (dev local via `docker-compose.yml`, valeur par défaut `guesschess`/`guesschess`).
-- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — **obligatoire**. App OAuth Google Cloud Console (redirect URI : `http://localhost:8080/login/oauth2/code/google`). Spring Security valide la présence de ces identifiants au démarrage dès que la registration `google` est déclarée dans `application.properties`, même s'ils ne servent qu'au moment du login.
-- `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` — **obligatoire**, même remarque. App OAuth GitHub Developer Settings (redirect URI : `http://localhost:8080/login/oauth2/code/github`).
-- `JWT_SECRET` — **obligatoire**. Secret HMAC pour signer les JWT (≥ 32 octets aléatoires, ex. `openssl rand -base64 32`).
-- `OAUTH_POST_LOGIN_REDIRECT_URI` — URL du frontend vers laquelle rediriger après login, JWT en fragment d'URL (`#token=...`). Défaut : `http://localhost:5173/oauth-callback`.
-
 ## Questions encore ouvertes (à trancher plus tard)
 
 - Mode spectateur
 - Gestion du temps / timer par coup
-- Lien compte joueur ↔ partie (nécessaire pour l'historique de matchs et l'ELO) : pour l'instant les comptes (étape 4) et le flux de jeu (`PlayerToken`) sont deux mécanismes complètement séparés
+- Choix définitif de la base de données
