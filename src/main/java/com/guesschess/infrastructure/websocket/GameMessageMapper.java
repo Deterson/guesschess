@@ -6,13 +6,18 @@ import com.guesschess.domain.board.Board;
 import com.guesschess.domain.board.Position;
 import com.guesschess.domain.game.GameResult;
 import com.guesschess.domain.game.RoundResult;
+import com.guesschess.domain.move.Move;
 import com.guesschess.domain.piece.Color;
 import com.guesschess.domain.piece.Piece;
 import com.guesschess.domain.piece.PieceType;
 import com.guesschess.infrastructure.websocket.dto.GameStateMessage;
+import com.guesschess.infrastructure.websocket.dto.LegalMoveMessage;
+import com.guesschess.infrastructure.websocket.dto.MoveHistoryEntry;
 import com.guesschess.infrastructure.websocket.dto.ResultMessage;
 import com.guesschess.infrastructure.websocket.dto.RoundSummaryMessage;
 import org.springframework.stereotype.Component;
+
+import java.util.List;
 
 /**
  * Traduction entre le protocole fil (chaines algebriques, codes piece) et les types
@@ -28,7 +33,9 @@ public class GameMessageMapper {
                 snapshot.sideToMove().name(),
                 snapshot.status().name(),
                 toResultMessage(snapshot.result()),
-                toRoundSummaryMessage(snapshot.lastRoundResult())
+                toRoundSummaryMessage(snapshot.lastRoundResult()),
+                toLegalMoveMessages(snapshot.legalMoves()),
+                toMoveHistoryEntries(snapshot.moveHistory())
         );
     }
 
@@ -62,6 +69,27 @@ public class GameMessageMapper {
                 roundResult.guessedCorrectly(),
                 roundResult.movePlayed()
         );
+    }
+
+    private List<LegalMoveMessage> toLegalMoveMessages(List<Move> legalMoves) {
+        return legalMoves.stream()
+                .map(move -> new LegalMoveMessage(
+                        move.from().toAlgebraic(),
+                        move.to().toAlgebraic(),
+                        move.promotionType() == null ? null : move.promotionType().name()))
+                .toList();
+    }
+
+    private List<MoveHistoryEntry> toMoveHistoryEntries(List<Move> moveHistory) {
+        return moveHistory.stream()
+                .map(move -> new MoveHistoryEntry(
+                        move.from().toAlgebraic(),
+                        move.to().toAlgebraic(),
+                        toCode(move.movedPiece()),
+                        move.capturedPiece() == null ? null : toCode(move.capturedPiece()),
+                        move.type().name(),
+                        move.promotionType() == null ? null : move.promotionType().name()))
+                .toList();
     }
 
     private String[][] toBoardCells(Board board) {

@@ -1,0 +1,18 @@
+ne rien implémenter dans ce TODO à moins que cela ait été explicitement demandé
+
+
+--- règles générales
+
+--- FRONT
+- les pièces sont moches, en choisir des nouvelles plus jolies et minimalistes
+- quand on clique sur une pièce, des points verts apparaissent pour les coups possible. Si le coup possible est de manger une pièce, ne pas mettre un point, mais un cadre vert autour de la case à manger
+- pouvoir dragger les pièces
+- rajouter du son
+
+
+
+étapes optionnelles:
+- un mode tutoriel sur le front
+- un ordinateur qui joue (l'entraîner ? avec des noeuds etc ? ou un stockfish ?)
+
+

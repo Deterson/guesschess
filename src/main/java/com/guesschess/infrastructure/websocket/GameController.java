@@ -8,10 +8,12 @@ import com.guesschess.application.NoSuchLegalMoveException;
 import com.guesschess.application.PlayerToken;
 import com.guesschess.application.UnknownPlayerTokenException;
 import com.guesschess.application.WrongTurnException;
+import com.guesschess.domain.game.GameId;
 import com.guesschess.domain.game.GameNotFoundException;
 import com.guesschess.infrastructure.websocket.dto.AckMessage;
 import com.guesschess.infrastructure.websocket.dto.CreateGameResponse;
 import com.guesschess.infrastructure.websocket.dto.ErrorMessage;
+import com.guesschess.infrastructure.websocket.dto.GameStateMessage;
 import com.guesschess.infrastructure.websocket.dto.SubmitGuessRequest;
 import com.guesschess.infrastructure.websocket.dto.SubmitMoveRequest;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
@@ -56,6 +58,13 @@ public class GameController {
                 created.gameId().toString(),
                 created.whiteToken().toString(),
                 created.blackToken().toString());
+    }
+
+    @MessageMapping("/games/{gameId}/view")
+    @SendToUser("/queue/game.state")
+    public GameStateMessage viewGame(@DestinationVariable String gameId) {
+        GameSnapshot snapshot = gameLifecycleService.viewGame(GameId.fromString(gameId));
+        return mapper.toGameStateMessage(snapshot);
     }
 
     @MessageMapping("/games/{gameId}/move")

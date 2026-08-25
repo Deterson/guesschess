@@ -30,7 +30,7 @@ Jeu d'échecs classique avec une règle additionnelle :
 - Chaque "round" (coup réel + devinette) est modélisé comme un petit état à deux soumissions cachées, résolu seulement quand les deux sont arrivées. Le serveur ne doit jamais exposer une soumission avant que les deux soient là (anti-triche).
 - Cet état de round doit être **persisté en base**, pas seulement gardé en mémoire, pour fonctionner aussi bien en temps réel qu'en asynchrone (un joueur peut soumettre puis se déconnecter, l'autre soumet plus tard).
 - Java 25 + threads virtuels pour bien encaisser les connexions WebSocket concurrentes sans trop peser sur les 4 Go du Pi.
-- Base de données : privilégier une option légère (SQLite ou Postgres en conteneur léger) — pas encore tranché.
+- Base de données : PostgreSQL en conteneur léger (tranché à l'étape 4), cohérent avec le docker-compose complet prévu à l'étape 6. Migrations gérées par Flyway.
 - **Architecture : Domain-Driven Design (DDD)**, cohérente avec le monolithe modulaire à trois couches ci-dessus :
   - **Bounded contexts** : séparer le contexte "Partie" (moteur d'échecs + mécanique de devinette) du contexte "Compte joueur" (identité, auth, OAuth) — ils n'ont pas de raison de partager leur modèle.
   - **Aggregate root** : `Game` encapsule tout l'état d'une partie (plateau, historique des coups, round en cours, résultat) et garantit ses invariants.
@@ -92,7 +92,7 @@ Jeu d'échecs classique avec une règle additionnelle :
 
 ### ⚠️ Points de vigilance pour la v1 (à cause de ces fonctionnalités futures)
 
-- **Authentification** : décider *maintenant* le principe (OAuth, email/mot de passe, ou les deux) avant l'étape 4, car ce choix façonne directement le modèle `User` et la config Spring Security. Le redéfinir après coup implique de retoucher le modèle utilisateur et tout ce qui en dépend (sessions, permissions...).
+- **Authentification** : tranché à l'étape 4 — OAuth uniquement (Google/GitHub), pas d'email/mot de passe. Sessions JWT stateless (pas de session stockée côté serveur au-delà de la poignée de main OAuth2 elle-même).
 - **Résultat d'une partie** : structurer dès l'étape 2/3 l'agrégat `Game` pour qu'il enregistre le résultat **et sa cause** (mat classique, abandon, roi capturé via devinette...) plutôt qu'un simple gagnant/perdant. Ça évite de devoir réparer les données a posteriori quand on branchera l'historique et l'ELO.
 
 ## Roadmap (ordre des prompts à donner à Claude Code)
@@ -100,14 +100,30 @@ Jeu d'échecs classique avec une règle additionnelle :
 1. Modéliser le moteur d'échecs pur en Java 25 (domaine, sans Spring ni réseau)
 2. Modéliser la règle de devinette comme extension du moteur (état du round, résolution)
 3. Architecture applicative Spring Boot (couches, WebSocket vs STOMP, cycle de vie d'une partie)
-4. Persistance et comptes joueurs (choix DB, Spring Data, auth simple)
+4. ✅ Persistance et comptes joueurs (fait) : PostgreSQL (Spring Data JPA, migrations Flyway),
+   comptes joueurs en OAuth uniquement (Google/GitHub), sessions JWT stateless pour les
+   endpoints REST du contexte "Compte joueur". Game/GameAccess sont passés de l'implémentation
+   en mémoire à Postgres (voir `infrastructure/persistence/jpa`) ; le flux WebSocket/
+   `PlayerToken` du contexte "Partie" reste inchangé et non authentifié pour l'instant — le
+   lien compte↔partie (historique) est une fonctionnalité future, pas encore implémentée.
 5. Frontend VueJS 3 (échiquier interactif, client WebSocket, UI de devinette)
 6. Dockerisation (images arm64/multi-arch pour le backend, build Vue servi par nginx, docker-compose)
 7. Déploiement sur le Raspberry Pi (reverse proxy, HTTPS, limites mémoire/CPU, dimensionnement JVM)
 8. Tests et peaufinage (tests unitaires du moteur, tests de la mécanique de devinette, UX)
 
+## Variables d'environnement (depuis l'étape 4)
+
+⚠️ Toutes celles marquées **obligatoire** doivent être définies pour que l'application démarre
+tout court (échec rapide voulu au boot Spring, pas seulement au moment du login) :
+
+- `POSTGRES_USER` / `POSTGRES_PASSWORD` — identifiants Postgres (dev local via `docker-compose.yml`, valeur par défaut `guesschess`/`guesschess`).
+- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` — **obligatoire**. App OAuth Google Cloud Console (redirect URI : `http://localhost:8080/login/oauth2/code/google`). Spring Security valide la présence de ces identifiants au démarrage dès que la registration `google` est déclarée dans `application.properties`, même s'ils ne servent qu'au moment du login.
+- `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` — **obligatoire**, même remarque. App OAuth GitHub Developer Settings (redirect URI : `http://localhost:8080/login/oauth2/code/github`).
+- `JWT_SECRET` — **obligatoire**. Secret HMAC pour signer les JWT (≥ 32 octets aléatoires, ex. `openssl rand -base64 32`).
+- `OAUTH_POST_LOGIN_REDIRECT_URI` — URL du frontend vers laquelle rediriger après login, JWT en fragment d'URL (`#token=...`). Défaut : `http://localhost:5173/oauth-callback`.
+
 ## Questions encore ouvertes (à trancher plus tard)
 
 - Mode spectateur
 - Gestion du temps / timer par coup
-- Choix définitif de la base de données
+- Lien compte joueur ↔ partie (nécessaire pour l'historique de matchs et l'ELO) : pour l'instant les comptes (étape 4) et le flux de jeu (`PlayerToken`) sont deux mécanismes complètement séparés

@@ -55,6 +55,49 @@ class StompFlowIntegrationTest {
     }
 
     @Test
+    void viewGameReturnsInitialStateWithLegalMovesAndEmptyHistory() throws Exception {
+        StompSession session = connect();
+        CreateGameResponse game = createGame(session);
+
+        BlockingQueue<GameStateMessage> viewResponses = new LinkedBlockingQueue<>();
+        session.subscribe("/user/queue/game.state", handlerFor(GameStateMessage.class, viewResponses));
+        session.send("/app/games/" + game.gameId() + "/view", "");
+
+        GameStateMessage state = viewResponses.poll(5, TimeUnit.SECONDS);
+
+        assertNotNull(state);
+        assertEquals("WHITE", state.sideToMove());
+        assertEquals(20, state.legalMoves().size());
+        assertTrue(state.moveHistory().isEmpty());
+    }
+
+    @Test
+    void resolvedRoundAppendsToMoveHistoryAndUpdatesLegalMoves() throws Exception {
+        StompSession session = connect();
+        CreateGameResponse game = createGame(session);
+
+        BlockingQueue<GameStateMessage> broadcasts = new LinkedBlockingQueue<>();
+        session.subscribe("/topic/games/" + game.gameId(), handlerFor(GameStateMessage.class, broadcasts));
+        BlockingQueue<AckMessage> guessAcks = new LinkedBlockingQueue<>();
+        session.subscribe("/user/queue/guess.ack", handlerFor(AckMessage.class, guessAcks));
+
+        session.send("/app/games/" + game.gameId() + "/guess",
+                new SubmitGuessRequest(game.blackToken(), "d2", "d4", null));
+        assertNotNull(guessAcks.poll(5, TimeUnit.SECONDS));
+
+        session.send("/app/games/" + game.gameId() + "/move",
+                new SubmitMoveRequest(game.whiteToken(), "e2", "e4", null));
+        GameStateMessage state = broadcasts.poll(5, TimeUnit.SECONDS);
+
+        assertNotNull(state);
+        assertEquals(1, state.moveHistory().size());
+        assertEquals("e2", state.moveHistory().get(0).from());
+        assertEquals("e4", state.moveHistory().get(0).to());
+        assertEquals("wP", state.moveHistory().get(0).piece());
+        assertFalse(state.legalMoves().isEmpty());
+    }
+
+    @Test
     void correctGuessCancelsTheMoveAndBroadcastsTheResolutionPublicly() throws Exception {
         StompSession session = connect();
         CreateGameResponse game = createGame(session);
