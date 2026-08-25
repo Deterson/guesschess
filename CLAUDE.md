@@ -30,7 +30,7 @@ Jeu d'échecs classique avec une règle additionnelle :
 - Chaque "round" (coup réel + devinette) est modélisé comme un petit état à deux soumissions cachées, résolu seulement quand les deux sont arrivées. Le serveur ne doit jamais exposer une soumission avant que les deux soient là (anti-triche).
 - Cet état de round doit être **persisté en base**, pas seulement gardé en mémoire, pour fonctionner aussi bien en temps réel qu'en asynchrone (un joueur peut soumettre puis se déconnecter, l'autre soumet plus tard).
 - Java 25 + threads virtuels pour bien encaisser les connexions WebSocket concurrentes sans trop peser sur les 4 Go du Pi.
-- Base de données : PostgreSQL en conteneur léger (tranché à l'étape 4), cohérent avec le docker-compose complet prévu à l'étape 6. Migrations gérées par Flyway.
+- Base de données : PostgreSQL en conteneur léger (tranché à l'étape 4), cohérent avec le docker-compose complet prévu à l'étape 9. Migrations gérées par Flyway.
 - **Architecture : Domain-Driven Design (DDD)**, cohérente avec le monolithe modulaire à trois couches ci-dessus :
   - **Bounded contexts** : séparer le contexte "Partie" (moteur d'échecs + mécanique de devinette) du contexte "Compte joueur" (identité, auth, OAuth) — ils n'ont pas de raison de partager leur modèle.
   - **Aggregate root** : `Game` encapsule tout l'état d'une partie (plateau, historique des coups, round en cours, résultat) et garantit ses invariants.
@@ -60,7 +60,7 @@ Jeu d'échecs classique avec une règle additionnelle :
 
 - Une seule instance Spring Boot + threads virtuels tient bien plusieurs milliers de connexions WebSocket ouvertes — le débit de messages n'est pas le problème (voir section Communication frontend-backend), la mémoire par connexion l'est davantage.
 - **Si un jour plusieurs instances backend sont nécessaires** (Pi seul insuffisant, ou migration cloud) : le vrai défi du WebSocket multi-instance, c'est qu'un message pour le joueur B doit atteindre l'instance qui tient *sa* connexion, potentiellement différente de celle de A. Deux options : sessions collantes (sticky sessions, simple mais rigide) ou un bus pub/sub entre instances (Redis pub/sub par exemple) pour diffuser les événements de résolution de round. L'état des rounds déjà persisté en base facilite cette transition, car les instances restent sans état applicatif.
-- Le reverse proxy (étape 7 de la roadmap) doit être configuré spécifiquement pour le WebSocket : upgrade de connexion géré correctement, timeouts assez longs pour ne pas couper des connexions ouvertes mais inactives.
+- Le reverse proxy (étape 10 de la roadmap) doit être configuré spécifiquement pour le WebSocket : upgrade de connexion géré correctement, timeouts assez longs pour ne pas couper des connexions ouvertes mais inactives.
 - Prévoir une limite de connexions concurrentes et une dégradation propre (plutôt qu'un crash) si un pic dépasse la capacité.
 - Limitation de débit (rate limiting) par joueur/IP sur les soumissions, pour se protéger d'un client abusif ou buggé plutôt que de faire confiance à la fréquence naturelle du jeu.
 
@@ -105,11 +105,43 @@ Jeu d'échecs classique avec une règle additionnelle :
    endpoints REST du contexte "Compte joueur". Game/GameAccess sont passés de l'implémentation
    en mémoire à Postgres (voir `infrastructure/persistence/jpa`) ; le flux WebSocket/
    `PlayerToken` du contexte "Partie" reste inchangé et non authentifié pour l'instant — le
-   lien compte↔partie (historique) est une fonctionnalité future, pas encore implémentée.
-5. Frontend VueJS 3 (échiquier interactif, client WebSocket, UI de devinette)
-6. Dockerisation (images arm64/multi-arch pour le backend, build Vue servi par nginx, docker-compose)
-7. Déploiement sur le Raspberry Pi (reverse proxy, HTTPS, limites mémoire/CPU, dimensionnement JVM)
-8. Tests et peaufinage (tests unitaires du moteur, tests de la mécanique de devinette, UX)
+   lien compte↔partie (historique) est prévu à l'étape 6 (voir section dédiée plus bas).
+5. ✅ Frontend VueJS 3 (échiquier interactif, client WebSocket, UI de devinette) (fait)
+6. Compte joueur lié à une partie — lier immuablement chaque partie à un compte ou à une identité
+   anonyme persistante, tout en gardant le jeu en anonyme possible (voir section dédiée plus bas)
+7. Page d'accueil — création de partie (choix de couleur, lien d'invitation à usage unique, modale
+   connexion/anonyme) (voir section dédiée plus bas)
+8. Page de profil (historique des parties, nom de joueur, etc.)
+9. Dockerisation (images arm64/multi-arch pour le backend, build Vue servi par nginx, docker-compose)
+10. Déploiement sur le Raspberry Pi (reverse proxy, HTTPS, limites mémoire/CPU, dimensionnement JVM)
+11. Tests et peaufinage (tests unitaires du moteur, tests de la mécanique de devinette, UX)
+
+## Liaison compte/session ↔ partie (étapes 6-7)
+
+- **Lien immuable** : chaque partie référence, par couleur, soit un compte (`userId`), soit une
+  identité de session anonyme — jamais les deux, et jamais modifié une fois posé. Pas de
+  "changement de joueur" en cours de partie.
+- **Identité anonyme** : cookie **HttpOnly signé côté serveur** (pas de JWT en localStorage, pour
+  éviter l'exposition XSS), longue durée (~1 an), régénéré uniquement si absent. Réutilisée pour
+  toutes les parties jouées depuis le même navigateur, ce qui permet un mini-historique pour les
+  joueurs non connectés (utile pour la page de profil, étape 8) sans nécessiter de compte. Fusion
+  ultérieure anonyme → compte : hors scope v1, à trancher plus tard si besoin.
+- **Page d'accueil (étape 7)** : choix de couleur à la création (blancs / noirs / aléatoire). Que
+  le créateur soit déjà connecté ou non, il passe par la **même modale** "se connecter / jouer en
+  anonyme" que l'adversaire avant que la partie soit effectivement créée et son lien posé —
+  comportement symétrique entre les deux joueurs.
+- Une fois la partie créée : redirection du créateur vers l'URL de sa partie, et popup affichant
+  le **lien unique** à envoyer à l'adversaire.
+- **Lien d'invitation à usage unique** : dès qu'un adversaire (compte ou anonyme) s'est lié à la
+  partie via ce lien, il devient invalide pour toute autre tentative de liaison (erreur claire,
+  pas de second joueur possible sur le même slot).
+- **Flux de l'adversaire cliquant sur le lien** : s'il est déjà connecté, son compte est
+  immédiatement et immuablement lié à la partie (pas de modale). Sinon, modale "se connecter" ou
+  "jouer en anonyme" ; le choix qui en résulte (compte après OAuth, ou identité de session
+  anonyme) est immédiatement et immuablement lié à la partie.
+- **Bounded context** : le lien lui-même (partie ↔ compte/anonyme) vit côté "Partie" (le `Game`
+  référence un identifiant de joueur), la résolution de cet identifiant (qui est ce compte, ou
+  gestion du cookie anonyme) reste du ressort du contexte "Compte joueur".
 
 ## Variables d'environnement (depuis l'étape 4)
 
@@ -126,4 +158,6 @@ tout court (échec rapide voulu au boot Spring, pas seulement au moment du login
 
 - Mode spectateur
 - Gestion du temps / timer par coup
-- Lien compte joueur ↔ partie (nécessaire pour l'historique de matchs et l'ELO) : pour l'instant les comptes (étape 4) et le flux de jeu (`PlayerToken`) sont deux mécanismes complètement séparés
+- Fusion d'une identité anonyme vers un compte après coup (ex. un joueur qui a joué en anonyme se
+  connecte ensuite et voudrait récupérer son historique) — hors scope v1 (voir section "Liaison
+  compte/session ↔ partie")
