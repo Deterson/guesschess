@@ -228,6 +228,36 @@ class GameGuessingTest {
         assertTrue(game.isInCheck());
     }
 
+    @Test
+    void guessmateVariantEndsTheGameInstantlyWhenTheCheckEscapeIsGuessedCorrectly() {
+        Game game = Game.fromPosition(checkWithSingleEscapePosition(), GameVariant.GUESSMATE);
+        Move escape = findMove(game.legalMoves(), "a1", "b1");
+        game.submitGuess(escape);
+
+        RoundResult result = game.submitMove(escape).orElseThrow();
+
+        assertFalse(result.movePlayed());
+        assertTrue(result.guessedCorrectly());
+        assertEquals(GameStatus.FINISHED, game.status());
+        assertEquals(GameResultCause.CHECK_PARRY_GUESSED, game.result().cause());
+        assertEquals(Color.BLACK, game.result().winner());
+        assertEquals(Piece.of(PieceType.KING, Color.WHITE), game.board().pieceAt(Position.fromAlgebraic("a1")));
+    }
+
+    @Test
+    void guessmateVariantBehavesLikeGuesschessWhenTheCorrectGuessIsNotAboutParryingCheck() {
+        Game game = Game.newGame(GameVariant.GUESSMATE);
+        Move e4 = findMove(game.legalMoves(), "e2", "e4");
+        game.submitGuess(e4);
+
+        RoundResult result = game.submitMove(e4).orElseThrow();
+
+        assertFalse(result.movePlayed());
+        assertTrue(result.guessedCorrectly());
+        assertEquals(GameStatus.ONGOING, game.status());
+        assertEquals(Color.BLACK, game.sideToMove());
+    }
+
     /**
      * Roi blanc en a1, en echec par la tour noire (colonne a), avec b2 tenu par le
      * cavalier noir : le seul coup legal blanc est Ra1-b1.

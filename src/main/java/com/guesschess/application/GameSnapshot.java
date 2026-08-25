@@ -5,6 +5,7 @@ import com.guesschess.domain.game.Game;
 import com.guesschess.domain.game.GameId;
 import com.guesschess.domain.game.GameResult;
 import com.guesschess.domain.game.GameStatus;
+import com.guesschess.domain.game.GameVariant;
 import com.guesschess.domain.game.RoundResult;
 import com.guesschess.domain.move.Move;
 import com.guesschess.domain.piece.Color;
@@ -22,6 +23,7 @@ import java.util.List;
  */
 public record GameSnapshot(
         GameId id,
+        GameVariant variant,
         Board board,
         Color sideToMove,
         GameStatus status,
@@ -34,6 +36,7 @@ public record GameSnapshot(
     public static GameSnapshot of(Game game) {
         return new GameSnapshot(
                 game.id(),
+                game.variant(),
                 game.board(),
                 game.sideToMove(),
                 game.status(),

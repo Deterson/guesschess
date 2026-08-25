@@ -29,6 +29,7 @@ public class GameMessageMapper {
     public GameStateMessage toGameStateMessage(GameSnapshot snapshot) {
         return new GameStateMessage(
                 snapshot.id().toString(),
+                snapshot.variant().name(),
                 toBoardCells(snapshot.board()),
                 snapshot.sideToMove().name(),
                 snapshot.status().name(),

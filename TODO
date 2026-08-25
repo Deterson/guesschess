@@ -2,8 +2,10 @@ ne rien implémenter dans ce TODO à moins que cela ait été explicitement dema
 
 
 --- règles générales
+- six guess repetition (si 6 guess d'affilé sont effectués, la partie termine en une égalité)
 
 --- FRONT
+- l'historique doit être de la forme "Blancs <coup joué> (<coup deviné>)" par exemple "Blancs e2 (e4)". Si le coup est deviné "Blancs (e2!)"
 - les pièces sont moches, en choisir des nouvelles plus jolies et minimalistes
 - quand on clique sur une pièce, des points verts apparaissent pour les coups possible. Si le coup possible est de manger une pièce, ne pas mettre un point, mais un cadre vert autour de la case à manger
 - pouvoir dragger les pièces

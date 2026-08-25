@@ -18,11 +18,11 @@ export const useGameStore = defineStore('game', () => {
 
   let subscriptions = []
 
-  async function createGame() {
+  async function createGame(variant = 'GUESSCHESS') {
     await connect()
     return new Promise((resolve) => {
       subscribe('/user/queue/games.created', (payload) => resolve(payload))
-      publish('/app/games.create')
+      publish('/app/games.create', { variant })
     })
   }
 

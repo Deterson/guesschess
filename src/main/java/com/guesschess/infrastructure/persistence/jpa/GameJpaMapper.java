@@ -31,6 +31,7 @@ class GameJpaMapper {
         Instant now = Instant.now();
         return new GameEntity(
                 memento.id().value(),
+                memento.variant(),
                 memento.status(),
                 memento.result() != null ? memento.result().winner() : null,
                 memento.result() != null ? memento.result().cause() : null,
@@ -63,6 +64,7 @@ class GameJpaMapper {
 
         Game.Memento memento = new Game.Memento(
                 new GameId(entity.getId()),
+                entity.getVariant(),
                 toBoard(state.board()),
                 positionHistory,
                 moveHistory,

@@ -26,11 +26,16 @@ import java.util.Optional;
  * correcte -> coup annule, le trait passe au devineur sans qu'aucune piece ne bouge ;
  * devinette fausse ou absente -> coup joue normalement.
  *
- * Cas particulier : si le coup annule etait la parade a un echec, le roi reste en
- * echec et le trait passe quand meme au devineur, qui a alors normalement acces au
- * coup capturant ce roi parmi ses coups legaux. C'est un coup comme un autre : rien
- * n'oblige le devineur a le jouer, et lui-meme peut se faire deviner. Si personne ne
- * capture jamais, la regle de repetition finit par forcer la nulle.
+ * Cas particulier (variante GUESSCHESS, la regle de base - voir GameVariant) : si le
+ * coup annule etait la parade a un echec, le roi reste en echec et le trait passe
+ * quand meme au devineur, qui a alors normalement acces au coup capturant ce roi
+ * parmi ses coups legaux. C'est un coup comme un autre : rien n'oblige le devineur a
+ * le jouer, et lui-meme peut se faire deviner. Si personne ne capture jamais, la
+ * regle de repetition finit par forcer la nulle.
+ *
+ * Variante GUESSMATE : dans ce meme cas particulier (devinette correcte du coup qui
+ * parait un echec), la partie se termine immediatement, victoire du devineur, plutot
+ * que de simplement annuler le coup et attendre une capture ulterieure du roi.
  */
 public final class Game {
 
@@ -38,6 +43,7 @@ public final class Game {
     private static final int REPETITION_LIMIT = 3;
 
     private final GameId id;
+    private final GameVariant variant;
     private Board board;
     private final List<Board> positionHistory = new ArrayList<>();
     private final List<Move> moveHistory = new ArrayList<>();
@@ -48,16 +54,18 @@ public final class Game {
     private Move pendingGuess;
     private RoundResult lastRoundResult;
 
-    private Game(GameId id, Board initialBoard) {
+    private Game(GameId id, Board initialBoard, GameVariant variant) {
         this.id = id;
         this.board = initialBoard;
+        this.variant = variant;
         this.positionHistory.add(initialBoard);
     }
 
-    private Game(GameId id, Board board, List<Board> positionHistory, List<Move> moveHistory,
+    private Game(GameId id, GameVariant variant, Board board, List<Board> positionHistory, List<Move> moveHistory,
                  GameStatus status, GameResult result, Move pendingMove, boolean guessSubmitted,
                  Move pendingGuess, RoundResult lastRoundResult) {
         this.id = id;
+        this.variant = variant;
         this.board = board;
         this.positionHistory.addAll(positionHistory);
         this.moveHistory.addAll(moveHistory);
@@ -70,19 +78,35 @@ public final class Game {
     }
 
     public static Game newGame() {
-        return newGame(GameId.random());
+        return newGame(GameId.random(), GameVariant.GUESSCHESS);
+    }
+
+    public static Game newGame(GameVariant variant) {
+        return newGame(GameId.random(), variant);
     }
 
     public static Game newGame(GameId id) {
-        return new Game(id, Board.initial());
+        return newGame(id, GameVariant.GUESSCHESS);
+    }
+
+    public static Game newGame(GameId id, GameVariant variant) {
+        return new Game(id, Board.initial(), variant);
     }
 
     public static Game fromPosition(Board board) {
-        return fromPosition(GameId.random(), board);
+        return fromPosition(GameId.random(), board, GameVariant.GUESSCHESS);
+    }
+
+    public static Game fromPosition(Board board, GameVariant variant) {
+        return fromPosition(GameId.random(), board, variant);
     }
 
     public static Game fromPosition(GameId id, Board board) {
-        return new Game(id, board);
+        return fromPosition(id, board, GameVariant.GUESSCHESS);
+    }
+
+    public static Game fromPosition(GameId id, Board board, GameVariant variant) {
+        return new Game(id, board, variant);
     }
 
     /**
@@ -90,13 +114,17 @@ public final class Game {
      * ne pas utiliser dans le flux de jeu normal, qui passe par newGame/fromPosition).
      */
     public static Game fromMemento(Memento memento) {
-        return new Game(memento.id(), memento.board(), memento.positionHistory(), memento.moveHistory(),
+        return new Game(memento.id(), memento.variant(), memento.board(), memento.positionHistory(), memento.moveHistory(),
                 memento.status(), memento.result(), memento.pendingMove(), memento.guessSubmitted(),
                 memento.pendingGuess(), memento.lastRoundResult());
     }
 
     public GameId id() {
         return id;
+    }
+
+    public GameVariant variant() {
+        return variant;
     }
 
     public Board board() {
@@ -189,6 +217,7 @@ public final class Game {
         Color mover = sideToMove();
         Color guesser = mover.opposite();
         boolean guessedCorrectly = guess != null && guess.equals(actualMove);
+        boolean moverWasInCheck = CheckDetector.isInCheck(board, mover);
 
         this.pendingMove = null;
         this.guessSubmitted = false;
@@ -196,7 +225,11 @@ public final class Game {
 
         RoundResult roundResult;
         if (guessedCorrectly) {
-            cancelRound();
+            if (variant == GameVariant.GUESSMATE && moverWasInCheck) {
+                finish(GameResult.win(guesser, GameResultCause.CHECK_PARRY_GUESSED));
+            } else {
+                cancelRound();
+            }
             roundResult = RoundResult.cancelled(mover, guesser, actualMove, guess);
         } else {
             applyRealMove(actualMove);
@@ -276,12 +309,13 @@ public final class Game {
      * volontairement la devinette en attente).
      */
     public Memento toMemento() {
-        return new Memento(id, board, List.copyOf(positionHistory), List.copyOf(moveHistory),
+        return new Memento(id, variant, board, List.copyOf(positionHistory), List.copyOf(moveHistory),
                 status, result, pendingMove, guessSubmitted, pendingGuess, lastRoundResult);
     }
 
     public record Memento(
             GameId id,
+            GameVariant variant,
             Board board,
             List<Board> positionHistory,
             List<Move> moveHistory,

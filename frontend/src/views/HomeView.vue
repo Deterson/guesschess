@@ -5,11 +5,13 @@ import { useGameStore } from '../stores/game'
 const gameStore = useGameStore()
 const creating = ref(false)
 const links = ref(null)
+const guessmate = ref(false)
 
 async function createGame() {
   creating.value = true
   try {
-    const created = await gameStore.createGame()
+    const variant = guessmate.value ? 'GUESSMATE' : 'GUESSCHESS'
+    const created = await gameStore.createGame(variant)
     const path = `/game/${created.gameId}`
     const base = `${window.location.origin}${path}`
     links.value = {
@@ -34,13 +36,25 @@ async function copy(text) {
       jouer.
     </p>
 
+    <label class="flex items-center gap-3 rounded-lg bg-stone-800 px-4 py-3 text-sm">
+      <input type="checkbox" v-model="guessmate" class="h-4 w-4 accent-emerald-600" />
+      <span class="text-left">
+        <span class="font-semibold">Variante Guessmate</span>
+        <br />
+        <span class="text-stone-400">
+          Deviner correctement le coup qui pare un échec met fin à la partie immédiatement, au lieu de simplement
+          annuler le coup.
+        </span>
+      </span>
+    </label>
+
     <button
       type="button"
       class="rounded-lg bg-emerald-600 px-6 py-3 font-semibold hover:bg-emerald-500 disabled:opacity-50"
       :disabled="creating"
       @click="createGame"
     >
-      {{ creating ? 'Création…' : 'Créer une partie' }}
+      {{ creating ? 'Création…' : `Créer une partie${guessmate ? ' (Guessmate)' : ''}` }}
     </button>
 
     <div v-if="links" class="w-full space-y-4 text-left">

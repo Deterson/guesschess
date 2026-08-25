@@ -2,6 +2,7 @@ package com.guesschess.infrastructure.persistence.jpa;
 
 import com.guesschess.domain.game.GameResultCause;
 import com.guesschess.domain.game.GameStatus;
+import com.guesschess.domain.game.GameVariant;
 import com.guesschess.domain.piece.Color;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
@@ -27,6 +28,10 @@ class GameEntity {
 
     @Id
     private UUID id;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private GameVariant variant;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -59,9 +64,10 @@ class GameEntity {
         // JPA
     }
 
-    GameEntity(UUID id, GameStatus status, Color resultWinner, GameResultCause resultCause,
+    GameEntity(UUID id, GameVariant variant, GameStatus status, Color resultWinner, GameResultCause resultCause,
                Color sideToMove, GameStateJson state, Instant createdAt, Instant updatedAt) {
         this.id = id;
+        this.variant = variant;
         this.status = status;
         this.resultWinner = resultWinner;
         this.resultCause = resultCause;
@@ -73,6 +79,10 @@ class GameEntity {
 
     UUID getId() {
         return id;
+    }
+
+    GameVariant getVariant() {
+        return variant;
     }
 
     GameStatus getStatus() {

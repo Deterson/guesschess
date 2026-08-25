@@ -12,6 +12,7 @@ import java.util.List;
  */
 public record GameStateMessage(
         String gameId,
+        String variant,
         String[][] board,
         String sideToMove,
         String status,

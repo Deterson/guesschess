@@ -3,6 +3,7 @@ package com.guesschess.domain.game;
 public enum GameResultCause {
     CHECKMATE,
     KING_CAPTURED,
+    CHECK_PARRY_GUESSED,
     STALEMATE,
     DRAW_FIFTY_MOVE_RULE,
     DRAW_THREEFOLD_REPETITION,

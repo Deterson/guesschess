@@ -3,6 +3,7 @@ package com.guesschess.application;
 import com.guesschess.domain.game.Game;
 import com.guesschess.domain.game.GameId;
 import com.guesschess.domain.game.GameRepository;
+import com.guesschess.domain.game.GameVariant;
 import com.guesschess.domain.move.Move;
 import com.guesschess.domain.piece.Color;
 import org.springframework.stereotype.Service;
@@ -26,14 +27,18 @@ public class GameLifecycleService {
     }
 
     public CreatedGame createGame() {
-        Game game = Game.newGame();
+        return createGame(GameVariant.GUESSCHESS);
+    }
+
+    public CreatedGame createGame(GameVariant variant) {
+        Game game = Game.newGame(variant);
         gameRepository.insert(game);
 
         PlayerToken whiteToken = PlayerToken.random();
         PlayerToken blackToken = PlayerToken.random();
         gameAccessRepository.save(new GameAccess(game.id(), whiteToken, blackToken));
 
-        return new CreatedGame(game.id(), whiteToken, blackToken);
+        return new CreatedGame(game.id(), whiteToken, blackToken, variant);
     }
 
     /**

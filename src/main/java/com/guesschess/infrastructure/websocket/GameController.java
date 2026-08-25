@@ -10,7 +10,9 @@ import com.guesschess.application.UnknownPlayerTokenException;
 import com.guesschess.application.WrongTurnException;
 import com.guesschess.domain.game.GameId;
 import com.guesschess.domain.game.GameNotFoundException;
+import com.guesschess.domain.game.GameVariant;
 import com.guesschess.infrastructure.websocket.dto.AckMessage;
+import com.guesschess.infrastructure.websocket.dto.CreateGameRequest;
 import com.guesschess.infrastructure.websocket.dto.CreateGameResponse;
 import com.guesschess.infrastructure.websocket.dto.ErrorMessage;
 import com.guesschess.infrastructure.websocket.dto.GameStateMessage;
@@ -52,12 +54,16 @@ public class GameController {
 
     @MessageMapping("/games.create")
     @SendToUser("/queue/games.created")
-    public CreateGameResponse createGame() {
-        CreatedGame created = gameLifecycleService.createGame();
+    public CreateGameResponse createGame(@Payload(required = false) CreateGameRequest request) {
+        GameVariant variant = request == null || request.variant() == null
+                ? GameVariant.GUESSCHESS
+                : GameVariant.valueOf(request.variant());
+        CreatedGame created = gameLifecycleService.createGame(variant);
         return new CreateGameResponse(
                 created.gameId().toString(),
                 created.whiteToken().toString(),
-                created.blackToken().toString());
+                created.blackToken().toString(),
+                created.variant().name());
     }
 
     @MessageMapping("/games/{gameId}/view")
