@@ -18,14 +18,6 @@ export const useGameStore = defineStore('game', () => {
 
   let subscriptions = []
 
-  async function createGame(variant = 'GUESSCHESS') {
-    await connect()
-    return new Promise((resolve) => {
-      subscribe('/user/queue/games.created', (payload) => resolve(payload))
-      publish('/app/games.create', { variant })
-    })
-  }
-
   async function joinGame({ gameId: id, token: playerToken, color }) {
     subscriptions.forEach((sub) => sub.unsubscribe())
     subscriptions = []
@@ -83,7 +75,6 @@ export const useGameStore = defineStore('game', () => {
     state,
     error,
     pendingSubmission,
-    createGame,
     joinGame,
     submitMove,
     submitGuess,

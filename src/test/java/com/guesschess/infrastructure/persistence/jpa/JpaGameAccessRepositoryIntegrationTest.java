@@ -69,8 +69,9 @@ class JpaGameAccessRepositoryIntegrationTest {
         gameAccessRepository.save(new GameAccess(game.id(), PlayerToken.random(), PlayerToken.random()));
         PlayerRef whiteRef = new PlayerRef.Account(UserId.random());
 
-        gameAccessRepository.linkPlayer(game.id(), Color.WHITE, whiteRef);
+        PlayerRef bound = gameAccessRepository.linkPlayer(game.id(), Color.WHITE, whiteRef);
 
+        assertEquals(whiteRef, bound);
         GameAccess reloaded = gameAccessRepository.findByGameId(game.id()).orElseThrow();
         assertEquals(whiteRef, reloaded.playerOf(Color.WHITE));
         assertNull(reloaded.playerOf(Color.BLACK));
@@ -85,8 +86,9 @@ class JpaGameAccessRepositoryIntegrationTest {
         PlayerRef secondRef = new PlayerRef.Account(UserId.random());
 
         gameAccessRepository.linkPlayer(game.id(), Color.BLACK, firstRef);
-        gameAccessRepository.linkPlayer(game.id(), Color.BLACK, secondRef);
+        PlayerRef bound = gameAccessRepository.linkPlayer(game.id(), Color.BLACK, secondRef);
 
+        assertEquals(firstRef, bound);
         GameAccess reloaded = gameAccessRepository.findByGameId(game.id()).orElseThrow();
         assertEquals(firstRef, reloaded.playerOf(Color.BLACK));
     }

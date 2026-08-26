@@ -1,30 +1,46 @@
 <script setup>
 import { ref } from 'vue'
-import { useGameStore } from '../stores/game'
+import { useRouter } from 'vue-router'
+import { createGame } from '../services/api'
+import AuthModal from '../components/AuthModal.vue'
 
-const gameStore = useGameStore()
+const router = useRouter()
 const creating = ref(false)
-const links = ref(null)
+const showModal = ref(false)
+const error = ref(null)
 const guessmate = ref(false)
+const color = ref('RANDOM')
 
-async function createGame() {
+function openModal() {
+  error.value = null
+  showModal.value = true
+}
+
+async function create(authToken) {
+  showModal.value = false
   creating.value = true
+  error.value = null
   try {
     const variant = guessmate.value ? 'GUESSMATE' : 'GUESSCHESS'
-    const created = await gameStore.createGame(variant)
-    const path = `/game/${created.gameId}`
-    const base = `${window.location.origin}${path}`
-    links.value = {
-      white: { url: `${base}?token=${created.whiteToken}&color=white`, path: `${path}?token=${created.whiteToken}&color=white` },
-      black: { url: `${base}?token=${created.blackToken}&color=black`, path: `${path}?token=${created.blackToken}&color=black` },
-    }
+    const created = await createGame(variant, color.value, authToken)
+    router.push({
+      path: `/game/${created.gameId}`,
+      query: {
+        token: created.creatorToken,
+        color: created.creatorColor.toLowerCase(),
+        inviteToken: created.opponentToken,
+        inviteColor: created.opponentColor.toLowerCase(),
+      },
+    })
+  } catch (e) {
+    error.value = e.message
   } finally {
     creating.value = false
   }
 }
 
-async function copy(text) {
-  await navigator.clipboard.writeText(text)
+function continueAnonymously() {
+  create(null)
 }
 </script>
 
@@ -35,6 +51,24 @@ async function copy(text) {
       Échecs classiques, avec une règle en plus : à chaque coup, votre adversaire essaie de deviner ce que vous allez
       jouer.
     </p>
+
+    <fieldset class="w-full rounded-lg bg-stone-800 px-4 py-3 text-left">
+      <legend class="px-1 text-sm font-semibold">Votre couleur</legend>
+      <div class="flex gap-4 text-sm text-stone-300">
+        <label class="flex items-center gap-2">
+          <input type="radio" v-model="color" value="WHITE" class="accent-emerald-600" />
+          Blancs
+        </label>
+        <label class="flex items-center gap-2">
+          <input type="radio" v-model="color" value="BLACK" class="accent-emerald-600" />
+          Noirs
+        </label>
+        <label class="flex items-center gap-2">
+          <input type="radio" v-model="color" value="RANDOM" class="accent-emerald-600" />
+          Aléatoire
+        </label>
+      </div>
+    </fieldset>
 
     <label class="flex items-center gap-3 rounded-lg bg-stone-800 px-4 py-3 text-sm">
       <input type="checkbox" v-model="guessmate" class="h-4 w-4 accent-emerald-600" />
@@ -48,43 +82,22 @@ async function copy(text) {
       </span>
     </label>
 
+    <p v-if="error" class="text-sm text-red-400">{{ error }}</p>
+
     <button
       type="button"
       class="rounded-lg bg-emerald-600 px-6 py-3 font-semibold hover:bg-emerald-500 disabled:opacity-50"
       :disabled="creating"
-      @click="createGame"
+      @click="openModal"
     >
       {{ creating ? 'Création…' : `Créer une partie${guessmate ? ' (Guessmate)' : ''}` }}
     </button>
 
-    <div v-if="links" class="w-full space-y-4 text-left">
-      <p class="text-stone-300">Partagez un des deux liens avec votre adversaire, gardez l'autre pour vous :</p>
-
-      <div class="space-y-2 rounded-lg bg-stone-800 p-4">
-        <p class="text-sm font-semibold">Lien Blancs</p>
-        <div class="flex gap-2">
-          <input readonly class="flex-1 truncate rounded bg-stone-900 px-2 py-1 text-xs" :value="links.white.url" />
-          <button type="button" class="rounded bg-stone-700 px-3 py-1 text-sm hover:bg-stone-600" @click="copy(links.white.url)">
-            Copier
-          </button>
-          <router-link :to="links.white.path" class="rounded bg-emerald-700 px-3 py-1 text-sm hover:bg-emerald-600">
-            Jouer
-          </router-link>
-        </div>
-      </div>
-
-      <div class="space-y-2 rounded-lg bg-stone-800 p-4">
-        <p class="text-sm font-semibold">Lien Noirs</p>
-        <div class="flex gap-2">
-          <input readonly class="flex-1 truncate rounded bg-stone-900 px-2 py-1 text-xs" :value="links.black.url" />
-          <button type="button" class="rounded bg-stone-700 px-3 py-1 text-sm hover:bg-stone-600" @click="copy(links.black.url)">
-            Copier
-          </button>
-          <router-link :to="links.black.path" class="rounded bg-emerald-700 px-3 py-1 text-sm hover:bg-emerald-600">
-            Jouer
-          </router-link>
-        </div>
-      </div>
-    </div>
+    <AuthModal
+      :open="showModal"
+      :pending-action="{ type: 'create', variant: guessmate ? 'GUESSMATE' : 'GUESSCHESS', color }"
+      @anonymous="continueAnonymously"
+      @close="showModal = false"
+    />
   </div>
 </template>

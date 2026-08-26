@@ -120,8 +120,23 @@ Jeu d'échecs classique avec une règle additionnelle :
    partie elle-même ne lie personne pour l'instant. Le flux WebSocket reste par ailleurs non
    authentifiant (jeton = seul mécanisme d'autorisation) : l'identité résolue n'est que la métadonnée
    à lier, jamais un contrôle d'accès.
-7. Page d'accueil — création de partie (choix de couleur, lien d'invitation à usage unique, modale
-   connexion/anonyme) (voir section dédiée plus bas)
+7. ✅ Page d'accueil — création de partie (fait) : choix de couleur (blancs/noirs/aléatoire) sur
+   `HomeView`, création via REST (`POST /api/games`, pas STOMP — doit s'enchaîner avec une
+   redirection OAuth complète du navigateur) qui lie immédiatement le créateur à la couleur
+   choisie (`GameLifecycleService.createGame(variant, color, creator)`) et renvoie un unique lien
+   d'invitation pour la couleur adverse. Acceptation via `POST /api/games/{id}/join`
+   (`GameLifecycleService.joinGame`), à usage unique : une deuxième tentative avec une identité
+   différente répond `409 ALREADY_LINKED` (`GameAccessRepository.linkPlayer` renvoie désormais le
+   `PlayerRef` gagnant plutôt que `void`, pour distinguer ce cas d'un lien réussi). Résolution
+   d'identité HTTP compte/anonyme via `HttpPlayerIdentityResolver`, symétrique à
+   `WebSocketPlayerIdentity` côté STOMP. L'endpoint STOMP `/app/games.create` existant n'a pas été
+   touché (toujours utilisé par les tests d'intégration STOMP), simplement plus appelé par le
+   frontend. UI de login complète ajoutée (elle n'existait pas avant cette étape) : `AuthModal`
+   (composant partagé create/join), `OAuthCallbackView` (`/oauth-callback`, lit le JWT dans le
+   fragment d'URL), `JoinView` (`/join/:gameId`, lien immédiatement si déjà connecté sinon passe
+   par la modale), store `auth` (JWT en localStorage), intention différée
+   (`services/pendingAction.js`, sessionStorage) pour reprendre création/join après une
+   redirection OAuth complète (sortie du SPA).
 8. Page de profil (historique des parties, nom de joueur, etc.)
 9. Dockerisation (images arm64/multi-arch pour le backend, build Vue servi par nginx, docker-compose)
 10. Déploiement sur le Raspberry Pi (reverse proxy, HTTPS, limites mémoire/CPU, dimensionnement JVM)

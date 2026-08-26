@@ -7,11 +7,14 @@ import PromotionPicker from '../components/PromotionPicker.vue'
 import GameStatusBar from '../components/GameStatusBar.vue'
 import RoundResultBanner from '../components/RoundResultBanner.vue'
 import MoveHistoryList from '../components/MoveHistoryList.vue'
+import InviteBanner from '../components/InviteBanner.vue'
 
 const props = defineProps({
   gameId: { type: String, required: true },
   token: { type: String, default: null },
   color: { type: String, default: null },
+  inviteToken: { type: String, default: null },
+  inviteColor: { type: String, default: null },
 })
 
 const gameStore = useGameStore()
@@ -19,6 +22,7 @@ const { state, error, pendingSubmission, myColor } = storeToRefs(gameStore)
 
 const pendingPromotion = ref(null)
 const showLastRound = ref(true)
+const showInvite = ref(Boolean(props.inviteToken))
 
 watch(
   () => [props.gameId, props.token, props.color],
@@ -81,6 +85,14 @@ function submitNoGuess() {
 
     <template v-else>
       <div class="w-full max-w-xl">
+        <InviteBanner
+          v-if="showInvite"
+          :game-id="gameId"
+          :token="inviteToken"
+          :color="inviteColor"
+          @dismiss="showInvite = false"
+        />
+
         <GameStatusBar :state="state" :my-color="color" :my-role="myRole" :pending-submission="pendingSubmission" />
 
         <RoundResultBanner

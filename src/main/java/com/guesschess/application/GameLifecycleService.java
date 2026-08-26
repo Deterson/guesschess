@@ -42,6 +42,17 @@ public class GameLifecycleService {
     }
 
     /**
+     * Variante (etape 7) qui lie immediatement le createur a la couleur choisie, avant
+     * meme que la partie ne soit annoncee a un adversaire - contrairement au lien
+     * paresseux de submitMove/submitGuess (premier coup/devinette soumis).
+     */
+    public CreatedGame createGame(GameVariant variant, Color creatorColor, PlayerRef creator) {
+        CreatedGame created = createGame(variant);
+        gameAccessRepository.linkPlayer(created.gameId(), creatorColor, creator);
+        return created;
+    }
+
+    /**
      * Soumission du coup reel par le joueur au trait. Le round n'attend plus que la
      * devinette de l'adversaire : si elle est deja arrivee, retourne l'etat
      * resultant (a diffuser publiquement, le round vient de se resoudre) ; sinon
@@ -100,6 +111,20 @@ public class GameLifecycleService {
 
     public GameSnapshot viewGame(GameId id) {
         return gameRepository.withGame(id, GameSnapshot::of);
+    }
+
+    /**
+     * Acceptation d'un lien d'invitation (etape 7) : lie requester a la couleur du
+     * jeton s'il n'y a pas deja quelqu'un d'autre. linkedToRequester distingue une
+     * liaison reussie (nouvelle, ou reclic sur son propre lien) d'une invitation deja
+     * consommee par un autre joueur - a l'appelant de traduire ce dernier cas en erreur
+     * claire (l'invitation est a usage unique).
+     */
+    public JoinResult joinGame(PlayerToken token, PlayerRef requester) {
+        GameAccess access = requireAccess(token);
+        Color color = access.colorOf(token);
+        PlayerRef bound = gameAccessRepository.linkPlayer(access.gameId(), color, requester);
+        return new JoinResult(access.gameId(), color, bound.equals(requester));
     }
 
     private GameAccess requireAccess(PlayerToken token) {

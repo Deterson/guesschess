@@ -21,6 +21,11 @@ public interface GameAccessRepository {
      * Lie ref a color pour gameId si cette couleur n'est pas deja liee (etape 6) -
      * aucun effet sinon, y compris si ref differe du lien deja pose : le lien est
      * immuable une fois etabli (voir GameAccess.withPlayerLinked).
+     *
+     * @return le PlayerRef desormais associe a color (celui qui a gagne la course :
+     * ref si cet appel vient de poser le lien, ou le lien deja en place sinon) - permet
+     * a un appelant (etape 7, acceptation d'invitation) de distinguer un lien reussi
+     * d'une couleur deja prise par quelqu'un d'autre.
      */
-    void linkPlayer(GameId gameId, Color color, PlayerRef ref);
+    PlayerRef linkPlayer(GameId gameId, Color color, PlayerRef ref);
 }

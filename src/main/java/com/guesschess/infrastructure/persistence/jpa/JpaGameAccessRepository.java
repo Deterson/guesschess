@@ -56,7 +56,7 @@ class JpaGameAccessRepository implements GameAccessRepository {
 
     @Override
     @Transactional
-    public void linkPlayer(GameId gameId, Color color, PlayerRef ref) {
+    public PlayerRef linkPlayer(GameId gameId, Color color, PlayerRef ref) {
         String type = switch (ref) {
             case PlayerRef.Account account -> "ACCOUNT";
             case PlayerRef.Anonymous anonymous -> "ANONYMOUS";
@@ -70,6 +70,10 @@ class JpaGameAccessRepository implements GameAccessRepository {
         } else {
             springDataRepository.linkBlackPlayerIfAbsent(gameId.value(), type, playerId);
         }
+        GameAccessEntity reloaded = springDataRepository.findById(gameId.value()).orElseThrow();
+        return color == Color.WHITE
+                ? toPlayerRef(reloaded.getWhitePlayerType(), reloaded.getWhitePlayerId())
+                : toPlayerRef(reloaded.getBlackPlayerType(), reloaded.getBlackPlayerId());
     }
 
     private GameAccess toDomain(GameAccessEntity entity) {

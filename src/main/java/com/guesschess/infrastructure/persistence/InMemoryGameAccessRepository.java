@@ -40,12 +40,13 @@ public class InMemoryGameAccessRepository implements GameAccessRepository {
     }
 
     @Override
-    public void linkPlayer(GameId gameId, Color color, PlayerRef ref) {
-        byGameId.computeIfPresent(gameId, (id, access) -> {
-            GameAccess updated = access.withPlayerLinked(color, ref);
-            byToken.put(updated.whiteToken(), updated);
-            byToken.put(updated.blackToken(), updated);
-            return updated;
+    public PlayerRef linkPlayer(GameId gameId, Color color, PlayerRef ref) {
+        GameAccess updated = byGameId.computeIfPresent(gameId, (id, access) -> {
+            GameAccess linked = access.withPlayerLinked(color, ref);
+            byToken.put(linked.whiteToken(), linked);
+            byToken.put(linked.blackToken(), linked);
+            return linked;
         });
+        return updated == null ? null : updated.playerOf(color);
     }
 }
