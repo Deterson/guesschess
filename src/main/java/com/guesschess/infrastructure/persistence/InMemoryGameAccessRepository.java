@@ -2,8 +2,10 @@ package com.guesschess.infrastructure.persistence;
 
 import com.guesschess.application.GameAccess;
 import com.guesschess.application.GameAccessRepository;
+import com.guesschess.application.PlayerRef;
 import com.guesschess.application.PlayerToken;
 import com.guesschess.domain.game.GameId;
+import com.guesschess.domain.piece.Color;
 
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -35,5 +37,15 @@ public class InMemoryGameAccessRepository implements GameAccessRepository {
     @Override
     public Optional<GameAccess> findByGameId(GameId gameId) {
         return Optional.ofNullable(byGameId.get(gameId));
+    }
+
+    @Override
+    public void linkPlayer(GameId gameId, Color color, PlayerRef ref) {
+        byGameId.computeIfPresent(gameId, (id, access) -> {
+            GameAccess updated = access.withPlayerLinked(color, ref);
+            byToken.put(updated.whiteToken(), updated);
+            byToken.put(updated.blackToken(), updated);
+            return updated;
+        });
     }
 }

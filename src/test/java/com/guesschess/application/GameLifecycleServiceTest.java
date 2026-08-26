@@ -1,5 +1,7 @@
 package com.guesschess.application;
 
+import com.guesschess.domain.account.AnonymousId;
+import com.guesschess.domain.account.UserId;
 import com.guesschess.domain.board.Position;
 import com.guesschess.domain.game.GameId;
 import com.guesschess.domain.game.GameStatus;
@@ -14,6 +16,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -24,10 +27,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class GameLifecycleServiceTest {
 
     private GameLifecycleService service;
+    private GameAccessRepository gameAccessRepository;
 
     @BeforeEach
     void setUp() {
-        service = new GameLifecycleService(new InMemoryGameRepository(), new InMemoryGameAccessRepository());
+        gameAccessRepository = new InMemoryGameAccessRepository();
+        service = new GameLifecycleService(new InMemoryGameRepository(), gameAccessRepository);
     }
 
     @Test
@@ -108,5 +113,50 @@ class GameLifecycleServiceTest {
 
         assertEquals(game.gameId(), snapshot.id());
         assertEquals(GameStatus.ONGOING, snapshot.status());
+    }
+
+    @Test
+    void submittingAMoveWithARequesterLinksItToTheTokenColor() {
+        CreatedGame game = service.createGame();
+        MoveIntent e4 = MoveIntent.of(Position.fromAlgebraic("e2"), Position.fromAlgebraic("e4"));
+        PlayerRef requester = new PlayerRef.Account(UserId.random());
+
+        service.submitMove(game.whiteToken(), e4, requester);
+
+        GameAccess access = gameAccessRepository.findByGameId(game.gameId()).orElseThrow();
+        assertEquals(requester, access.playerOf(Color.WHITE));
+        assertNull(access.playerOf(Color.BLACK));
+    }
+
+    @Test
+    void submittingAGuessWithARequesterLinksItToTheTokenColor() {
+        CreatedGame game = service.createGame();
+        PlayerRef requester = new PlayerRef.Anonymous(AnonymousId.random());
+
+        service.submitGuess(game.blackToken(), null, requester);
+
+        GameAccess access = gameAccessRepository.findByGameId(game.gameId()).orElseThrow();
+        assertEquals(requester, access.playerOf(Color.BLACK));
+    }
+
+    @Test
+    void aColorAlreadyLinkedIsNeverRelinkedToADifferentRequester() {
+        CreatedGame game = service.createGame();
+        MoveIntent e4 = MoveIntent.of(Position.fromAlgebraic("e2"), Position.fromAlgebraic("e4"));
+        PlayerRef firstWhiteRequester = new PlayerRef.Anonymous(AnonymousId.random());
+        PlayerRef blackRequester = new PlayerRef.Account(UserId.random());
+
+        service.submitMove(game.whiteToken(), e4, firstWhiteRequester);
+        // guess null (incorrecte) : le coup est joue, le trait passe a Black.
+        service.submitGuess(game.blackToken(), null, blackRequester);
+
+        // Round 2 : White est maintenant le devineur (Black au trait) - meme couleur,
+        // meme jeton, mais une identite differente : ne doit pas ecraser le lien pose
+        // au round 1.
+        PlayerRef secondWhiteRequester = new PlayerRef.Account(UserId.random());
+        service.submitGuess(game.whiteToken(), null, secondWhiteRequester);
+
+        GameAccess access = gameAccessRepository.findByGameId(game.gameId()).orElseThrow();
+        assertEquals(firstWhiteRequester, access.playerOf(Color.WHITE));
     }
 }

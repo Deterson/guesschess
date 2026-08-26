@@ -5,6 +5,7 @@ import com.guesschess.application.GameLifecycleService;
 import com.guesschess.application.GameSnapshot;
 import com.guesschess.application.MoveIntent;
 import com.guesschess.application.NoSuchLegalMoveException;
+import com.guesschess.application.PlayerRef;
 import com.guesschess.application.PlayerToken;
 import com.guesschess.application.UnknownPlayerTokenException;
 import com.guesschess.application.WrongTurnException;
@@ -29,6 +30,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.messaging.simp.annotation.SendToUser;
 import org.springframework.stereotype.Controller;
 
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -75,9 +77,11 @@ public class GameController {
 
     @MessageMapping("/games/{gameId}/move")
     public void submitMove(@DestinationVariable String gameId, @Payload SubmitMoveRequest request,
-                            @Header("simpSessionId") String sessionId) {
+                            @Header("simpSessionId") String sessionId,
+                            @Header(value = "simpSessionAttributes", required = false) Map<String, Object> sessionAttributes) {
         MoveIntent intent = mapper.toMoveIntent(request.from(), request.to(), request.promotion());
-        Optional<GameSnapshot> resolved = gameLifecycleService.submitMove(PlayerToken.fromString(request.token()), intent);
+        PlayerRef requester = WebSocketPlayerIdentity.resolve(sessionAttributes);
+        Optional<GameSnapshot> resolved = gameLifecycleService.submitMove(PlayerToken.fromString(request.token()), intent, requester);
         if (resolved.isPresent()) {
             broadcast(resolved.get());
         } else {
@@ -87,11 +91,13 @@ public class GameController {
 
     @MessageMapping("/games/{gameId}/guess")
     public void submitGuess(@DestinationVariable String gameId, @Payload SubmitGuessRequest request,
-                             @Header("simpSessionId") String sessionId) {
+                             @Header("simpSessionId") String sessionId,
+                             @Header(value = "simpSessionAttributes", required = false) Map<String, Object> sessionAttributes) {
         MoveIntent intent = request.from() == null || request.to() == null
                 ? null
                 : mapper.toMoveIntent(request.from(), request.to(), request.promotion());
-        Optional<GameSnapshot> resolved = gameLifecycleService.submitGuess(PlayerToken.fromString(request.token()), intent);
+        PlayerRef requester = WebSocketPlayerIdentity.resolve(sessionAttributes);
+        Optional<GameSnapshot> resolved = gameLifecycleService.submitGuess(PlayerToken.fromString(request.token()), intent, requester);
         if (resolved.isPresent()) {
             broadcast(resolved.get());
         } else {

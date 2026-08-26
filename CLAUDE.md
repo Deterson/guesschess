@@ -107,8 +107,19 @@ Jeu d'échecs classique avec une règle additionnelle :
    `PlayerToken` du contexte "Partie" reste inchangé et non authentifié pour l'instant — le
    lien compte↔partie (historique) est prévu à l'étape 6 (voir section dédiée plus bas).
 5. ✅ Frontend VueJS 3 (échiquier interactif, client WebSocket, UI de devinette) (fait)
-6. Compte joueur lié à une partie — lier immuablement chaque partie à un compte ou à une identité
-   anonyme persistante, tout en gardant le jeu en anonyme possible (voir section dédiée plus bas)
+6. ✅ Compte joueur lié à une partie (fait) : `game_access` porte désormais, par couleur, un lien
+   optionnel-puis-immuable vers un `PlayerRef` (compte ou identité anonyme) — jamais les deux,
+   jamais modifié une fois posé (`GameAccess.withPlayerLinked`, écriture SQL conditionnelle
+   `... where white_player_type is null`). Identité anonyme : cookie HttpOnly signé HMAC
+   (`AnonymousIdentityFilter`, réutilise `app.jwt.secret`), résolue au handshake WebSocket
+   (`AnonymousIdentityHandshakeInterceptor`). Compte : JWT en header `Authorization` du CONNECT
+   STOMP (`JwtStompChannelInterceptor`, absent de la requête HTTP handshake elle-même — les
+   navigateurs n'autorisent pas de header custom dessus). Le lien se pose au premier coup/
+   devinette soumis par chaque couleur (`GameLifecycleService.submitMove/submitGuess(..., PlayerRef)`) ;
+   aucun choix de couleur ni flux d'invitation n'existe encore (prévu étape 7), donc la création de
+   partie elle-même ne lie personne pour l'instant. Le flux WebSocket reste par ailleurs non
+   authentifiant (jeton = seul mécanisme d'autorisation) : l'identité résolue n'est que la métadonnée
+   à lier, jamais un contrôle d'accès.
 7. Page d'accueil — création de partie (choix de couleur, lien d'invitation à usage unique, modale
    connexion/anonyme) (voir section dédiée plus bas)
 8. Page de profil (historique des parties, nom de joueur, etc.)
@@ -153,6 +164,7 @@ tout court (échec rapide voulu au boot Spring, pas seulement au moment du login
 - `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` — **obligatoire**, même remarque. App OAuth GitHub Developer Settings (redirect URI : `http://localhost:8080/login/oauth2/code/github`).
 - `JWT_SECRET` — **obligatoire**. Secret HMAC pour signer les JWT (≥ 32 octets aléatoires, ex. `openssl rand -base64 32`).
 - `OAUTH_POST_LOGIN_REDIRECT_URI` — URL du frontend vers laquelle rediriger après login, JWT en fragment d'URL (`#token=...`). Défaut : `http://localhost:5173/oauth-callback`.
+- `ANONYMOUS_COOKIE_SECURE` — (étape 6) `true`/`false`, flag `Secure` du cookie d'identité anonyme `guesschess_anon`. Défaut `false` (dev local en HTTP) ; mettre `true` derrière HTTPS (étape 10).
 
 ## Questions encore ouvertes (à trancher plus tard)
 

@@ -1,6 +1,7 @@
 package com.guesschess.application;
 
 import com.guesschess.domain.game.GameId;
+import com.guesschess.domain.piece.Color;
 
 import java.util.Optional;
 
@@ -15,4 +16,11 @@ public interface GameAccessRepository {
     Optional<GameAccess> findByToken(PlayerToken token);
 
     Optional<GameAccess> findByGameId(GameId gameId);
+
+    /**
+     * Lie ref a color pour gameId si cette couleur n'est pas deja liee (etape 6) -
+     * aucun effet sinon, y compris si ref differe du lien deja pose : le lien est
+     * immuable une fois etabli (voir GameAccess.withPlayerLinked).
+     */
+    void linkPlayer(GameId gameId, Color color, PlayerRef ref);
 }

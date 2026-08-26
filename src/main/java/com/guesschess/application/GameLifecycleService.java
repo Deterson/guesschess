@@ -48,9 +48,23 @@ public class GameLifecycleService {
      * vide, le coup reste enregistre en attente.
      */
     public Optional<GameSnapshot> submitMove(PlayerToken token, MoveIntent intent) {
+        return submitMove(token, intent, null);
+    }
+
+    /**
+     * Variante liant en plus (etape 6) requester - le compte ou l'identite anonyme
+     * resolue pour la connexion appelante - a la couleur du jeton, si cette couleur
+     * n'est pas deja liee. requester null (identite non resolue) ne lie rien mais
+     * n'empeche pas la soumission : le jeu reste possible en anonyme.
+     */
+    public Optional<GameSnapshot> submitMove(PlayerToken token, MoveIntent intent, PlayerRef requester) {
         GameAccess access = requireAccess(token);
+        Color color = access.colorOf(token);
         return gameRepository.withGame(access.gameId(), game -> {
             requireColor(access, token, game.sideToMove());
+            if (requester != null) {
+                gameAccessRepository.linkPlayer(access.gameId(), color, requester);
+            }
             Move move = resolveMove(game, intent);
             return game.submitMove(move).map(result -> GameSnapshot.of(game));
         });
@@ -64,9 +78,21 @@ public class GameLifecycleService {
      * rester cache tant que le round n'est pas resolu.
      */
     public Optional<GameSnapshot> submitGuess(PlayerToken token, MoveIntent intent) {
+        return submitGuess(token, intent, null);
+    }
+
+    /**
+     * Variante liant en plus (etape 6) requester a la couleur du jeton - voir
+     * submitMove(token, intent, requester).
+     */
+    public Optional<GameSnapshot> submitGuess(PlayerToken token, MoveIntent intent, PlayerRef requester) {
         GameAccess access = requireAccess(token);
+        Color color = access.colorOf(token);
         return gameRepository.withGame(access.gameId(), game -> {
             requireColor(access, token, game.sideToMove().opposite());
+            if (requester != null) {
+                gameAccessRepository.linkPlayer(access.gameId(), color, requester);
+            }
             Move guess = intent == null ? null : resolveMove(game, intent);
             return game.submitGuess(guess).map(result -> GameSnapshot.of(game));
         });

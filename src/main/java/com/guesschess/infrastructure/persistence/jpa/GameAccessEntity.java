@@ -25,6 +25,18 @@ class GameAccessEntity {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
+    @Column(name = "white_player_type")
+    private String whitePlayerType;
+
+    @Column(name = "white_player_id")
+    private UUID whitePlayerId;
+
+    @Column(name = "black_player_type")
+    private String blackPlayerType;
+
+    @Column(name = "black_player_id")
+    private UUID blackPlayerId;
+
     protected GameAccessEntity() {
         // JPA
     }
@@ -50,5 +62,21 @@ class GameAccessEntity {
 
     Instant getCreatedAt() {
         return createdAt;
+    }
+
+    String getWhitePlayerType() {
+        return whitePlayerType;
+    }
+
+    UUID getWhitePlayerId() {
+        return whitePlayerId;
+    }
+
+    String getBlackPlayerType() {
+        return blackPlayerType;
+    }
+
+    UUID getBlackPlayerId() {
+        return blackPlayerId;
     }
 }
