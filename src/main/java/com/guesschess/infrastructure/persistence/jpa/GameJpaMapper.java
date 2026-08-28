@@ -59,7 +59,7 @@ class GameJpaMapper {
         GameResult result = entity.getResultCause() != null
                 ? new GameResult(entity.getResultWinner(), entity.getResultCause())
                 : null;
-        List<Board> positionHistory = state.positionHistory().stream().map(this::toBoard).toList();
+        List<Game.PositionRecord> positionHistory = state.positionHistory().stream().map(this::toPositionRecord).toList();
         List<Move> moveHistory = state.moveHistory().stream().map(this::toMove).toList();
 
         Game.Memento memento = new Game.Memento(
@@ -73,7 +73,11 @@ class GameJpaMapper {
                 toMove(state.pendingMove()),
                 state.guessSubmitted(),
                 toMove(state.pendingGuess()),
-                toRoundResult(state.lastRoundResult())
+                toRoundResult(state.lastRoundResult()),
+                toMove(state.whiteGuessedMove()),
+                state.whiteGuessedMoveStreak(),
+                toMove(state.blackGuessedMove()),
+                state.blackGuessedMoveStreak()
         );
         return Game.fromMemento(memento);
     }
@@ -81,13 +85,25 @@ class GameJpaMapper {
     private GameStateJson toStateJson(Game.Memento memento) {
         return new GameStateJson(
                 toBoardJson(memento.board()),
-                memento.positionHistory().stream().map(this::toBoardJson).toList(),
+                memento.positionHistory().stream().map(this::toPositionRecordJson).toList(),
                 memento.moveHistory().stream().map(this::toMoveJson).toList(),
                 toMoveJson(memento.pendingMove()),
                 memento.guessSubmitted(),
                 toMoveJson(memento.pendingGuess()),
-                toRoundResultJson(memento.lastRoundResult())
+                toRoundResultJson(memento.lastRoundResult()),
+                toMoveJson(memento.whiteGuessedMove()),
+                memento.whiteGuessedMoveStreak(),
+                toMoveJson(memento.blackGuessedMove()),
+                memento.blackGuessedMoveStreak()
         );
+    }
+
+    private PositionRecordJson toPositionRecordJson(Game.PositionRecord record) {
+        return new PositionRecordJson(toBoardJson(record.board()), record.origin().name());
+    }
+
+    private Game.PositionRecord toPositionRecord(PositionRecordJson json) {
+        return new Game.PositionRecord(toBoard(json.board()), Game.PositionOrigin.valueOf(json.origin()));
     }
 
     private BoardJson toBoardJson(Board board) {

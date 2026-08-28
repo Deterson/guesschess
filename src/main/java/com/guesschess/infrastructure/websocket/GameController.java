@@ -15,11 +15,14 @@ import com.guesschess.application.WrongTurnException;
 import com.guesschess.domain.game.GameId;
 import com.guesschess.domain.game.GameNotFoundException;
 import com.guesschess.domain.game.GameVariant;
+import com.guesschess.domain.piece.Color;
 import com.guesschess.infrastructure.websocket.dto.AckMessage;
+import com.guesschess.infrastructure.websocket.dto.ChatMessage;
 import com.guesschess.infrastructure.websocket.dto.CreateGameRequest;
 import com.guesschess.infrastructure.websocket.dto.CreateGameResponse;
 import com.guesschess.infrastructure.websocket.dto.ErrorMessage;
 import com.guesschess.infrastructure.websocket.dto.GameStateMessage;
+import com.guesschess.infrastructure.websocket.dto.SubmitChatMessageRequest;
 import com.guesschess.infrastructure.websocket.dto.SubmitGuessRequest;
 import com.guesschess.infrastructure.websocket.dto.SubmitMoveRequest;
 import com.guesschess.infrastructure.websocket.dto.ViewGameRequest;
@@ -46,6 +49,8 @@ import java.util.Optional;
  */
 @Controller
 public class GameController {
+
+    private static final int MAX_CHAT_MESSAGE_LENGTH = 500;
 
     private final GameLifecycleService gameLifecycleService;
     private final GameMessageMapper mapper;
@@ -118,6 +123,28 @@ public class GameController {
         } else {
             sendToUser(sessionId, "/queue/guess.ack", new AckMessage("recorded_waiting_for_move"));
         }
+    }
+
+    /**
+     * Chat ephemere : relaye tel quel sur /topic/games/{gameId}/chat, jamais persiste
+     * ni journalise cote serveur (voir ChatMessage). Reserve aux deux joueurs - le
+     * jeton doit resoudre une couleur pour CETTE partie (resolveColor, lecture seule,
+     * ne lie ni ne modifie rien contrairement a submitMove/submitGuess) ; un
+     * spectateur (pas de jeton, ou jeton d'une autre partie) est rejete.
+     */
+    @MessageMapping("/games/{gameId}/chat")
+    public void submitChat(@DestinationVariable String gameId, @Payload SubmitChatMessageRequest request) {
+        GameId id = GameId.fromString(gameId);
+        PlayerToken token = request.token() == null || request.token().isBlank()
+                ? null
+                : PlayerToken.fromString(request.token());
+        Color color = gameLifecycleService.resolveColor(id, token)
+                .orElseThrow(() -> new UnknownPlayerTokenException(token));
+        String text = request.text() == null ? "" : request.text().trim();
+        if (text.isEmpty() || text.length() > MAX_CHAT_MESSAGE_LENGTH) {
+            throw new IllegalArgumentException("chat message must be between 1 and " + MAX_CHAT_MESSAGE_LENGTH + " characters");
+        }
+        messagingTemplate.convertAndSend("/topic/games/" + gameId + "/chat", new ChatMessage(color.name(), text));
     }
 
     @MessageExceptionHandler({

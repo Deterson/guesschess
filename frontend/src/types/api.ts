@@ -18,6 +18,7 @@ export type GameResultCause =
   | 'STALEMATE'
   | 'DRAW_FIFTY_MOVE_RULE'
   | 'DRAW_THREEFOLD_REPETITION'
+  | 'DRAW_THREE_GUESS_REPETITION'
   | 'DRAW_INSUFFICIENT_MATERIAL'
 
 /** "wP", "bK"... ou null pour une case vide (voir GameMessageMapper.toCode). */
@@ -121,4 +122,10 @@ export interface GameStateMessage {
 export interface ErrorMessage {
   code: string
   message: string
+}
+
+/** Chat ephemere : jamais persiste, ni par le backend ni par ce store (voir ChatMessage.java). */
+export interface ChatMessage {
+  color: Color
+  text: string
 }

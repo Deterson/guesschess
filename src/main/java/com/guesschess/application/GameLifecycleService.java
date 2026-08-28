@@ -192,6 +192,22 @@ public class GameLifecycleService {
         return Optional.empty();
     }
 
+    /**
+     * Resolution en lecture seule token -> couleur, pour un usage qui n'a besoin de
+     * verifier "es-tu un joueur de cette partie" sans agir sur l'agregat Game (ex. chat
+     * ephemere). Vide si token est null, inconnu, ou appartient a une autre partie -
+     * jamais d'exception, contrairement a requireAccess qui est reservee aux actions de
+     * jeu (coup/devinette).
+     */
+    public Optional<Color> resolveColor(GameId id, PlayerToken token) {
+        if (token == null) {
+            return Optional.empty();
+        }
+        return gameAccessRepository.findByToken(token)
+                .filter(access -> access.gameId().equals(id))
+                .map(access -> access.colorOf(token));
+    }
+
     private GameAccess requireAccess(PlayerToken token) {
         return gameAccessRepository.findByToken(token)
                 .orElseThrow(() -> new UnknownPlayerTokenException(token));

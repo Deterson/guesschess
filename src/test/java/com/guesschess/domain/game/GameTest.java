@@ -158,6 +158,107 @@ class GameTest {
     }
 
     @Test
+    void correctGuessesDoNotCountTowardThreefoldRepetition() {
+        Board board = Board.empty()
+                .withPiece(Position.fromAlgebraic("a1"), Piece.of(PieceType.KING, Color.WHITE))
+                .withPiece(Position.fromAlgebraic("b1"), Piece.of(PieceType.KNIGHT, Color.WHITE))
+                .withPiece(Position.fromAlgebraic("a8"), Piece.of(PieceType.KING, Color.BLACK))
+                .withPiece(Position.fromAlgebraic("b8"), Piece.of(PieceType.KNIGHT, Color.BLACK));
+        Game game = Game.fromPosition(board);
+
+        // a guessed round is cancelled - no piece actually moves - so the position
+        // (knights home) keeps recurring, but only via GUESS-origin entries. Two
+        // round-trips (4 correct guesses) would have hit the old, buggy 3-occurrence
+        // count (initial + after trip 1 + after trip 2) if guesses were counted.
+        for (int i = 0; i < 2; i++) {
+            guessCorrectly(game, "b1", "c3");
+            guessCorrectly(game, "b8", "c6");
+        }
+
+        assertEquals(GameStatus.ONGOING, game.status());
+        assertNull(game.result());
+    }
+
+    @Test
+    void threeGuessRepetitionEndsGameInADrawAfterSixConsecutiveCorrectGuesses() {
+        Board board = Board.empty()
+                .withPiece(Position.fromAlgebraic("a1"), Piece.of(PieceType.KING, Color.WHITE))
+                .withPiece(Position.fromAlgebraic("b1"), Piece.of(PieceType.KNIGHT, Color.WHITE))
+                .withPiece(Position.fromAlgebraic("a8"), Piece.of(PieceType.KING, Color.BLACK))
+                .withPiece(Position.fromAlgebraic("b8"), Piece.of(PieceType.KNIGHT, Color.BLACK));
+        Game game = Game.fromPosition(board);
+
+        // 3 round-trips = 6 correct guesses in a row (3 each), none of them ever
+        // actually moving a piece.
+        for (int i = 0; i < 3; i++) {
+            guessCorrectly(game, "b1", "c3");
+            guessCorrectly(game, "b8", "c6");
+        }
+
+        assertEquals(GameStatus.FINISHED, game.status());
+        assertEquals(GameResultCause.DRAW_THREE_GUESS_REPETITION, game.result().cause());
+        assertNull(game.result().winner());
+    }
+
+    @Test
+    void threeGuessRepetitionRequiresTheSameGuessedMoveOnEachSide() {
+        Board board = Board.empty()
+                .withPiece(Position.fromAlgebraic("a1"), Piece.of(PieceType.KING, Color.WHITE))
+                .withPiece(Position.fromAlgebraic("b1"), Piece.of(PieceType.KNIGHT, Color.WHITE))
+                .withPiece(Position.fromAlgebraic("a8"), Piece.of(PieceType.KING, Color.BLACK))
+                .withPiece(Position.fromAlgebraic("b8"), Piece.of(PieceType.KNIGHT, Color.BLACK));
+        Game game = Game.fromPosition(board);
+
+        // White guesses b1-c3 correctly 3 times in a row, but black's knight is
+        // guessed correctly on 3 different squares (c6, then a6, then d7) - 6
+        // consecutive correct guesses overall, same as the passing scenario above,
+        // but it must NOT end the game since black never repeats the same guess.
+        guessCorrectly(game, "b1", "c3");
+        guessCorrectly(game, "b8", "c6");
+        guessCorrectly(game, "b1", "c3");
+        guessCorrectly(game, "b8", "a6");
+        guessCorrectly(game, "b1", "c3");
+        guessCorrectly(game, "b8", "d7");
+
+        assertEquals(GameStatus.ONGOING, game.status());
+        assertNull(game.result());
+
+        // black now starts repeating d7 too - once it also reaches 3 in a row
+        // (matching white's already-repeated b1-c3), the draw fires.
+        guessCorrectly(game, "b1", "c3");
+        guessCorrectly(game, "b8", "d7");
+        guessCorrectly(game, "b1", "c3");
+        guessCorrectly(game, "b8", "d7");
+
+        assertEquals(GameStatus.FINISHED, game.status());
+        assertEquals(GameResultCause.DRAW_THREE_GUESS_REPETITION, game.result().cause());
+        assertNull(game.result().winner());
+    }
+
+    @Test
+    void guessRepetitionStreakResetsAfterARealMoveIsPlayed() {
+        Board board = Board.empty()
+                .withPiece(Position.fromAlgebraic("a1"), Piece.of(PieceType.KING, Color.WHITE))
+                .withPiece(Position.fromAlgebraic("b1"), Piece.of(PieceType.KNIGHT, Color.WHITE))
+                .withPiece(Position.fromAlgebraic("a8"), Piece.of(PieceType.KING, Color.BLACK))
+                .withPiece(Position.fromAlgebraic("b8"), Piece.of(PieceType.KNIGHT, Color.BLACK));
+        Game game = Game.fromPosition(board);
+
+        // 6 correct guesses overall, but split into two runs of 3 by a real
+        // (ungessed) move in between - the streak must not carry over.
+        guessCorrectly(game, "b1", "c3");
+        guessCorrectly(game, "b8", "c6");
+        guessCorrectly(game, "b1", "c3");
+        play(game, "b8", "c6");
+        guessCorrectly(game, "b1", "c3");
+        guessCorrectly(game, "c6", "d4");
+        guessCorrectly(game, "b1", "c3");
+
+        assertEquals(GameStatus.ONGOING, game.status());
+        assertNull(game.result());
+    }
+
+    @Test
     void insufficientMaterialEndsGameInADraw() {
         Board board = Board.empty()
                 .withPiece(Position.fromAlgebraic("e1"), Piece.of(PieceType.KING, Color.WHITE))
@@ -189,6 +290,12 @@ class GameTest {
     private static void play(Game game, String from, String to) {
         game.submitMove(findMove(game.legalMoves(), from, to));
         game.submitGuess(null);
+    }
+
+    private static void guessCorrectly(Game game, String from, String to) {
+        Move move = findMove(game.legalMoves(), from, to);
+        game.submitMove(move);
+        game.submitGuess(move);
     }
 
     private static Move findMove(List<Move> moves, String from, String to) {

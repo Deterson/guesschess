@@ -9,6 +9,7 @@ import PromotionPicker from '../components/PromotionPicker.vue'
 import GameStatusBar from '../components/GameStatusBar.vue'
 import RoundResultBanner from '../components/RoundResultBanner.vue'
 import MoveHistoryList from '../components/MoveHistoryList.vue'
+import ChatPanel from '../components/ChatPanel.vue'
 import InviteBanner from '../components/InviteBanner.vue'
 import AuthModal from '../components/AuthModal.vue'
 import type { PromotionPieceType } from '../types/api'
@@ -19,7 +20,7 @@ const props = defineProps<{
 
 const gameStore = useGameStore()
 const authStore = useAuthStore()
-const { state, error, pendingSubmission, pendingMove, myColor, canAct } = storeToRefs(gameStore)
+const { state, error, pendingSubmission, pendingMove, myColor, canAct, chatMessages } = storeToRefs(gameStore)
 
 const pendingPromotion = ref<{ from: string; to: string; options: PromotionPieceType[] } | null>(null)
 const hoveredGuess = ref(false)
@@ -177,44 +178,61 @@ function submitNoGuess() {
 
     <template v-else>
       <div class="grid w-full grid-cols-1 items-start gap-6 @min-[67rem]:grid-cols-[minmax(0,1fr)_36rem_minmax(0,1fr)]">
-        <div class="mx-auto w-full max-w-xl @min-[67rem]:mx-0 @min-[67rem]:max-w-none">
-          <InviteBanner v-if="showInvite" :game-id="gameId" @dismiss="inviteDismissed = true" />
+        <!--
+          "contents" en etroit desimbrique ce wrapper : statut et chat redeviennent
+          des items de grille independants (au meme titre que board/historique),
+          reordonnables individuellement via order-* pour que le chat suive le
+          plateau plutot que le statut dans l'empilement grid-cols-1. "block" en
+          large le re-imbrique : statut+chat s'empilent alors en flux normal DANS ce
+          wrapper (devenu la colonne 1), immunise contre le probleme des lignes CSS
+          Grid (une ligne prend la hauteur de son membre le plus grand, ici le
+          plateau) qui repoussait sinon le chat tout en bas de la colonne au lieu de
+          le laisser suivre immediatement le texte de statut.
+        -->
+        <div class="contents @min-[67rem]:block @min-[67rem]:col-start-1">
+          <div class="order-1 mx-auto w-full max-w-xl @min-[67rem]:order-none @min-[67rem]:mx-0 @min-[67rem]:max-w-none">
+            <InviteBanner v-if="showInvite" :game-id="gameId" @dismiss="inviteDismissed = true" />
 
-          <div v-if="myColor && !canAct" class="mb-4 rounded-lg bg-stone-800 px-4 py-3 text-sm text-stone-300">
-            Vous regardez cette partie en spectateur : quelqu'un d'autre s'est déjà connecté avec ce lien.
+            <div v-if="myColor && !canAct" class="mb-4 rounded-lg bg-stone-800 px-4 py-3 text-sm text-stone-300">
+              Vous regardez cette partie en spectateur : quelqu'un d'autre s'est déjà connecté avec ce lien.
+            </div>
+            <div v-else-if="!myColor && state.full" class="mb-4 rounded-lg bg-stone-800 px-4 py-3 text-sm text-stone-300">
+              Vous regardez cette partie en spectateur : elle est déjà complète.
+            </div>
+            <div v-else-if="!myColor" class="mb-4 space-y-2 rounded-lg bg-stone-800 px-4 py-3 text-sm text-stone-300">
+              <p>Vous regardez cette partie en spectateur.</p>
+              <p v-if="joinError" class="text-red-400">{{ joinError }}</p>
+              <button
+                type="button"
+                class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold hover:bg-emerald-500 disabled:opacity-50"
+                :disabled="joining"
+                @click="startJoin"
+              >
+                {{ joining ? 'Connexion…' : 'Rejoindre cette partie' }}
+              </button>
+            </div>
+
+            <GameStatusBar :state="state" :my-color="myColor" :my-role="myRole" :pending-submission="pendingSubmission" />
+
+            <RoundResultBanner
+              v-if="state.lastRound"
+              :round="state.lastRound"
+              :my-color="myColor"
+              @hover="hoveredGuess = $event"
+            />
+
+            <div v-if="error" class="mb-4 rounded-lg bg-red-900/60 px-4 py-3 text-sm">
+              {{ error.message }}
+              <button type="button" class="ml-2 text-red-300 hover:text-red-100" @click="gameStore.dismissError()">✕</button>
+            </div>
           </div>
-          <div v-else-if="!myColor && state.full" class="mb-4 rounded-lg bg-stone-800 px-4 py-3 text-sm text-stone-300">
-            Vous regardez cette partie en spectateur : elle est déjà complète.
-          </div>
-          <div v-else-if="!myColor" class="mb-4 space-y-2 rounded-lg bg-stone-800 px-4 py-3 text-sm text-stone-300">
-            <p>Vous regardez cette partie en spectateur.</p>
-            <p v-if="joinError" class="text-red-400">{{ joinError }}</p>
-            <button
-              type="button"
-              class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold hover:bg-emerald-500 disabled:opacity-50"
-              :disabled="joining"
-              @click="startJoin"
-            >
-              {{ joining ? 'Connexion…' : 'Rejoindre cette partie' }}
-            </button>
-          </div>
 
-          <GameStatusBar :state="state" :my-color="myColor" :my-role="myRole" :pending-submission="pendingSubmission" />
-
-          <RoundResultBanner
-            v-if="state.lastRound"
-            :round="state.lastRound"
-            :my-color="myColor"
-            @hover="hoveredGuess = $event"
-          />
-
-          <div v-if="error" class="mb-4 rounded-lg bg-red-900/60 px-4 py-3 text-sm">
-            {{ error.message }}
-            <button type="button" class="ml-2 text-red-300 hover:text-red-100" @click="gameStore.dismissError()">✕</button>
+          <div class="order-3 mx-auto w-full max-w-xl @min-[67rem]:order-none @min-[67rem]:mx-0 @min-[67rem]:max-w-none">
+            <ChatPanel :messages="chatMessages" :can-send="Boolean(myColor) && canAct" @send="gameStore.sendChat" />
           </div>
         </div>
 
-        <div class="mx-auto flex w-full max-w-xl flex-col items-center gap-4 @min-[67rem]:mx-0 @min-[67rem]:max-w-none">
+        <div class="order-2 mx-auto flex w-full max-w-xl flex-col items-center gap-4 @min-[67rem]:order-none @min-[67rem]:col-start-2 @min-[67rem]:mx-0 @min-[67rem]:max-w-none">
           <ChessBoard
             :board="state.board"
             :legal-moves="state.legalMoves"
@@ -236,7 +254,7 @@ function submitNoGuess() {
           </button>
         </div>
 
-        <div class="mx-auto w-full max-w-xl @min-[67rem]:mx-0 @min-[67rem]:max-w-none">
+        <div class="order-4 mx-auto w-full max-w-xl @min-[67rem]:order-none @min-[67rem]:col-start-3 @min-[67rem]:mx-0 @min-[67rem]:max-w-none">
           <MoveHistoryList :move-history="state.moveHistory" />
         </div>
       </div>

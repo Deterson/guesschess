@@ -41,11 +41,30 @@ public final class Game {
 
     private static final int FIFTY_MOVE_HALFMOVE_LIMIT = 100;
     private static final int REPETITION_LIMIT = 3;
+    private static final int GUESS_REPETITION_LIMIT_PER_SIDE = 3;
+
+    /**
+     * Origine d'une entree de positionHistory : MOVE pour un coup reellement joue
+     * (y compris la position initiale), GUESS pour un round annule par une devinette
+     * correcte (le plateau ne bouge pas, seul le trait passe - voir Game.cancelRound).
+     * Seules les entrees MOVE comptent pour la nulle par triple repetition (voir
+     * countOccurrences) ; la regle "three guess repetition" est trackee separement
+     * (voir whiteGuessedMove/blackGuessedMove ci-dessous), car elle porte sur l'identite
+     * du coup devine, pas seulement sur la position. Public (comme Memento) pour rester
+     * lisible depuis la persistance JPA, seul autre endroit qui manipule l'historique.
+     */
+    public enum PositionOrigin {
+        MOVE,
+        GUESS
+    }
+
+    public record PositionRecord(Board board, PositionOrigin origin) {
+    }
 
     private final GameId id;
     private final GameVariant variant;
     private Board board;
-    private final List<Board> positionHistory = new ArrayList<>();
+    private final List<PositionRecord> positionHistory = new ArrayList<>();
     private final List<Move> moveHistory = new ArrayList<>();
     private GameStatus status = GameStatus.ONGOING;
     private GameResult result;
@@ -54,16 +73,33 @@ public final class Game {
     private Move pendingGuess;
     private RoundResult lastRoundResult;
 
+    /**
+     * Suivi de la regle de "three guess repetition" : pour chaque couleur, le dernier
+     * coup devine correctement quand elle etait au trait, et le nombre de fois de suite
+     * (sans coup reellement joue entre-temps) que ce meme coup a ete devine. La nulle
+     * est declaree quand les deux compteurs atteignent GUESS_REPETITION_LIMIT_PER_SIDE
+     * simultanement - donc un meme coup repete 3 fois cote blancs ET un meme coup
+     * (eventuellement different) repete 3 fois cote noirs, dans un enchainement continu
+     * de devinettes correctes. Un coup reellement joue reinitialise les deux compteurs
+     * (voir resetGuessedMoveStreaks) ; un coup devine qui differe du precedent pour
+     * une couleur ne reinitialise que le compteur de cette couleur-la.
+     */
+    private Move whiteGuessedMove;
+    private int whiteGuessedMoveStreak;
+    private Move blackGuessedMove;
+    private int blackGuessedMoveStreak;
+
     private Game(GameId id, Board initialBoard, GameVariant variant) {
         this.id = id;
         this.board = initialBoard;
         this.variant = variant;
-        this.positionHistory.add(initialBoard);
+        this.positionHistory.add(new PositionRecord(initialBoard, PositionOrigin.MOVE));
     }
 
-    private Game(GameId id, GameVariant variant, Board board, List<Board> positionHistory, List<Move> moveHistory,
+    private Game(GameId id, GameVariant variant, Board board, List<PositionRecord> positionHistory, List<Move> moveHistory,
                  GameStatus status, GameResult result, Move pendingMove, boolean guessSubmitted,
-                 Move pendingGuess, RoundResult lastRoundResult) {
+                 Move pendingGuess, RoundResult lastRoundResult, Move whiteGuessedMove, int whiteGuessedMoveStreak,
+                 Move blackGuessedMove, int blackGuessedMoveStreak) {
         this.id = id;
         this.variant = variant;
         this.board = board;
@@ -75,6 +111,10 @@ public final class Game {
         this.guessSubmitted = guessSubmitted;
         this.pendingGuess = pendingGuess;
         this.lastRoundResult = lastRoundResult;
+        this.whiteGuessedMove = whiteGuessedMove;
+        this.whiteGuessedMoveStreak = whiteGuessedMoveStreak;
+        this.blackGuessedMove = blackGuessedMove;
+        this.blackGuessedMoveStreak = blackGuessedMoveStreak;
     }
 
     public static Game newGame() {
@@ -116,7 +156,8 @@ public final class Game {
     public static Game fromMemento(Memento memento) {
         return new Game(memento.id(), memento.variant(), memento.board(), memento.positionHistory(), memento.moveHistory(),
                 memento.status(), memento.result(), memento.pendingMove(), memento.guessSubmitted(),
-                memento.pendingGuess(), memento.lastRoundResult());
+                memento.pendingGuess(), memento.lastRoundResult(), memento.whiteGuessedMove(),
+                memento.whiteGuessedMoveStreak(), memento.blackGuessedMove(), memento.blackGuessedMoveStreak());
     }
 
     public GameId id() {
@@ -246,7 +287,7 @@ public final class Game {
             if (variant == GameVariant.GUESSMATE && moverWasInCheck) {
                 finish(GameResult.win(guesser, GameResultCause.CHECK_PARRY_GUESSED));
             } else {
-                cancelRound();
+                cancelRound(mover, actualMove);
             }
             roundResult = RoundResult.cancelled(mover, guesser, actualMove, guess);
         } else {
@@ -260,7 +301,8 @@ public final class Game {
     private void applyRealMove(Move move) {
         board = board.applyMove(move);
         moveHistory.add(move);
-        positionHistory.add(board);
+        positionHistory.add(new PositionRecord(board, PositionOrigin.MOVE));
+        resetGuessedMoveStreaks();
 
         if (move.isCapture() && move.capturedPiece().type() == PieceType.KING) {
             finish(GameResult.win(move.movedPiece().color(), GameResultCause.KING_CAPTURED));
@@ -269,10 +311,39 @@ public final class Game {
         resolveGameEnd();
     }
 
-    private void cancelRound() {
+    private void cancelRound(Color mover, Move guessedMove) {
         board = board.pass();
-        positionHistory.add(board);
+        positionHistory.add(new PositionRecord(board, PositionOrigin.GUESS));
+        recordGuessedMove(mover, guessedMove);
         resolveGameEnd();
+    }
+
+    private void recordGuessedMove(Color mover, Move move) {
+        switch (mover) {
+            case WHITE -> {
+                if (move.equals(whiteGuessedMove)) {
+                    whiteGuessedMoveStreak++;
+                } else {
+                    whiteGuessedMove = move;
+                    whiteGuessedMoveStreak = 1;
+                }
+            }
+            case BLACK -> {
+                if (move.equals(blackGuessedMove)) {
+                    blackGuessedMoveStreak++;
+                } else {
+                    blackGuessedMove = move;
+                    blackGuessedMoveStreak = 1;
+                }
+            }
+        }
+    }
+
+    private void resetGuessedMoveStreaks() {
+        whiteGuessedMove = null;
+        whiteGuessedMoveStreak = 0;
+        blackGuessedMove = null;
+        blackGuessedMoveStreak = 0;
     }
 
     private void resolveGameEnd() {
@@ -295,6 +366,10 @@ public final class Game {
             finish(GameResult.draw(GameResultCause.DRAW_THREEFOLD_REPETITION));
             return;
         }
+        if (whiteGuessedMoveStreak >= GUESS_REPETITION_LIMIT_PER_SIDE && blackGuessedMoveStreak >= GUESS_REPETITION_LIMIT_PER_SIDE) {
+            finish(GameResult.draw(GameResultCause.DRAW_THREE_GUESS_REPETITION));
+            return;
+        }
         if (MaterialEvaluator.isInsufficientMaterial(board)) {
             finish(GameResult.draw(GameResultCause.DRAW_INSUFFICIENT_MATERIAL));
         }
@@ -313,8 +388,8 @@ public final class Game {
 
     private int countOccurrences(Board position) {
         int count = 0;
-        for (Board past : positionHistory) {
-            if (past.isSamePosition(position)) {
+        for (PositionRecord past : positionHistory) {
+            if (past.origin() == PositionOrigin.MOVE && past.board().isSamePosition(position)) {
                 count++;
             }
         }
@@ -328,21 +403,26 @@ public final class Game {
      */
     public Memento toMemento() {
         return new Memento(id, variant, board, List.copyOf(positionHistory), List.copyOf(moveHistory),
-                status, result, pendingMove, guessSubmitted, pendingGuess, lastRoundResult);
+                status, result, pendingMove, guessSubmitted, pendingGuess, lastRoundResult,
+                whiteGuessedMove, whiteGuessedMoveStreak, blackGuessedMove, blackGuessedMoveStreak);
     }
 
     public record Memento(
             GameId id,
             GameVariant variant,
             Board board,
-            List<Board> positionHistory,
+            List<PositionRecord> positionHistory,
             List<Move> moveHistory,
             GameStatus status,
             GameResult result,
             Move pendingMove,
             boolean guessSubmitted,
             Move pendingGuess,
-            RoundResult lastRoundResult
+            RoundResult lastRoundResult,
+            Move whiteGuessedMove,
+            int whiteGuessedMoveStreak,
+            Move blackGuessedMove,
+            int blackGuessedMoveStreak
     ) {
     }
 }

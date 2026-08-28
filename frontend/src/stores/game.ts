@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { connect, publish, subscribe } from '../services/stompClient'
 import type { StompSubscription } from '@stomp/stompjs'
-import type { ColorLower, ErrorMessage, GameStateMessage, MySubmissionMessage, PromotionPieceType } from '../types/api'
+import type { ChatMessage, ColorLower, ErrorMessage, GameStateMessage, MySubmissionMessage, PromotionPieceType } from '../types/api'
 
 interface JoinGameParams {
   gameId: string
@@ -32,6 +32,12 @@ export const useGameStore = defineStore('game', () => {
    * filet de sécurité serveur (jeton forgé) plutôt qu'un cas normal.
    */
   const canAct = ref(false)
+  /**
+   * Chat ephemere : en memoire uniquement, jamais persiste (ni localStorage ni
+   * ailleurs) - vide a chaque (re)join, un rechargement de page perd donc
+   * l'historique par design (voir CLAUDE.md).
+   */
+  const chatMessages = ref<ChatMessage[]>([])
 
   let subscriptions: StompSubscription[] = []
 
@@ -47,9 +53,15 @@ export const useGameStore = defineStore('game', () => {
     pendingSubmission.value = false
     pendingMove.value = null
     canAct.value = Boolean(playerToken)
+    chatMessages.value = []
 
     await connect()
 
+    subscriptions.push(
+      await subscribe<ChatMessage>(`/topic/games/${id}/chat`, (payload) => {
+        chatMessages.value.push(payload)
+      }),
+    )
     subscriptions.push(
       await subscribe<GameStateMessage>(`/topic/games/${id}`, (payload) => {
         state.value = payload
@@ -107,6 +119,10 @@ export const useGameStore = defineStore('game', () => {
     error.value = null
   }
 
+  function sendChat(text: string) {
+    publish(`/app/games/${gameId.value}/chat`, { token: token.value, text })
+  }
+
   return {
     gameId,
     token,
@@ -116,9 +132,11 @@ export const useGameStore = defineStore('game', () => {
     pendingSubmission,
     pendingMove,
     canAct,
+    chatMessages,
     joinGame,
     submitMove,
     submitGuess,
+    sendChat,
     dismissError,
   }
 })

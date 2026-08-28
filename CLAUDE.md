@@ -217,3 +217,4 @@ tout court (échec rapide voulu au boot Spring, pas seulement au moment du login
 
 ## Ne jamais laisser tourner le back ou le front à la fin d'un prompt
 Cela permet de libérer les ports pour qu'ils puissent être lancées directement depuis la machine locale
+Cependant il ne faut pas down le docker compose

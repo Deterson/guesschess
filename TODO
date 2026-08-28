@@ -2,23 +2,19 @@ ne rien implémenter dans ce TODO à moins que cela ait été explicitement dema
 
 
 --- règles générales
-- fix le bug des 3 nuls (distinguer dans l'historique les états du plateau issus d'un coup, et ceux issus d'un guess. ne compter que ceux issus d'un coup pour la three-fold-repetition)
-- six guess repetition (si 6 guess d'affilé sont effectués, la partie termine en une égalité)
 - garder la possibilité d'en passant si c'est le dernier coup effectif (mon pion avance de 2 et peut être pris en passant,
     je guess le coup de mon adversaire, il guess mon coup, le plateau est dans le même état qu'avant et mon pion devrait toujours être pris en passant, mais ce n'est pas le cas)
 
 --- FRONT
+- une page de règles (6 guess repetition, guessmate)
 - afficher dans l'historique les coups devinés. Changer l'historique parce qu'il est moche
 - enlever le bouton "ne pas deviner" (sera sûrement fait pendant l'étape du timer)
 - traduction intégrale en anglais (plus tard un switch pour le français)
-- quand on clique sur une pièce, des points verts apparaissent pour les coups possible. Si le coup possible est de manger une pièce, ne pas mettre un point, mais un cadre vert autour de la case à manger
-- pouvoir dragger les pièces
 - rajouter du son
 - avoir un vrai historique cliquable à côté du jeu, qui ramène à la position cliquée.
-- un système de messagerie éphémère (le back ne transmet que les messages)
 - un favicon et un logo stylé
 
 étapes optionnelles:
 - un mode tutoriel sur le front
 - un ordinateur qui joue (l'entraîner ? avec des noeuds etc ? ou un stockfish ?)
-
+- une appli mobile / webapp

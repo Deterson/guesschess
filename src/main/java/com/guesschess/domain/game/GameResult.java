@@ -14,6 +14,7 @@ public record GameResult(Color winner, GameResultCause cause) {
         boolean isDraw = cause == GameResultCause.STALEMATE
                 || cause == GameResultCause.DRAW_FIFTY_MOVE_RULE
                 || cause == GameResultCause.DRAW_THREEFOLD_REPETITION
+                || cause == GameResultCause.DRAW_THREE_GUESS_REPETITION
                 || cause == GameResultCause.DRAW_INSUFFICIENT_MATERIAL;
         if (isDraw && winner != null) {
             throw new IllegalArgumentException("winner must be null for cause " + cause);

@@ -10,11 +10,15 @@ import java.util.List;
  */
 record GameStateJson(
         BoardJson board,
-        List<BoardJson> positionHistory,
+        List<PositionRecordJson> positionHistory,
         List<MoveJson> moveHistory,
         MoveJson pendingMove,
         boolean guessSubmitted,
         MoveJson pendingGuess,
-        RoundResultJson lastRoundResult
+        RoundResultJson lastRoundResult,
+        MoveJson whiteGuessedMove,
+        int whiteGuessedMoveStreak,
+        MoveJson blackGuessedMove,
+        int blackGuessedMoveStreak
 ) {
 }
