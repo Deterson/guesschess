@@ -52,8 +52,7 @@ function continueAnonymously() {
   <div class="mx-auto flex max-w-xl flex-col items-center gap-6 px-4 py-16 text-center">
     <h1 class="text-3xl font-bold">Guesschess</h1>
     <p class="text-stone-400">
-      Échecs classiques, avec une règle en plus : à chaque coup, votre adversaire essaie de deviner ce que vous allez
-      jouer.
+      Les échecs, mais si vous devinez le coup de votre adversaire, il ne joue pas.
     </p>
 
     <fieldset class="w-full rounded-lg bg-stone-800 px-4 py-3 text-left">
