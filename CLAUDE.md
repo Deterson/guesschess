@@ -143,7 +143,23 @@ Jeu d'échecs classique avec une règle additionnelle :
    localStorage), intention différée (`services/pendingAction.js`, sessionStorage) pour reprendre
    création/join après une redirection OAuth complète (sortie du SPA).
 8. Page de profil (historique des parties, nom de joueur, etc.)
-9. Dockerisation (images arm64/multi-arch pour le backend, build Vue servi par nginx, docker-compose)
+9. ✅ Dockerisation (fait) : `Dockerfile` racine (backend, multi-stage `eclipse-temurin:25-jdk`
+   → `25-jre`, wrapper Maven car pas de tag `maven:*-eclipse-temurin-25` garanti, JVM bornée par
+   `-XX:MaxRAMPercentage=75.0`) et `frontend/Dockerfile` (multi-stage `node:22-alpine` → build servi
+   par `nginx:1.27-alpine`). `frontend/nginx.conf` proxifie `/api`, `/ws`, `/oauth2`, `/login` vers le
+   backend en **same-origin** — `api.ts`/`stompClient.ts` retombent sur des URLs relatives en prod
+   (au lieu de `localhost:8080` en dur), donc une même image fonctionne derrière n'importe quel
+   domaine sans le connaître au moment du build ; CORS devient obsolète en prod. `spring-boot-starter-actuator`
+   ajouté (`/actuator/health` seul exposé, `permitAll`) pour un vrai `HEALTHCHECK` Docker plutôt qu'un
+   test TCP aveugle. `docker-compose.prod.yml` : postgres sans port publié, `image:`+`build:` sur
+   backend/frontend (même fichier sert au build local et au `pull` depuis GHCR à l'étape 10),
+   `depends_on: condition: service_healthy` en chaîne, `.env.prod.example` documenté. Vérifié
+   localement (build + up + partie anonyme jouée de bout en bout via le proxy nginx, coup envoyé et
+   round persisté en base). **Piège à retenir** : `docker-compose.prod.yml` et le `docker-compose.yml`
+   de dev partagent le même nom de projet Compose par défaut (dossier `Guesschess`) donc le même
+   volume Postgres si lancés depuis le même dossier sans `-p` — utiliser un nom de projet distinct
+   (`docker compose -p ... -f docker-compose.prod.yml ...`) pour tester la stack prod en local sans
+   toucher aux données de dev.
 10. Déploiement sur le Raspberry Pi (reverse proxy, HTTPS, limites mémoire/CPU, dimensionnement JVM)
 11. Tests et peaufinage (tests unitaires du moteur, tests de la mécanique de devinette, UX)
 
@@ -198,3 +214,6 @@ tout court (échec rapide voulu au boot Spring, pas seulement au moment du login
 - Fusion d'une identité anonyme vers un compte après coup (ex. un joueur qui a joué en anonyme se
   connecte ensuite et voudrait récupérer son historique) — hors scope v1 (voir section "Liaison
   compte/session ↔ partie")
+
+## Ne jamais laisser tourner le back ou le front à la fin d'un prompt
+Cela permet de libérer les ports pour qu'ils puissent être lancées directement depuis la machine locale

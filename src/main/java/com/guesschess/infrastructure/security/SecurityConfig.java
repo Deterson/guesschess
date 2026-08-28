@@ -50,7 +50,7 @@ class SecurityConfig {
                 .cors(withDefaults())
                 .addFilterBefore(anonymousIdentityFilter, UsernamePasswordAuthenticationFilter.class)
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/ws/**", "/oauth2/**", "/login/**").permitAll()
+                        .requestMatchers("/ws/**", "/oauth2/**", "/login/**", "/actuator/health").permitAll()
                         .requestMatchers("/api/account/**").authenticated()
                         .anyRequest().permitAll())
                 .oauth2Login(oauth2 -> oauth2.successHandler(oAuthLoginSuccessHandler))

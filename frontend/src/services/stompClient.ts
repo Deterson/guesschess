@@ -1,6 +1,15 @@
 import { Client, type StompSubscription } from '@stomp/stompjs'
 
-const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8080/ws'
+/**
+ * Même logique que api.ts : en prod, nginx proxifie /ws en same-origin vers le
+ * backend (voir frontend/nginx.conf), donc on dérive l'URL du WebSocket de l'origine
+ * courante de la page plutôt que de coder un domaine en dur au moment du build.
+ */
+const WS_URL =
+  import.meta.env.VITE_WS_URL ??
+  (import.meta.env.DEV
+    ? 'ws://localhost:8080/ws'
+    : `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws`)
 
 let client: Client | null = null
 let connectPromise: Promise<Client> | null = null

@@ -1,7 +1,14 @@
 import { useAuthStore } from '../stores/auth'
 import type { Color, CreateGameHttpResponse, ErrorResponse, GameVariant, JoinGameHttpResponse, MyAccessHttpResponse } from '../types/api'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+/**
+ * En dev (`npm run dev`), le frontend (5173) et le backend (8080) sont deux origines
+ * distinctes. En prod, nginx sert le frontend et proxifie /api, /ws, /oauth2, /login
+ * vers le backend en same-origin (voir frontend/nginx.conf) - '' (chaine vide) donne
+ * des URLs relatives, donc la même image fonctionne derrière nginx quel que soit le
+ * domaine, sans avoir besoin de le connaître au moment du build.
+ */
+const API_URL = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://localhost:8080' : '')
 
 export class ApiError extends Error {
   status: number

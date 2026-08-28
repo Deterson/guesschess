@@ -1,0 +1,12 @@
+frontend/
+target/
+out/
+bruno/
+.git/
+.idea/
+.vscode/
+*.md
+.env
+.env.*
+!.env.example
+!.env.prod.example
