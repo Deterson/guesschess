@@ -4,7 +4,6 @@ import { storeToRefs } from 'pinia'
 import { useGameStore } from '../stores/game'
 import { useAuthStore } from '../stores/auth'
 import { ApiError, myAccess, joinGame as apiJoinGame } from '../services/api'
-import { consume as consumeJustCreated } from '../services/justCreated'
 import ChessBoard from '../components/ChessBoard.vue'
 import PromotionPicker from '../components/PromotionPicker.vue'
 import GameStatusBar from '../components/GameStatusBar.vue'
@@ -24,7 +23,15 @@ const { state, error, pendingSubmission, myColor, canAct } = storeToRefs(gameSto
 
 const pendingPromotion = ref<{ from: string; to: string; options: PromotionPieceType[] } | null>(null)
 const showLastRound = ref(true)
-const showInvite = ref(consumeJustCreated(props.gameId))
+const inviteDismissed = ref(false)
+/**
+ * Dérivé de l'état plutôt que d'un flag "vient d'être créée" à usage unique
+ * (sessionStorage) : reste correct après un rechargement de page (le créateur voit
+ * toujours son lien tant que personne ne l'a rejoint), et se masque automatiquement
+ * en temps réel dès que l'adversaire rejoint (state.full arrive via la diffusion
+ * STOMP déclenchée par GameCreationController.join - GameStateMessage.full).
+ */
+const showInvite = computed(() => Boolean(myColor.value) && !state.value?.full && !inviteDismissed.value)
 const accessDenied = ref(false)
 const joining = ref(false)
 const joinError = ref<string | null>(null)
@@ -171,7 +178,7 @@ function submitNoGuess() {
 
     <template v-else>
       <div class="w-full max-w-xl">
-        <InviteBanner v-if="showInvite" :game-id="gameId" @dismiss="showInvite = false" />
+        <InviteBanner v-if="showInvite" :game-id="gameId" @dismiss="inviteDismissed = true" />
 
         <div v-if="myColor && !canAct" class="mb-4 rounded-lg bg-stone-800 px-4 py-3 text-sm text-stone-300">
           Vous regardez cette partie en spectateur : quelqu'un d'autre s'est déjà connecté avec ce lien.

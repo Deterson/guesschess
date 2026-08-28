@@ -4,7 +4,6 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useGameStore } from '../stores/game'
 import { consume as consumePendingAction } from '../services/pendingAction'
-import { mark as markJustCreated } from '../services/justCreated'
 import { createGame, joinGame } from '../services/api'
 
 const router = useRouter()
@@ -31,7 +30,6 @@ onMounted(async () => {
   try {
     if (action.type === 'create') {
       const created = await createGame(action.variant, action.color, token)
-      markJustCreated(created.gameId)
       await gameStore.joinGame({
         gameId: created.gameId,
         token: created.creatorToken,

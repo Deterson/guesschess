@@ -62,7 +62,10 @@ public class AnonymousIdentityFilter extends OncePerRequestFilter {
         }
         for (Cookie cookie : cookies) {
             if (COOKIE_NAME.equals(cookie.getName())) {
-                return decode(cookie.getValue());
+                AnonymousId decoded = decode(cookie.getValue());
+                if (decoded != null) {
+                    return decoded;
+                }
             }
         }
         return null;

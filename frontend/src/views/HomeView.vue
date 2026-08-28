@@ -2,7 +2,6 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { createGame } from '../services/api'
-import { mark as markJustCreated } from '../services/justCreated'
 import { useGameStore } from '../stores/game'
 import AuthModal from '../components/AuthModal.vue'
 import type { Color } from '../types/api'
@@ -27,7 +26,6 @@ async function create(authToken: string | null) {
   try {
     const variant = guessmate.value ? 'GUESSMATE' : 'GUESSCHESS'
     const created = await createGame(variant, color.value, authToken)
-    markJustCreated(created.gameId)
     // Le token/couleur revenus ici sont déjà vérifiés côté serveur - on peuple
     // directement le store plutôt que de forcer GameView à les redécouvrir via
     // /my-access, dont la fiabilité dépend de la propagation immédiate du cookie
