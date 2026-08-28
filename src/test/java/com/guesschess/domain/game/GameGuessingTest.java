@@ -13,6 +13,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -107,6 +108,59 @@ class GameGuessingTest {
 
         assertTrue(result.guessedCorrectly());
         assertEquals(e4, result.guessedMove());
+    }
+
+    @Test
+    void mySubmissionIsNoneForBothColorsBeforeAnySubmission() {
+        Game game = Game.newGame();
+
+        assertFalse(game.mySubmission(Color.WHITE).submitted());
+        assertFalse(game.mySubmission(Color.BLACK).submitted());
+    }
+
+    @Test
+    void mySubmissionReflectsTheMoversOwnMoveButNeverTheGuessersToTheMover() {
+        Game game = Game.newGame();
+        Move e4 = findMove(game.legalMoves(), "e2", "e4");
+        game.submitMove(e4);
+
+        assertTrue(game.mySubmission(Color.WHITE).submitted());
+        assertEquals(e4, game.mySubmission(Color.WHITE).move());
+        assertFalse(game.mySubmission(Color.BLACK).submitted());
+    }
+
+    @Test
+    void mySubmissionReflectsTheGuessersOwnGuessButNeverTheMoversToTheGuesser() {
+        Game game = Game.newGame();
+        Move e4 = findMove(game.legalMoves(), "e2", "e4");
+        game.submitGuess(e4);
+
+        assertTrue(game.mySubmission(Color.BLACK).submitted());
+        assertEquals(e4, game.mySubmission(Color.BLACK).move());
+        assertFalse(game.mySubmission(Color.WHITE).submitted());
+    }
+
+    @Test
+    void mySubmissionDistinguishesExplicitNoGuessFromNothingSubmittedYet() {
+        Game game = Game.newGame();
+
+        assertFalse(game.mySubmission(Color.BLACK).submitted());
+
+        game.submitGuess(null);
+
+        assertTrue(game.mySubmission(Color.BLACK).submitted());
+        assertNull(game.mySubmission(Color.BLACK).move());
+    }
+
+    @Test
+    void mySubmissionIsResetForBothColorsOnceTheRoundResolves() {
+        Game game = Game.newGame();
+        Move e4 = findMove(game.legalMoves(), "e2", "e4");
+        game.submitGuess(e4);
+        game.submitMove(e4);
+
+        assertFalse(game.mySubmission(Color.WHITE).submitted());
+        assertFalse(game.mySubmission(Color.BLACK).submitted());
     }
 
     @Test

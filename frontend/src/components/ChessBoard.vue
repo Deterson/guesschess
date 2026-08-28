@@ -22,12 +22,16 @@ const props = withDefaults(
     orientation?: ColorLower
     disabled?: boolean
     lastRound?: RoundSummaryMessage | null
+    pendingMove?: { from: string; to: string } | null
+    hoverGuess?: { from: string; to: string } | null
   }>(),
   {
     legalMoves: () => [],
     orientation: 'white',
     disabled: false,
     lastRound: null,
+    pendingMove: null,
+    hoverGuess: null,
   },
 )
 
@@ -94,12 +98,38 @@ function pieceAt(file: number, rank: number): PieceCode | null {
   return props.board[rank][file]
 }
 
+function isCaptureDestination(file: number, rank: number): boolean {
+  return pieceAt(file, rank) != null
+}
+
 function iconOf(code: PieceCode | null): string | null {
   return code ? PIECE_ICONS[code] : null
 }
 
+function pieceAtSquare(square: string): PieceCode | null {
+  const file = FILES.indexOf(square[0])
+  const rank = Number(square.slice(1)) - 1
+  return props.board[rank]?.[file] ?? null
+}
+
 function isLastRoundSquare(square: string): boolean {
-  return props.lastRound != null && (square === props.lastRound.actualFrom || square === props.lastRound.actualTo)
+  return (
+    props.pendingMove == null &&
+    props.lastRound != null &&
+    (square === props.lastRound.actualFrom || square === props.lastRound.actualTo)
+  )
+}
+
+function isGuessedLastRoundSquare(square: string): boolean {
+  return isLastRoundSquare(square) && (props.lastRound?.guessedCorrectly ?? false)
+}
+
+function isPendingSquare(square: string): boolean {
+  return props.pendingMove != null && (square === props.pendingMove.from || square === props.pendingMove.to)
+}
+
+function isHoverGuessSquare(square: string): boolean {
+  return props.hoverGuess != null && (square === props.hoverGuess.from || square === props.hoverGuess.to)
 }
 
 function attemptMove(from: string, to: string): boolean {
@@ -122,6 +152,11 @@ function onSquareClick(file: number, rank: number) {
     return
   }
 
+  if (selectedFrom.value === square) {
+    selectedFrom.value = null
+    return
+  }
+
   selectedFrom.value = legalFromSquares.value.has(square) ? square : null
 }
 
@@ -131,7 +166,6 @@ function onSquarePointerDown(event: PointerEvent, file: number, rank: number) {
   const piece = pieceAt(file, rank)
   if (!piece || !legalFromSquares.value.has(square)) return
 
-  selectedFrom.value = square
   dragState.value = {
     pointerId: event.pointerId,
     from: square,
@@ -154,7 +188,10 @@ function onSquarePointerMove(event: PointerEvent) {
   if (!drag.dragging) {
     const dx = event.clientX - drag.startX
     const dy = event.clientY - drag.startY
-    if (Math.hypot(dx, dy) > DRAG_THRESHOLD_PX) drag.dragging = true
+    if (Math.hypot(dx, dy) > DRAG_THRESHOLD_PX) {
+      drag.dragging = true
+      selectedFrom.value = drag.from
+    }
   }
 }
 
@@ -192,7 +229,13 @@ function onSquarePointerCancel(event: PointerEvent) {
         :class="[
           (file + rank) % 2 === 0 ? 'bg-amber-800' : 'bg-amber-100',
           selectedFrom === algebraic(file, rank) ? 'ring-4 ring-emerald-400 ring-inset' : '',
-          isLastRoundSquare(algebraic(file, rank)) ? 'bg-sky-500/50' : '',
+          isGuessedLastRoundSquare(algebraic(file, rank))
+            ? 'bg-red-500/50'
+            : isLastRoundSquare(algebraic(file, rank))
+              ? 'bg-sky-500/50'
+              : '',
+          isPendingSquare(algebraic(file, rank)) ? 'bg-sky-500/25' : '',
+          isHoverGuessSquare(algebraic(file, rank)) ? 'ring-4 ring-violet-400 ring-inset' : '',
           disabled ? 'cursor-default' : 'cursor-pointer',
         ]"
         :data-square="algebraic(file, rank)"
@@ -204,15 +247,40 @@ function onSquarePointerCancel(event: PointerEvent) {
         @pointercancel="onSquarePointerCancel"
       >
         <img
-          v-if="iconOf(pieceAt(file, rank)) && !(dragState?.dragging && dragState.from === algebraic(file, rank))"
+          v-if="
+            iconOf(pieceAt(file, rank)) &&
+            !(dragState?.dragging && dragState.from === algebraic(file, rank)) &&
+            pendingMove?.from !== algebraic(file, rank) &&
+            pendingMove?.to !== algebraic(file, rank) &&
+            hoverGuess?.from !== algebraic(file, rank) &&
+            hoverGuess?.to !== algebraic(file, rank)
+          "
           :src="iconOf(pieceAt(file, rank))!"
           class="h-[80%] w-[80%] drop-shadow"
           draggable="false"
           alt=""
         />
+        <img
+          v-if="pendingMove?.to === algebraic(file, rank) && iconOf(pieceAtSquare(pendingMove.from))"
+          :src="iconOf(pieceAtSquare(pendingMove.from))!"
+          class="h-[80%] w-[80%] opacity-40 grayscale"
+          draggable="false"
+          alt=""
+        />
+        <img
+          v-if="hoverGuess?.to === algebraic(file, rank) && iconOf(pieceAtSquare(hoverGuess.from))"
+          :src="iconOf(pieceAtSquare(hoverGuess.from))!"
+          class="h-[80%] w-[80%] drop-shadow"
+          draggable="false"
+          alt=""
+        />
         <span
-          v-if="legalDestinations.has(algebraic(file, rank))"
+          v-if="legalDestinations.has(algebraic(file, rank)) && !isCaptureDestination(file, rank)"
           class="absolute inset-0 m-auto h-3 w-3 rounded-full bg-emerald-500/70"
+        />
+        <span
+          v-if="legalDestinations.has(algebraic(file, rank)) && isCaptureDestination(file, rank)"
+          class="pointer-events-none absolute inset-1 rounded-md border-4 border-emerald-500/70"
         />
       </button>
     </template>

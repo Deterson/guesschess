@@ -26,7 +26,7 @@ import java.util.Optional;
  * correcte -> coup annule, le trait passe au devineur sans qu'aucune piece ne bouge ;
  * devinette fausse ou absente -> coup joue normalement.
  *
- * Cas particulier (variante GUESSCHESS, la regle de base - voir GameVariant) : si le
+ * Cas particulier (variante GUESSMATE, la regle de base - voir GameVariant) : si le
  * coup annule etait la parade a un echec, le roi reste en echec et le trait passe
  * quand meme au devineur, qui a alors normalement acces au coup capturant ce roi
  * parmi ses coups legaux. C'est un coup comme un autre : rien n'oblige le devineur a
@@ -78,7 +78,7 @@ public final class Game {
     }
 
     public static Game newGame() {
-        return newGame(GameId.random(), GameVariant.GUESSCHESS);
+        return newGame(GameId.random(), GameVariant.REGULAR);
     }
 
     public static Game newGame(GameVariant variant) {
@@ -86,7 +86,7 @@ public final class Game {
     }
 
     public static Game newGame(GameId id) {
-        return newGame(id, GameVariant.GUESSCHESS);
+        return newGame(id, GameVariant.REGULAR);
     }
 
     public static Game newGame(GameId id, GameVariant variant) {
@@ -94,7 +94,7 @@ public final class Game {
     }
 
     public static Game fromPosition(Board board) {
-        return fromPosition(GameId.random(), board, GameVariant.GUESSCHESS);
+        return fromPosition(GameId.random(), board, GameVariant.REGULAR);
     }
 
     public static Game fromPosition(Board board, GameVariant variant) {
@@ -102,7 +102,7 @@ public final class Game {
     }
 
     public static Game fromPosition(GameId id, Board board) {
-        return fromPosition(id, board, GameVariant.GUESSCHESS);
+        return fromPosition(id, board, GameVariant.REGULAR);
     }
 
     public static Game fromPosition(GameId id, Board board, GameVariant variant) {
@@ -149,6 +149,24 @@ public final class Game {
 
     public RoundResult lastRoundResult() {
         return lastRoundResult;
+    }
+
+    /**
+     * Ce que color a deja soumis pour le round en cours (son propre coup reel si
+     * color est au trait, sa propre devinette sinon) - reserve a informer CE joueur
+     * de sa propre soumission en attente (typiquement apres un rechargement de page,
+     * pour eviter qu'il ne retente une soumission que le serveur bloquerait). Ne
+     * jamais utiliser pour renvoyer la soumission de l'AUTRE couleur : ce serait
+     * exactement la fuite anti-triche que GameSnapshot evite deliberement.
+     */
+    public PendingSubmission mySubmission(Color color) {
+        if (status != GameStatus.ONGOING) {
+            return PendingSubmission.NONE;
+        }
+        if (color == sideToMove()) {
+            return pendingMove == null ? PendingSubmission.NONE : PendingSubmission.of(pendingMove);
+        }
+        return guessSubmitted ? PendingSubmission.of(pendingGuess) : PendingSubmission.NONE;
     }
 
     public boolean isInCheck() {

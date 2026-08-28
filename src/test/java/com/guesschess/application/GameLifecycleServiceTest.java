@@ -118,6 +118,44 @@ class GameLifecycleServiceTest {
     }
 
     @Test
+    void viewGameWithTokenExposesMySubmissionOnlyToTheSubmittingColor() {
+        CreatedGame game = service.createGame();
+        MoveIntent e4 = MoveIntent.of(Position.fromAlgebraic("e2"), Position.fromAlgebraic("e4"));
+
+        assertFalse(service.viewGame(game.gameId(), game.whiteToken()).mySubmission().submitted());
+
+        service.submitMove(game.whiteToken(), e4);
+
+        GameView moverView = service.viewGame(game.gameId(), game.whiteToken());
+        assertTrue(moverView.mySubmission().submitted());
+        assertEquals(e4.from(), moverView.mySubmission().move().from());
+        assertEquals(e4.to(), moverView.mySubmission().move().to());
+
+        assertFalse(service.viewGame(game.gameId(), game.blackToken()).mySubmission().submitted());
+    }
+
+    @Test
+    void viewGameWithoutOrUnrelatedTokenNeverExposesASubmission() {
+        CreatedGame game = service.createGame();
+        MoveIntent e4 = MoveIntent.of(Position.fromAlgebraic("e2"), Position.fromAlgebraic("e4"));
+        service.submitMove(game.whiteToken(), e4);
+
+        assertFalse(service.viewGame(game.gameId(), null).mySubmission().submitted());
+        assertFalse(service.viewGame(game.gameId(), PlayerToken.random()).mySubmission().submitted());
+    }
+
+    @Test
+    void viewGameWithTokenExposesAnExplicitNoGuessAsSubmitted() {
+        CreatedGame game = service.createGame();
+
+        service.submitGuess(game.blackToken(), null);
+
+        GameView guesserView = service.viewGame(game.gameId(), game.blackToken());
+        assertTrue(guesserView.mySubmission().submitted());
+        assertNull(guesserView.mySubmission().move());
+    }
+
+    @Test
     void submittingAMoveWithARequesterLinksItToTheTokenColor() {
         CreatedGame game = service.createGame();
         MoveIntent e4 = MoveIntent.of(Position.fromAlgebraic("e2"), Position.fromAlgebraic("e4"));
@@ -167,7 +205,7 @@ class GameLifecycleServiceTest {
     void creatingAGameWithAChosenColorLinksOnlyThatColor() {
         PlayerRef creator = new PlayerRef.Account(UserId.random());
 
-        CreatedGame game = service.createGame(GameVariant.GUESSCHESS, Color.BLACK, creator);
+        CreatedGame game = service.createGame(GameVariant.REGULAR, Color.BLACK, creator);
 
         GameAccess access = gameAccessRepository.findByGameId(game.gameId()).orElseThrow();
         assertEquals(creator, access.playerOf(Color.BLACK));
@@ -176,7 +214,7 @@ class GameLifecycleServiceTest {
 
     @Test
     void joiningClaimsTheOnlyOpenColorAndReportsSuccess() {
-        CreatedGame game = service.createGame(GameVariant.GUESSCHESS, Color.WHITE, new PlayerRef.Anonymous(AnonymousId.random()));
+        CreatedGame game = service.createGame(GameVariant.REGULAR, Color.WHITE, new PlayerRef.Anonymous(AnonymousId.random()));
         PlayerRef opponent = new PlayerRef.Anonymous(AnonymousId.random());
 
         JoinResult result = service.joinGame(game.gameId(), opponent);
@@ -191,7 +229,7 @@ class GameLifecycleServiceTest {
 
     @Test
     void joiningAGameThatIsAlreadyFullIsRejected() {
-        CreatedGame game = service.createGame(GameVariant.GUESSCHESS, Color.WHITE, new PlayerRef.Anonymous(AnonymousId.random()));
+        CreatedGame game = service.createGame(GameVariant.REGULAR, Color.WHITE, new PlayerRef.Anonymous(AnonymousId.random()));
         service.joinGame(game.gameId(), new PlayerRef.Anonymous(AnonymousId.random()));
         PlayerRef thirdVisitor = new PlayerRef.Account(UserId.random());
 
@@ -207,7 +245,7 @@ class GameLifecycleServiceTest {
 
     @Test
     void findMyAccessRecoversTheTokenAndColorFromIdentityAlone() {
-        CreatedGame game = service.createGame(GameVariant.GUESSCHESS, Color.WHITE, new PlayerRef.Anonymous(AnonymousId.random()));
+        CreatedGame game = service.createGame(GameVariant.REGULAR, Color.WHITE, new PlayerRef.Anonymous(AnonymousId.random()));
         PlayerRef requester = new PlayerRef.Anonymous(AnonymousId.random());
         service.joinGame(game.gameId(), requester);
 
@@ -219,7 +257,7 @@ class GameLifecycleServiceTest {
 
     @Test
     void findMyAccessIsEmptyForAnIdentityNotLinkedToEitherColor() {
-        CreatedGame game = service.createGame(GameVariant.GUESSCHESS, Color.WHITE, new PlayerRef.Anonymous(AnonymousId.random()));
+        CreatedGame game = service.createGame(GameVariant.REGULAR, Color.WHITE, new PlayerRef.Anonymous(AnonymousId.random()));
         PlayerRef stranger = new PlayerRef.Account(UserId.random());
 
         assertTrue(service.findMyAccess(game.gameId(), stranger).isEmpty());
@@ -227,7 +265,7 @@ class GameLifecycleServiceTest {
 
     @Test
     void findMyAccessWithAnUnresolvedIdentityIsEmpty() {
-        CreatedGame game = service.createGame(GameVariant.GUESSCHESS, Color.WHITE, new PlayerRef.Anonymous(AnonymousId.random()));
+        CreatedGame game = service.createGame(GameVariant.REGULAR, Color.WHITE, new PlayerRef.Anonymous(AnonymousId.random()));
 
         assertTrue(service.findMyAccess(game.gameId(), null).isEmpty());
     }

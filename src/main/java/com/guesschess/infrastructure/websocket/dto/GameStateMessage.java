@@ -10,7 +10,10 @@ import java.util.List;
  * a la fois pour son propre coup et pour la devinette de son adversaire, qui porte
  * sur les memes coups. full indique si les deux couleurs sont deja liees a un
  * joueur reel - permet au frontend de masquer le bouton "Rejoindre cette partie"
- * cote spectateur sans dependre d'un appel REST separe.
+ * cote spectateur sans dependre d'un appel REST separe. mySubmission vaut toujours
+ * MySubmissionMessage.NONE dans ce message quand il est diffuse publiquement sur ce
+ * topic - seule la reponse privee a /app/games/{id}/view le renseigne (voir
+ * MySubmissionMessage).
  */
 public record GameStateMessage(
         String gameId,
@@ -22,6 +25,7 @@ public record GameStateMessage(
         RoundSummaryMessage lastRound,
         List<LegalMoveMessage> legalMoves,
         List<MoveHistoryEntry> moveHistory,
-        boolean full
+        boolean full,
+        MySubmissionMessage mySubmission
 ) {
 }

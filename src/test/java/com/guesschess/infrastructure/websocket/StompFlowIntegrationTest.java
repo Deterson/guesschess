@@ -5,6 +5,7 @@ import com.guesschess.infrastructure.websocket.dto.CreateGameResponse;
 import com.guesschess.infrastructure.websocket.dto.GameStateMessage;
 import com.guesschess.infrastructure.websocket.dto.SubmitGuessRequest;
 import com.guesschess.infrastructure.websocket.dto.SubmitMoveRequest;
+import com.guesschess.infrastructure.websocket.dto.ViewGameRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -199,6 +200,54 @@ class StompFlowIntegrationTest {
 
         assertNotNull(state);
         assertTrue(state.lastRound().guessedCorrectly());
+    }
+
+    /**
+     * Reproduit le bug de rechargement de page : le mover soumet son coup, une
+     * "nouvelle session" (autre connexion, comme un onglet rafraichi) revoit l'etat
+     * avec son propre jeton - elle doit retrouver son coup en attente (pour ne pas
+     * retenter une soumission que le serveur bloquerait), alors qu'une session sans
+     * jeton (spectateur) ou avec le jeton de l'adversaire ne doit jamais l'obtenir.
+     */
+    @Test
+    void viewAfterReconnectExposesMyOwnPendingMoveButNeverToTheOpponentOrASpectator() throws Exception {
+        StompSession session = connect();
+        CreateGameResponse game = createGame(session);
+
+        BlockingQueue<AckMessage> moveAcks = new LinkedBlockingQueue<>();
+        session.subscribe("/user/queue/move.ack", handlerFor(AckMessage.class, moveAcks));
+        session.send("/app/games/" + game.gameId() + "/move",
+                new SubmitMoveRequest(game.whiteToken(), "e2", "e4", null));
+        assertNotNull(moveAcks.poll(5, TimeUnit.SECONDS));
+
+        StompSession reloadedMoverSession = connect();
+        BlockingQueue<GameStateMessage> moverViews = new LinkedBlockingQueue<>();
+        reloadedMoverSession.subscribe("/user/queue/game.state", handlerFor(GameStateMessage.class, moverViews));
+        reloadedMoverSession.send("/app/games/" + game.gameId() + "/view", new ViewGameRequest(game.whiteToken()));
+        GameStateMessage moverState = moverViews.poll(5, TimeUnit.SECONDS);
+
+        assertNotNull(moverState);
+        assertTrue(moverState.mySubmission().submitted());
+        assertEquals("e2", moverState.mySubmission().from());
+        assertEquals("e4", moverState.mySubmission().to());
+
+        StompSession guesserSession = connect();
+        BlockingQueue<GameStateMessage> guesserViews = new LinkedBlockingQueue<>();
+        guesserSession.subscribe("/user/queue/game.state", handlerFor(GameStateMessage.class, guesserViews));
+        guesserSession.send("/app/games/" + game.gameId() + "/view", new ViewGameRequest(game.blackToken()));
+        GameStateMessage guesserState = guesserViews.poll(5, TimeUnit.SECONDS);
+
+        assertNotNull(guesserState);
+        assertFalse(guesserState.mySubmission().submitted());
+
+        StompSession spectatorSession = connect();
+        BlockingQueue<GameStateMessage> spectatorViews = new LinkedBlockingQueue<>();
+        spectatorSession.subscribe("/user/queue/game.state", handlerFor(GameStateMessage.class, spectatorViews));
+        spectatorSession.send("/app/games/" + game.gameId() + "/view", "");
+        GameStateMessage spectatorState = spectatorViews.poll(5, TimeUnit.SECONDS);
+
+        assertNotNull(spectatorState);
+        assertFalse(spectatorState.mySubmission().submitted());
     }
 
     private CreateGameResponse createGame(StompSession session) throws Exception {

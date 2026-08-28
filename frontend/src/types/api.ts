@@ -6,7 +6,7 @@
 
 export type Color = 'WHITE' | 'BLACK'
 export type ColorLower = 'white' | 'black'
-export type GameVariant = 'GUESSCHESS' | 'GUESSMATE'
+export type GameVariant = 'REGULAR' | 'GUESSMATE'
 export type GameStatus = 'ONGOING' | 'FINISHED'
 export type PieceType = 'PAWN' | 'KNIGHT' | 'BISHOP' | 'ROOK' | 'QUEEN' | 'KING'
 export type PromotionPieceType = Exclude<PieceType, 'PAWN' | 'KING'>
@@ -89,6 +89,21 @@ export interface RoundSummaryMessage {
   movePlayed: boolean
 }
 
+/**
+ * Ma propre soumission pour le round en cours (jamais celle de l'adversaire) - voir
+ * MySubmissionMessage.java. Toujours { submitted: false, from: null, to: null,
+ * promotion: null } dans un message reçu via /topic/games/{gameId} (diffusion
+ * publique) ; seule la réponse à /app/games/{id}/view (canal privé
+ * /user/queue/game.state) la renseigne réellement. submitted=true avec from/to null
+ * signifie "devinette explicitement absente soumise" (bouton "Ne pas deviner").
+ */
+export interface MySubmissionMessage {
+  submitted: boolean
+  from: string | null
+  to: string | null
+  promotion: PromotionPieceType | null
+}
+
 export interface GameStateMessage {
   gameId: string
   variant: GameVariant
@@ -100,6 +115,7 @@ export interface GameStateMessage {
   legalMoves: LegalMoveMessage[]
   moveHistory: MoveHistoryEntry[]
   full: boolean
+  mySubmission: MySubmissionMessage
 }
 
 export interface ErrorMessage {

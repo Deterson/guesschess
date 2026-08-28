@@ -19,10 +19,10 @@ const props = defineProps<{
 
 const gameStore = useGameStore()
 const authStore = useAuthStore()
-const { state, error, pendingSubmission, myColor, canAct } = storeToRefs(gameStore)
+const { state, error, pendingSubmission, pendingMove, myColor, canAct } = storeToRefs(gameStore)
 
 const pendingPromotion = ref<{ from: string; to: string; options: PromotionPieceType[] } | null>(null)
-const showLastRound = ref(true)
+const hoveredGuess = ref(false)
 const inviteDismissed = ref(false)
 /**
  * Dérivé de l'état plutôt que d'un flag "vient d'être créée" à usage unique
@@ -62,7 +62,6 @@ watch(
   async (gameId) => {
     if (!gameId) return
     accessDenied.value = false
-    showLastRound.value = false
     if (gameStore.gameId === gameId && gameStore.token) {
       return
     }
@@ -113,12 +112,12 @@ async function performJoin(authToken: string | null) {
   }
 }
 
-watch(
-  () => state.value?.lastRound,
-  (lastRound) => {
-    if (lastRound) showLastRound.value = true
-  },
-)
+const hoverGuessSquares = computed(() => {
+  if (!hoveredGuess.value) return null
+  const round = state.value?.lastRound
+  if (!round?.guessedFrom || !round.guessedTo) return null
+  return { from: round.guessedFrom, to: round.guessedTo }
+})
 
 const myRole = computed(() => {
   if (!state.value || !myColor.value) return null
@@ -166,7 +165,7 @@ function submitNoGuess() {
 </script>
 
 <template>
-  <div class="mx-auto flex max-w-4xl flex-col items-center gap-4 px-4 py-8">
+  <div class="@container mx-auto flex w-full max-w-7xl flex-col items-center gap-4 px-4 py-8">
     <router-link to="/" class="self-start text-sm text-stone-400 hover:text-stone-200">← Accueil</router-link>
 
     <div v-if="accessDenied" class="text-stone-400">
@@ -177,62 +176,69 @@ function submitNoGuess() {
     <div v-else-if="!state" class="text-stone-400">Connexion à la partie…</div>
 
     <template v-else>
-      <div class="w-full max-w-xl">
-        <InviteBanner v-if="showInvite" :game-id="gameId" @dismiss="inviteDismissed = true" />
+      <div class="grid w-full grid-cols-1 items-start gap-6 @min-[67rem]:grid-cols-[minmax(0,1fr)_36rem_minmax(0,1fr)]">
+        <div class="mx-auto w-full max-w-xl @min-[67rem]:mx-0 @min-[67rem]:max-w-none">
+          <InviteBanner v-if="showInvite" :game-id="gameId" @dismiss="inviteDismissed = true" />
 
-        <div v-if="myColor && !canAct" class="mb-4 rounded-lg bg-stone-800 px-4 py-3 text-sm text-stone-300">
-          Vous regardez cette partie en spectateur : quelqu'un d'autre s'est déjà connecté avec ce lien.
+          <div v-if="myColor && !canAct" class="mb-4 rounded-lg bg-stone-800 px-4 py-3 text-sm text-stone-300">
+            Vous regardez cette partie en spectateur : quelqu'un d'autre s'est déjà connecté avec ce lien.
+          </div>
+          <div v-else-if="!myColor && state.full" class="mb-4 rounded-lg bg-stone-800 px-4 py-3 text-sm text-stone-300">
+            Vous regardez cette partie en spectateur : elle est déjà complète.
+          </div>
+          <div v-else-if="!myColor" class="mb-4 space-y-2 rounded-lg bg-stone-800 px-4 py-3 text-sm text-stone-300">
+            <p>Vous regardez cette partie en spectateur.</p>
+            <p v-if="joinError" class="text-red-400">{{ joinError }}</p>
+            <button
+              type="button"
+              class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold hover:bg-emerald-500 disabled:opacity-50"
+              :disabled="joining"
+              @click="startJoin"
+            >
+              {{ joining ? 'Connexion…' : 'Rejoindre cette partie' }}
+            </button>
+          </div>
+
+          <GameStatusBar :state="state" :my-color="myColor" :my-role="myRole" :pending-submission="pendingSubmission" />
+
+          <RoundResultBanner
+            v-if="state.lastRound"
+            :round="state.lastRound"
+            :my-color="myColor"
+            @hover="hoveredGuess = $event"
+          />
+
+          <div v-if="error" class="mb-4 rounded-lg bg-red-900/60 px-4 py-3 text-sm">
+            {{ error.message }}
+            <button type="button" class="ml-2 text-red-300 hover:text-red-100" @click="gameStore.dismissError()">✕</button>
+          </div>
         </div>
-        <div v-else-if="!myColor && state.full" class="mb-4 rounded-lg bg-stone-800 px-4 py-3 text-sm text-stone-300">
-          Vous regardez cette partie en spectateur : elle est déjà complète.
-        </div>
-        <div v-else-if="!myColor" class="mb-4 space-y-2 rounded-lg bg-stone-800 px-4 py-3 text-sm text-stone-300">
-          <p>Vous regardez cette partie en spectateur.</p>
-          <p v-if="joinError" class="text-red-400">{{ joinError }}</p>
+
+        <div class="mx-auto flex w-full max-w-xl flex-col items-center gap-4 @min-[67rem]:mx-0 @min-[67rem]:max-w-none">
+          <ChessBoard
+            :board="state.board"
+            :legal-moves="state.legalMoves"
+            :orientation="myColor ?? 'white'"
+            :disabled="boardDisabled"
+            :last-round="state.lastRound"
+            :pending-move="pendingMove"
+            :hover-guess="hoverGuessSquares"
+            @choose-move="onChooseMove"
+          />
+
           <button
+            v-if="myRole === 'guesser' && !boardDisabled"
             type="button"
-            class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold hover:bg-emerald-500 disabled:opacity-50"
-            :disabled="joining"
-            @click="startJoin"
+            class="rounded-lg bg-stone-700 px-4 py-2 text-sm hover:bg-stone-600"
+            @click="submitNoGuess"
           >
-            {{ joining ? 'Connexion…' : 'Rejoindre cette partie' }}
+            Ne pas deviner
           </button>
         </div>
 
-        <GameStatusBar :state="state" :my-color="myColor" :my-role="myRole" :pending-submission="pendingSubmission" />
-
-        <RoundResultBanner
-          v-if="state.lastRound && showLastRound"
-          :round="state.lastRound"
-          @dismiss="showLastRound = false"
-        />
-
-        <div v-if="error" class="mb-4 rounded-lg bg-red-900/60 px-4 py-3 text-sm">
-          {{ error.message }}
-          <button type="button" class="ml-2 text-red-300 hover:text-red-100" @click="gameStore.dismissError()">✕</button>
+        <div class="mx-auto w-full max-w-xl @min-[67rem]:mx-0 @min-[67rem]:max-w-none">
+          <MoveHistoryList :move-history="state.moveHistory" />
         </div>
-      </div>
-
-      <ChessBoard
-        :board="state.board"
-        :legal-moves="state.legalMoves"
-        :orientation="myColor ?? 'white'"
-        :disabled="boardDisabled"
-        :last-round="state.lastRound"
-        @choose-move="onChooseMove"
-      />
-
-      <button
-        v-if="myRole === 'guesser' && !boardDisabled"
-        type="button"
-        class="rounded-lg bg-stone-700 px-4 py-2 text-sm hover:bg-stone-600"
-        @click="submitNoGuess"
-      >
-        Ne pas deviner
-      </button>
-
-      <div class="w-full max-w-xl">
-        <MoveHistoryList :move-history="state.moveHistory" />
       </div>
 
       <PromotionPicker

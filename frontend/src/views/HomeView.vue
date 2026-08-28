@@ -24,7 +24,7 @@ async function create(authToken: string | null) {
   creating.value = true
   error.value = null
   try {
-    const variant = guessmate.value ? 'GUESSMATE' : 'GUESSCHESS'
+    const variant = guessmate.value ? 'GUESSMATE' : 'REGULAR'
     const created = await createGame(variant, color.value, authToken)
     // Le token/couleur revenus ici sont déjà vérifiés côté serveur - on peuple
     // directement le store plutôt que de forcer GameView à les redécouvrir via
@@ -99,7 +99,7 @@ function continueAnonymously() {
 
     <AuthModal
       :open="showModal"
-      :pending-action="{ type: 'create', variant: guessmate ? 'GUESSMATE' : 'GUESSCHESS', color }"
+      :pending-action="{ type: 'create', variant: guessmate ? 'GUESSMATE' : 'REGULAR', color }"
       @anonymous="continueAnonymously"
       @close="showModal = false"
     />

@@ -6,6 +6,7 @@ import com.guesschess.domain.board.Board;
 import com.guesschess.domain.board.Position;
 import com.guesschess.domain.game.GameResult;
 import com.guesschess.domain.game.RoundResult;
+import com.guesschess.domain.game.PendingSubmission;
 import com.guesschess.domain.move.Move;
 import com.guesschess.domain.piece.Color;
 import com.guesschess.domain.piece.Piece;
@@ -13,6 +14,7 @@ import com.guesschess.domain.piece.PieceType;
 import com.guesschess.infrastructure.websocket.dto.GameStateMessage;
 import com.guesschess.infrastructure.websocket.dto.LegalMoveMessage;
 import com.guesschess.infrastructure.websocket.dto.MoveHistoryEntry;
+import com.guesschess.infrastructure.websocket.dto.MySubmissionMessage;
 import com.guesschess.infrastructure.websocket.dto.ResultMessage;
 import com.guesschess.infrastructure.websocket.dto.RoundSummaryMessage;
 import org.springframework.stereotype.Component;
@@ -26,7 +28,16 @@ import java.util.List;
 @Component
 public class GameMessageMapper {
 
+    /**
+     * A n'utiliser que pour une diffusion publique (/topic/games/{gameId}) : ne porte
+     * jamais de soumission personnelle (voir MySubmissionMessage.NONE), par
+     * construction plutot que par convention chez l'appelant.
+     */
     public GameStateMessage toGameStateMessage(GameSnapshot snapshot, boolean full) {
+        return toGameStateMessage(snapshot, full, PendingSubmission.NONE);
+    }
+
+    public GameStateMessage toGameStateMessage(GameSnapshot snapshot, boolean full, PendingSubmission mySubmission) {
         return new GameStateMessage(
                 snapshot.id().toString(),
                 snapshot.variant().name(),
@@ -37,7 +48,8 @@ public class GameMessageMapper {
                 toRoundSummaryMessage(snapshot.lastRoundResult()),
                 toLegalMoveMessages(snapshot.legalMoves()),
                 toMoveHistoryEntries(snapshot.moveHistory()),
-                full
+                full,
+                toMySubmissionMessage(mySubmission)
         );
     }
 
@@ -71,6 +83,21 @@ public class GameMessageMapper {
                 roundResult.guessedCorrectly(),
                 roundResult.movePlayed()
         );
+    }
+
+    private MySubmissionMessage toMySubmissionMessage(PendingSubmission mySubmission) {
+        if (!mySubmission.submitted()) {
+            return MySubmissionMessage.NONE;
+        }
+        Move move = mySubmission.move();
+        if (move == null) {
+            return new MySubmissionMessage(true, null, null, null);
+        }
+        return new MySubmissionMessage(
+                true,
+                move.from().toAlgebraic(),
+                move.to().toAlgebraic(),
+                move.promotionType() == null ? null : move.promotionType().name());
     }
 
     private List<LegalMoveMessage> toLegalMoveMessages(List<Move> legalMoves) {

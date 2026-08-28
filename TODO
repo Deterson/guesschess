@@ -8,15 +8,13 @@ ne rien implémenter dans ce TODO à moins que cela ait été explicitement dema
 
 --- FRONT
 - enlever le bouton "ne pas deviner" (sera sûrement fait pendant l'étape du timer)
-- quand le joueur a joué ou deviné, le coup s'affiche en gris tant qu'on attend la validation
 - traduction intégrale en anglais (plus tard un switch pour le français)
 - l'historique doit être de la forme "Blancs <coup joué> (<coup deviné>)" par exemple "Blancs e2 (e4)". Si le coup est deviné "Blancs (e2!)"
-- les pièces sont moches, en choisir des nouvelles plus jolies et minimalistes
 - quand on clique sur une pièce, des points verts apparaissent pour les coups possible. Si le coup possible est de manger une pièce, ne pas mettre un point, mais un cadre vert autour de la case à manger
 - pouvoir dragger les pièces
 - rajouter du son
-
-
+- avoir un vrai historique cliquable à côté du jeu, qui ramène à la position cliquée.
+- un système de messagerie éphémère (le back ne transmet que les messages)
 
 étapes optionnelles:
 - un mode tutoriel sur le front

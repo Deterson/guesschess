@@ -3,6 +3,7 @@ package com.guesschess.infrastructure.websocket;
 import com.guesschess.application.CreatedGame;
 import com.guesschess.application.GameLifecycleService;
 import com.guesschess.application.GameSnapshot;
+import com.guesschess.application.GameView;
 import com.guesschess.application.MoveIntent;
 import com.guesschess.application.NoOpenColorException;
 import com.guesschess.application.NoSuchLegalMoveException;
@@ -21,6 +22,7 @@ import com.guesschess.infrastructure.websocket.dto.ErrorMessage;
 import com.guesschess.infrastructure.websocket.dto.GameStateMessage;
 import com.guesschess.infrastructure.websocket.dto.SubmitGuessRequest;
 import com.guesschess.infrastructure.websocket.dto.SubmitMoveRequest;
+import com.guesschess.infrastructure.websocket.dto.ViewGameRequest;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.MessageExceptionHandler;
@@ -60,7 +62,7 @@ public class GameController {
     @SendToUser("/queue/games.created")
     public CreateGameResponse createGame(@Payload(required = false) CreateGameRequest request) {
         GameVariant variant = request == null || request.variant() == null
-                ? GameVariant.GUESSCHESS
+                ? GameVariant.REGULAR
                 : GameVariant.valueOf(request.variant());
         CreatedGame created = gameLifecycleService.createGame(variant);
         return new CreateGameResponse(
@@ -70,12 +72,22 @@ public class GameController {
                 created.variant().name());
     }
 
+    /**
+     * request (et son token) est optionnel pour rester compatible avec un client qui
+     * n'envoie encore aucun payload - dans ce cas comme si token etait absent,
+     * degrade en spectateur (voir GameLifecycleService.viewGame(GameId, PlayerToken)).
+     * token identifie le demandeur pour joindre a l'etat public sa propre soumission
+     * en attente pour le round en cours (MySubmissionMessage) - jamais celle de
+     * l'adversaire : c'est ce qui permet au frontend d'eviter de retenter, apres un
+     * rechargement de page, une soumission que le serveur bloquerait.
+     */
     @MessageMapping("/games/{gameId}/view")
     @SendToUser("/queue/game.state")
-    public GameStateMessage viewGame(@DestinationVariable String gameId) {
+    public GameStateMessage viewGame(@DestinationVariable String gameId, @Payload(required = false) ViewGameRequest request) {
         GameId id = GameId.fromString(gameId);
-        GameSnapshot snapshot = gameLifecycleService.viewGame(id);
-        return mapper.toGameStateMessage(snapshot, gameLifecycleService.isFull(id));
+        PlayerToken token = request == null || request.token() == null ? null : PlayerToken.fromString(request.token());
+        GameView view = gameLifecycleService.viewGame(id, token);
+        return mapper.toGameStateMessage(view.snapshot(), gameLifecycleService.isFull(id), view.mySubmission());
     }
 
     @MessageMapping("/games/{gameId}/move")

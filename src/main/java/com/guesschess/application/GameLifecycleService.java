@@ -5,6 +5,7 @@ import com.guesschess.domain.game.GameId;
 import com.guesschess.domain.game.GameNotFoundException;
 import com.guesschess.domain.game.GameRepository;
 import com.guesschess.domain.game.GameVariant;
+import com.guesschess.domain.game.PendingSubmission;
 import com.guesschess.domain.move.Move;
 import com.guesschess.domain.piece.Color;
 import org.springframework.stereotype.Service;
@@ -28,7 +29,7 @@ public class GameLifecycleService {
     }
 
     public CreatedGame createGame() {
-        return createGame(GameVariant.GUESSCHESS);
+        return createGame(GameVariant.REGULAR);
     }
 
     public CreatedGame createGame(GameVariant variant) {
@@ -111,6 +112,25 @@ public class GameLifecycleService {
 
     public GameSnapshot viewGame(GameId id) {
         return gameRepository.withGame(id, GameSnapshot::of);
+    }
+
+    /**
+     * Variante (correction du bug de rechargement de page) qui identifie le
+     * demandeur par jeton pour joindre a l'etat public sa propre soumission en
+     * attente pour le round en cours - jamais celle de l'adversaire, jamais pour un
+     * spectateur (token null, invalide, ou d'une autre partie degrade silencieusement
+     * vers PendingSubmission.NONE plutot que d'echouer : consulter une partie n'a
+     * jamais necessite de jeton valide).
+     */
+    public GameView viewGame(GameId id, PlayerToken token) {
+        return gameRepository.withGame(id, game -> {
+            Color color = token == null ? null : gameAccessRepository.findByToken(token)
+                    .filter(access -> access.gameId().equals(id))
+                    .map(access -> access.colorOf(token))
+                    .orElse(null);
+            PendingSubmission mySubmission = color == null ? PendingSubmission.NONE : game.mySubmission(color);
+            return new GameView(GameSnapshot.of(game), mySubmission);
+        });
     }
 
     /**

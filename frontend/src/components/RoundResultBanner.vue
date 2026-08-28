@@ -1,35 +1,40 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { Color, RoundSummaryMessage } from '../types/api'
+import type { ColorLower, RoundSummaryMessage } from '../types/api'
 
-const props = defineProps<{
-  round: RoundSummaryMessage
-}>()
+const props = withDefaults(
+  defineProps<{
+    round: RoundSummaryMessage
+    myColor?: ColorLower | null
+  }>(),
+  {
+    myColor: null,
+  },
+)
 
 const emit = defineEmits<{
-  dismiss: []
+  hover: [boolean]
 }>()
 
-const COLOR_LABELS: Record<Color, string> = { WHITE: 'les blancs', BLACK: 'les noirs' }
-const OF_LABELS: Record<Color, string> = { WHITE: 'des blancs', BLACK: 'des noirs' }
-
 const text = computed(() => {
-  const guesser = COLOR_LABELS[props.round.guesser]
-  const mover = OF_LABELS[props.round.mover]
+  if (!props.round.guessedFrom || !props.round.guessedTo) return 'pas de devinette'
+  return `coup deviné : ${props.round.guessedFrom} (${props.round.guessedCorrectly ? 'bingo' : 'raté'})`
+})
 
-  if (props.round.guessedCorrectly) {
-    return `${guesser} ont deviné ${props.round.guessedFrom}-${props.round.guessedTo} : coup ${mover} annulé, trait passé au devineur.`
-  }
-  const guessPart = props.round.guessedFrom
-    ? `${guesser} ont deviné ${props.round.guessedFrom}-${props.round.guessedTo}, à tort`
-    : `${guesser} n'ont rien deviné`
-  return `${guessPart} : coup ${props.round.actualFrom}-${props.round.actualTo} ${mover} joué normalement.`
+const colorClass = computed(() => {
+  if (!props.round.guessedCorrectly) return 'bg-sky-900/60'
+  const guesserIsMe = props.myColor != null && props.round.guesser === props.myColor.toUpperCase()
+  return guesserIsMe ? 'bg-emerald-900/60' : 'bg-red-900/60'
 })
 </script>
 
 <template>
-  <div class="mb-4 flex items-center justify-between gap-3 rounded-lg bg-emerald-900/60 px-4 py-3 text-sm">
+  <div
+    class="mb-4 rounded-lg px-4 py-3 text-sm"
+    :class="colorClass"
+    @mouseenter="emit('hover', true)"
+    @mouseleave="emit('hover', false)"
+  >
     <p>{{ text }}</p>
-    <button type="button" class="shrink-0 text-emerald-300 hover:text-emerald-100" @click="emit('dismiss')">✕</button>
   </div>
 </template>
