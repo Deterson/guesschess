@@ -7,8 +7,10 @@ import com.guesschess.domain.piece.Color;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Verifie l'immutabilite du lien couleur -> joueur (etape 6 de la roadmap) :
@@ -53,5 +55,22 @@ class GameAccessTest {
         GameAccess linkedAgain = linkedOnce.withPlayerLinked(Color.WHITE, ref);
 
         assertSame(linkedOnce, linkedAgain);
+    }
+
+    @Test
+    void isFullIsFalseUntilBothColorsAreLinked() {
+        GameAccess onlyWhiteLinked = fresh.withPlayerLinked(Color.WHITE, new PlayerRef.Account(UserId.random()));
+
+        assertFalse(fresh.isFull());
+        assertFalse(onlyWhiteLinked.isFull());
+    }
+
+    @Test
+    void isFullIsTrueOnceBothColorsAreLinked() {
+        GameAccess bothLinked = fresh
+                .withPlayerLinked(Color.WHITE, new PlayerRef.Account(UserId.random()))
+                .withPlayerLinked(Color.BLACK, new PlayerRef.Anonymous(AnonymousId.random()));
+
+        assertTrue(bothLinked.isFull());
     }
 }

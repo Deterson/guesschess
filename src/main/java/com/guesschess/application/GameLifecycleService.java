@@ -2,6 +2,7 @@ package com.guesschess.application;
 
 import com.guesschess.domain.game.Game;
 import com.guesschess.domain.game.GameId;
+import com.guesschess.domain.game.GameNotFoundException;
 import com.guesschess.domain.game.GameRepository;
 import com.guesschess.domain.game.GameVariant;
 import com.guesschess.domain.move.Move;
@@ -65,17 +66,18 @@ public class GameLifecycleService {
     /**
      * Variante liant en plus (etape 6) requester - le compte ou l'identite anonyme
      * resolue pour la connexion appelante - a la couleur du jeton, si cette couleur
-     * n'est pas deja liee. requester null (identite non resolue) ne lie rien mais
-     * n'empeche pas la soumission : le jeu reste possible en anonyme.
+     * n'est pas deja liee ; et (etape 7, durcissement) rejette l'action si une identite
+     * differente a deja revendique cette couleur - le token seul ne suffit plus des
+     * qu'un premier joueur a agi. requester null (identite non resolue) ne lie rien et
+     * ne declenche jamais ce rejet : le jeu reste possible en anonyme pour un appelant
+     * qui ne resout pas d'identite.
      */
     public Optional<GameSnapshot> submitMove(PlayerToken token, MoveIntent intent, PlayerRef requester) {
         GameAccess access = requireAccess(token);
         Color color = access.colorOf(token);
         return gameRepository.withGame(access.gameId(), game -> {
             requireColor(access, token, game.sideToMove());
-            if (requester != null) {
-                gameAccessRepository.linkPlayer(access.gameId(), color, requester);
-            }
+            requireOwnership(access.gameId(), color, requester);
             Move move = resolveMove(game, intent);
             return game.submitMove(move).map(result -> GameSnapshot.of(game));
         });
@@ -93,17 +95,15 @@ public class GameLifecycleService {
     }
 
     /**
-     * Variante liant en plus (etape 6) requester a la couleur du jeton - voir
-     * submitMove(token, intent, requester).
+     * Variante liant en plus (etape 6) requester a la couleur du jeton, avec le meme
+     * durcissement (etape 7) - voir submitMove(token, intent, requester).
      */
     public Optional<GameSnapshot> submitGuess(PlayerToken token, MoveIntent intent, PlayerRef requester) {
         GameAccess access = requireAccess(token);
         Color color = access.colorOf(token);
         return gameRepository.withGame(access.gameId(), game -> {
             requireColor(access, token, game.sideToMove().opposite());
-            if (requester != null) {
-                gameAccessRepository.linkPlayer(access.gameId(), color, requester);
-            }
+            requireOwnership(access.gameId(), color, requester);
             Move guess = intent == null ? null : resolveMove(game, intent);
             return game.submitGuess(guess).map(result -> GameSnapshot.of(game));
         });
@@ -114,17 +114,62 @@ public class GameLifecycleService {
     }
 
     /**
-     * Acceptation d'un lien d'invitation (etape 7) : lie requester a la couleur du
-     * jeton s'il n'y a pas deja quelqu'un d'autre. linkedToRequester distingue une
-     * liaison reussie (nouvelle, ou reclic sur son propre lien) d'une invitation deja
-     * consommee par un autre joueur - a l'appelant de traduire ce dernier cas en erreur
-     * claire (l'invitation est a usage unique).
+     * Les deux couleurs sont-elles liees a un joueur reel (compte ou identite
+     * anonyme) ? Conditionne cote frontend l'affichage du bouton "Rejoindre cette
+     * partie" a un spectateur - false (partie non trouvee) plutot qu'une exception,
+     * ce cas n'ayant pas besoin d'etre distingue par l'appelant ici.
      */
-    public JoinResult joinGame(PlayerToken token, PlayerRef requester) {
-        GameAccess access = requireAccess(token);
-        Color color = access.colorOf(token);
-        PlayerRef bound = gameAccessRepository.linkPlayer(access.gameId(), color, requester);
-        return new JoinResult(access.gameId(), color, bound.equals(requester));
+    public boolean isFull(GameId gameId) {
+        return gameAccessRepository.findByGameId(gameId)
+                .map(GameAccess::isFull)
+                .orElse(false);
+    }
+
+    /**
+     * Acceptation d'une invitation (etape 7, sans token) : revendique l'unique couleur
+     * encore libre de gameId pour requester - il n'y a plus de choix de couleur a faire
+     * cote appelant, puisqu'un lien reel n'a jamais qu'un seul siege libre (le
+     * createur revendique deja le sien a la creation). linkedToRequester distingue une
+     * liaison reussie (nouvelle, ou reclic sur son propre lien) d'une invitation deja
+     * consommee par un autre joueur entre-temps (course perdue).
+     *
+     * @throws NoOpenColorException si les deux couleurs sont deja revendiquees
+     */
+    public JoinResult joinGame(GameId gameId, PlayerRef requester) {
+        GameAccess access = gameAccessRepository.findByGameId(gameId)
+                .orElseThrow(() -> new GameNotFoundException(gameId));
+        Color openColor = access.playerOf(Color.WHITE) == null ? Color.WHITE
+                : access.playerOf(Color.BLACK) == null ? Color.BLACK
+                : null;
+        if (openColor == null) {
+            throw new NoOpenColorException(gameId);
+        }
+        PlayerToken token = openColor == Color.WHITE ? access.whiteToken() : access.blackToken();
+        PlayerRef bound = gameAccessRepository.linkPlayer(gameId, openColor, requester);
+        return new JoinResult(gameId, openColor, token, bound.equals(requester));
+    }
+
+    /**
+     * Retrouve le jeton/couleur de requester pour gameId a partir de sa seule identite
+     * (etape 7, recuperation d'acces) - utile a un joueur anonyme qui a perdu l'URL
+     * contenant son jeton (onglet ferme sans l'avoir enregistree ailleurs) : son
+     * identite (cookie anonyme persistant, ou compte) suffit a la retrouver. Vide si
+     * requester n'est lie a aucune des deux couleurs de cette partie, y compris si
+     * requester est null (identite non resolue).
+     */
+    public Optional<MyAccess> findMyAccess(GameId gameId, PlayerRef requester) {
+        if (requester == null) {
+            return Optional.empty();
+        }
+        GameAccess access = gameAccessRepository.findByGameId(gameId)
+                .orElseThrow(() -> new GameNotFoundException(gameId));
+        if (requester.equals(access.playerOf(Color.WHITE))) {
+            return Optional.of(new MyAccess(Color.WHITE, access.whiteToken()));
+        }
+        if (requester.equals(access.playerOf(Color.BLACK))) {
+            return Optional.of(new MyAccess(Color.BLACK, access.blackToken()));
+        }
+        return Optional.empty();
     }
 
     private GameAccess requireAccess(PlayerToken token) {
@@ -136,6 +181,16 @@ public class GameLifecycleService {
         Color actual = access.colorOf(token);
         if (actual != expected) {
             throw new WrongTurnException(expected, actual);
+        }
+    }
+
+    private void requireOwnership(GameId gameId, Color color, PlayerRef requester) {
+        if (requester == null) {
+            return;
+        }
+        PlayerRef bound = gameAccessRepository.linkPlayer(gameId, color, requester);
+        if (!bound.equals(requester)) {
+            throw new NotYourColorException(color);
         }
     }
 

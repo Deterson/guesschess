@@ -43,6 +43,10 @@ public record GameAccess(GameId gameId, PlayerToken whiteToken, PlayerToken blac
         return color == Color.WHITE ? whitePlayer : blackPlayer;
     }
 
+    public boolean isFull() {
+        return whitePlayer != null && blackPlayer != null;
+    }
+
     /**
      * Lie ref a color si cette couleur n'est pas deja liee, sinon ne fait rien : le
      * lien est immuable une fois pose (voir doc de la classe).

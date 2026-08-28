@@ -4,7 +4,9 @@ import com.guesschess.application.CreatedGame;
 import com.guesschess.application.GameLifecycleService;
 import com.guesschess.application.GameSnapshot;
 import com.guesschess.application.MoveIntent;
+import com.guesschess.application.NoOpenColorException;
 import com.guesschess.application.NoSuchLegalMoveException;
+import com.guesschess.application.NotYourColorException;
 import com.guesschess.application.PlayerRef;
 import com.guesschess.application.PlayerToken;
 import com.guesschess.application.UnknownPlayerTokenException;
@@ -71,8 +73,9 @@ public class GameController {
     @MessageMapping("/games/{gameId}/view")
     @SendToUser("/queue/game.state")
     public GameStateMessage viewGame(@DestinationVariable String gameId) {
-        GameSnapshot snapshot = gameLifecycleService.viewGame(GameId.fromString(gameId));
-        return mapper.toGameStateMessage(snapshot);
+        GameId id = GameId.fromString(gameId);
+        GameSnapshot snapshot = gameLifecycleService.viewGame(id);
+        return mapper.toGameStateMessage(snapshot, gameLifecycleService.isFull(id));
     }
 
     @MessageMapping("/games/{gameId}/move")
@@ -108,6 +111,8 @@ public class GameController {
     @MessageExceptionHandler({
             UnknownPlayerTokenException.class,
             WrongTurnException.class,
+            NotYourColorException.class,
+            NoOpenColorException.class,
             NoSuchLegalMoveException.class,
             GameNotFoundException.class,
             IllegalArgumentException.class,
@@ -119,7 +124,8 @@ public class GameController {
     }
 
     private void broadcast(GameSnapshot snapshot) {
-        messagingTemplate.convertAndSend("/topic/games/" + snapshot.id(), mapper.toGameStateMessage(snapshot));
+        boolean full = gameLifecycleService.isFull(snapshot.id());
+        messagingTemplate.convertAndSend("/topic/games/" + snapshot.id(), mapper.toGameStateMessage(snapshot, full));
     }
 
     /**

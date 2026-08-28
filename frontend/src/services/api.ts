@@ -1,0 +1,68 @@
+import { useAuthStore } from '../stores/auth'
+import type { Color, CreateGameHttpResponse, ErrorResponse, GameVariant, JoinGameHttpResponse, MyAccessHttpResponse } from '../types/api'
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+
+export class ApiError extends Error {
+  status: number
+  code?: string
+
+  constructor(message: string, status: number, code?: string) {
+    super(message)
+    this.status = status
+    this.code = code
+  }
+}
+
+interface RequestOptions {
+  method?: string
+  body?: unknown
+  token?: string | null
+}
+
+/**
+ * `credentials: 'include'` fait partir le cookie d'identité anonyme
+ * (`guesschess_anon`, posé silencieusement par le backend sur toute requête HTTP) —
+ * nécessaire pour que la création/le join en anonyme résolvent la même identité que
+ * les futures requêtes du même navigateur.
+ */
+async function request<T>(path: string, { method = 'GET', body, token }: RequestOptions = {}): Promise<T> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (token) headers.Authorization = `Bearer ${token}`
+
+  const response = await fetch(`${API_URL}${path}`, {
+    method,
+    headers,
+    credentials: 'include',
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+
+  if (response.status === 401 && token) {
+    // Spring Security rejette une requête portant un Bearer invalide/expiré avec 401
+    // AVANT même d'atteindre l'endpoint, même quand celui-ci n'exige aucune
+    // authentification (permitAll) - un jeton présenté mais invalide n'est pas
+    // équivalent à une requête anonyme. Un compte périmé/corrompu en localStorage ne
+    // doit jamais bloquer un flux qui reste possible en anonyme : on l'oublie et on
+    // retente une seule fois sans lui.
+    useAuthStore().logout()
+    return request<T>(path, { method, body })
+  }
+
+  if (!response.ok) {
+    const errorBody: ErrorResponse | null = await response.json().catch(() => null)
+    throw new ApiError(errorBody?.message || `Erreur ${response.status}`, response.status, errorBody?.error)
+  }
+
+  return response.status === 204 ? (null as T) : response.json()
+}
+
+export const oauthAuthorizationUrl = (provider: string): string => `${API_URL}/oauth2/authorization/${provider}`
+
+export const createGame = (variant: GameVariant, color: Color | 'RANDOM', token: string | null) =>
+  request<CreateGameHttpResponse>('/api/games', { method: 'POST', body: { variant, color }, token })
+
+export const joinGame = (gameId: string, authToken: string | null) =>
+  request<JoinGameHttpResponse>(`/api/games/${gameId}/join`, { method: 'POST', token: authToken })
+
+export const myAccess = (gameId: string, authToken: string | null) =>
+  request<MyAccessHttpResponse>(`/api/games/${gameId}/my-access`, { token: authToken })

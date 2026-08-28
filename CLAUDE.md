@@ -118,25 +118,30 @@ Jeu d'échecs classique avec une règle additionnelle :
    devinette soumis par chaque couleur (`GameLifecycleService.submitMove/submitGuess(..., PlayerRef)`) ;
    aucun choix de couleur ni flux d'invitation n'existe encore (prévu étape 7), donc la création de
    partie elle-même ne lie personne pour l'instant. Le flux WebSocket reste par ailleurs non
-   authentifiant (jeton = seul mécanisme d'autorisation) : l'identité résolue n'est que la métadonnée
-   à lier, jamais un contrôle d'accès.
-7. ✅ Page d'accueil — création de partie (fait) : choix de couleur (blancs/noirs/aléatoire) sur
-   `HomeView`, création via REST (`POST /api/games`, pas STOMP — doit s'enchaîner avec une
-   redirection OAuth complète du navigateur) qui lie immédiatement le créateur à la couleur
-   choisie (`GameLifecycleService.createGame(variant, color, creator)`) et renvoie un unique lien
-   d'invitation pour la couleur adverse. Acceptation via `POST /api/games/{id}/join`
-   (`GameLifecycleService.joinGame`), à usage unique : une deuxième tentative avec une identité
-   différente répond `409 ALREADY_LINKED` (`GameAccessRepository.linkPlayer` renvoie désormais le
-   `PlayerRef` gagnant plutôt que `void`, pour distinguer ce cas d'un lien réussi). Résolution
-   d'identité HTTP compte/anonyme via `HttpPlayerIdentityResolver`, symétrique à
-   `WebSocketPlayerIdentity` côté STOMP. L'endpoint STOMP `/app/games.create` existant n'a pas été
-   touché (toujours utilisé par les tests d'intégration STOMP), simplement plus appelé par le
-   frontend. UI de login complète ajoutée (elle n'existait pas avant cette étape) : `AuthModal`
-   (composant partagé create/join), `OAuthCallbackView` (`/oauth-callback`, lit le JWT dans le
-   fragment d'URL), `JoinView` (`/join/:gameId`, lien immédiatement si déjà connecté sinon passe
-   par la modale), store `auth` (JWT en localStorage), intention différée
-   (`services/pendingAction.js`, sessionStorage) pour reprendre création/join après une
-   redirection OAuth complète (sortie du SPA).
+   authentifiant à ce stade (jeton = seul mécanisme d'autorisation) : l'identité résolue n'est
+   encore que la métadonnée à lier, pas un contrôle d'accès — durci à l'étape 7.
+7. ✅ Page d'accueil — création de partie (fait, avec durcissement ultérieur) : choix de couleur
+   (blancs/noirs/aléatoire) sur `HomeView`, création via REST (`POST /api/games`, pas STOMP — doit
+   s'enchaîner avec une redirection OAuth complète du navigateur) qui lie immédiatement le
+   créateur à la couleur choisie (`GameLifecycleService.createGame(variant, color, creator)`).
+   **Un seul lien par partie** (`/game/{gameId}`, jamais de jeton dans une URL) : quiconque l'ouvre
+   est résolu par sa seule identité via `GET /api/games/{id}/my-access`
+   (`GameLifecycleService.findMyAccess`) — déjà lié → joueur ; pas lié → spectateur avec un bouton
+   « Rejoindre cette partie » qui revendique l'unique siège encore libre
+   (`POST /api/games/{id}/join`, sans corps, `GameLifecycleService.joinGame(gameId, requester)` ;
+   partie déjà complète → `409 GAME_FULL`, `NoOpenColorException`). Le contrôle d'accès aux
+   coups/devinettes a été durci en conséquence : `GameLifecycleService.requireOwnership` rejette
+   (`NotYourColorException`) toute action dont l'identité ne correspond pas à celle déjà liée à la
+   couleur — le jeton (`PlayerToken`) redevient un détail d'implémentation interne (routage dans
+   les messages STOMP `submitMove`/`submitGuess`), jamais exposé côté client ; ce filet de sécurité
+   protège contre un jeton forgé même s'il ne peut plus fuiter par une URL. Résolution d'identité
+   HTTP compte/anonyme via `HttpPlayerIdentityResolver`, symétrique à `WebSocketPlayerIdentity`
+   côté STOMP. L'endpoint STOMP `/app/games.create` existant n'a pas été touché (toujours utilisé
+   par les tests d'intégration STOMP), simplement plus appelé par le frontend. UI de login complète
+   ajoutée (elle n'existait pas avant cette étape) : `AuthModal` (composant partagé create/join),
+   `OAuthCallbackView` (`/oauth-callback`, lit le JWT dans le fragment d'URL), store `auth` (JWT en
+   localStorage), intention différée (`services/pendingAction.js`, sessionStorage) pour reprendre
+   création/join après une redirection OAuth complète (sortie du SPA).
 8. Page de profil (historique des parties, nom de joueur, etc.)
 9. Dockerisation (images arm64/multi-arch pour le backend, build Vue servi par nginx, docker-compose)
 10. Déploiement sur le Raspberry Pi (reverse proxy, HTTPS, limites mémoire/CPU, dimensionnement JVM)
@@ -156,15 +161,20 @@ Jeu d'échecs classique avec une règle additionnelle :
   le créateur soit déjà connecté ou non, il passe par la **même modale** "se connecter / jouer en
   anonyme" que l'adversaire avant que la partie soit effectivement créée et son lien posé —
   comportement symétrique entre les deux joueurs.
-- Une fois la partie créée : redirection du créateur vers l'URL de sa partie, et popup affichant
-  le **lien unique** à envoyer à l'adversaire.
-- **Lien d'invitation à usage unique** : dès qu'un adversaire (compte ou anonyme) s'est lié à la
-  partie via ce lien, il devient invalide pour toute autre tentative de liaison (erreur claire,
-  pas de second joueur possible sur le même slot).
-- **Flux de l'adversaire cliquant sur le lien** : s'il est déjà connecté, son compte est
-  immédiatement et immuablement lié à la partie (pas de modale). Sinon, modale "se connecter" ou
-  "jouer en anonyme" ; le choix qui en résulte (compte après OAuth, ou identité de session
-  anonyme) est immédiatement et immuablement lié à la partie.
+- Une fois la partie créée : redirection du créateur vers l'URL de sa partie, et bannière affichant
+  ce **même lien** (`/game/{gameId}`, sans jeton) à envoyer à l'adversaire — un seul lien par
+  partie, pas de lien séparé par couleur (voir étape 7 pour le pourquoi : le jeton a cessé d'être
+  le mécanisme d'autorisation, il n'a donc plus de raison d'être dans une URL).
+- **Le lien reste valide pour tout le monde, la liaison est à usage unique** : n'importe qui peut
+  toujours ouvrir `/game/{gameId}` (lecture seule, mode spectateur, pas de jeton nécessaire), mais
+  une fois qu'un adversaire (compte ou anonyme) a revendiqué le siège encore libre, toute nouvelle
+  tentative de revendication échoue clairement (`409 GAME_FULL`) — pas de second joueur possible
+  sur la même couleur.
+- **Flux de l'adversaire visitant le lien** : d'abord résolu comme spectateur via
+  `GET /api/games/{id}/my-access` (identité pas encore liée). S'il clique "Rejoindre cette
+  partie" : déjà connecté → son compte est immédiatement et immuablement lié (pas de modale).
+  Sinon, modale "se connecter" ou "jouer en anonyme" ; le choix qui en résulte (compte après
+  OAuth, ou identité de session anonyme) est immédiatement et immuablement lié à la partie.
 - **Bounded context** : le lien lui-même (partie ↔ compte/anonyme) vit côté "Partie" (le `Game`
   référence un identifiant de joueur), la résolution de cet identifiant (qui est ce compte, ou
   gestion du cookie anonyme) reste du ressort du contexte "Compte joueur".

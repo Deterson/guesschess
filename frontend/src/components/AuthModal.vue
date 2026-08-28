@@ -1,14 +1,17 @@
-<script setup>
-import { save as savePendingAction } from '../services/pendingAction'
+<script setup lang="ts">
+import { save as savePendingAction, type PendingAction } from '../services/pendingAction'
 import { oauthAuthorizationUrl } from '../services/api'
 
-const props = defineProps({
-  open: { type: Boolean, required: true },
-  pendingAction: { type: Object, required: true },
-})
-const emit = defineEmits(['anonymous', 'close'])
+const props = defineProps<{
+  open: boolean
+  pendingAction: PendingAction
+}>()
+const emit = defineEmits<{
+  anonymous: []
+  close: []
+}>()
 
-function continueWithOAuth(provider) {
+function continueWithOAuth(provider: string) {
   savePendingAction(props.pendingAction)
   window.location.href = oauthAuthorizationUrl(provider)
 }

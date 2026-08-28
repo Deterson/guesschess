@@ -1,12 +1,16 @@
-<script setup>
-const props = defineProps({
-  color: { type: String, required: true },
-  options: { type: Array, required: true },
-})
-const emit = defineEmits(['select'])
+<script setup lang="ts">
+import type { ColorLower, PromotionPieceType } from '../types/api'
 
-const LABELS = { QUEEN: 'Dame', ROOK: 'Tour', BISHOP: 'Fou', KNIGHT: 'Cavalier' }
-const GLYPHS = {
+const props = defineProps<{
+  color: ColorLower
+  options: PromotionPieceType[]
+}>()
+const emit = defineEmits<{
+  select: [PromotionPieceType]
+}>()
+
+const LABELS: Record<PromotionPieceType, string> = { QUEEN: 'Dame', ROOK: 'Tour', BISHOP: 'Fou', KNIGHT: 'Cavalier' }
+const GLYPHS: Record<ColorLower, Record<PromotionPieceType, string>> = {
   white: { QUEEN: '♕', ROOK: '♖', BISHOP: '♗', KNIGHT: '♘' },
   black: { QUEEN: '♛', ROOK: '♜', BISHOP: '♝', KNIGHT: '♞' },
 }

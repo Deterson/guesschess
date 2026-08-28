@@ -1,15 +1,15 @@
-<script setup>
+<script setup lang="ts">
 import { ref } from 'vue'
 
-const props = defineProps({
-  gameId: { type: String, required: true },
-  token: { type: String, required: true },
-  color: { type: String, required: true },
-})
-const emit = defineEmits(['dismiss'])
+const props = defineProps<{
+  gameId: string
+}>()
+const emit = defineEmits<{
+  dismiss: []
+}>()
 
 const copied = ref(false)
-const link = `${window.location.origin}/join/${props.gameId}?token=${props.token}&color=${props.color}`
+const link = `${window.location.origin}/game/${props.gameId}`
 
 async function copy() {
   await navigator.clipboard.writeText(link)

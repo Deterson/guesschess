@@ -4,6 +4,7 @@ import com.guesschess.domain.account.AnonymousId;
 import com.guesschess.domain.account.UserId;
 import com.guesschess.domain.board.Position;
 import com.guesschess.domain.game.GameId;
+import com.guesschess.domain.game.GameNotFoundException;
 import com.guesschess.domain.game.GameStatus;
 import com.guesschess.domain.game.GameVariant;
 import com.guesschess.domain.piece.Color;
@@ -141,7 +142,7 @@ class GameLifecycleServiceTest {
     }
 
     @Test
-    void aColorAlreadyLinkedIsNeverRelinkedToADifferentRequester() {
+    void aColorAlreadyLinkedRejectsActionsFromADifferentRequester() {
         CreatedGame game = service.createGame();
         MoveIntent e4 = MoveIntent.of(Position.fromAlgebraic("e2"), Position.fromAlgebraic("e4"));
         PlayerRef firstWhiteRequester = new PlayerRef.Anonymous(AnonymousId.random());
@@ -152,10 +153,11 @@ class GameLifecycleServiceTest {
         service.submitGuess(game.blackToken(), null, blackRequester);
 
         // Round 2 : White est maintenant le devineur (Black au trait) - meme couleur,
-        // meme jeton, mais une identite differente : ne doit pas ecraser le lien pose
-        // au round 1.
+        // meme jeton, mais une identite differente : doit etre rejete (etape 7,
+        // durcissement) plutot que silencieusement accepte sans ecraser le lien.
         PlayerRef secondWhiteRequester = new PlayerRef.Account(UserId.random());
-        service.submitGuess(game.whiteToken(), null, secondWhiteRequester);
+        assertThrows(NotYourColorException.class,
+                () -> service.submitGuess(game.whiteToken(), null, secondWhiteRequester));
 
         GameAccess access = gameAccessRepository.findByGameId(game.gameId()).orElseThrow();
         assertEquals(firstWhiteRequester, access.playerOf(Color.WHITE));
@@ -173,37 +175,67 @@ class GameLifecycleServiceTest {
     }
 
     @Test
-    void joiningWithAKnownTokenLinksTheRequesterAndReportsSuccess() {
-        CreatedGame game = service.createGame();
+    void joiningClaimsTheOnlyOpenColorAndReportsSuccess() {
+        CreatedGame game = service.createGame(GameVariant.GUESSCHESS, Color.WHITE, new PlayerRef.Anonymous(AnonymousId.random()));
         PlayerRef opponent = new PlayerRef.Anonymous(AnonymousId.random());
 
-        JoinResult result = service.joinGame(game.blackToken(), opponent);
+        JoinResult result = service.joinGame(game.gameId(), opponent);
 
         assertEquals(game.gameId(), result.gameId());
         assertEquals(Color.BLACK, result.color());
+        assertEquals(game.blackToken(), result.token());
         assertTrue(result.linkedToRequester());
         GameAccess access = gameAccessRepository.findByGameId(game.gameId()).orElseThrow();
         assertEquals(opponent, access.playerOf(Color.BLACK));
     }
 
     @Test
-    void joiningAnAlreadyLinkedColorWithADifferentRequesterReportsFailureWithoutOverwriting() {
-        CreatedGame game = service.createGame();
-        PlayerRef firstOpponent = new PlayerRef.Anonymous(AnonymousId.random());
-        PlayerRef secondOpponent = new PlayerRef.Account(UserId.random());
-        service.joinGame(game.blackToken(), firstOpponent);
+    void joiningAGameThatIsAlreadyFullIsRejected() {
+        CreatedGame game = service.createGame(GameVariant.GUESSCHESS, Color.WHITE, new PlayerRef.Anonymous(AnonymousId.random()));
+        service.joinGame(game.gameId(), new PlayerRef.Anonymous(AnonymousId.random()));
+        PlayerRef thirdVisitor = new PlayerRef.Account(UserId.random());
 
-        JoinResult result = service.joinGame(game.blackToken(), secondOpponent);
-
-        assertFalse(result.linkedToRequester());
-        GameAccess access = gameAccessRepository.findByGameId(game.gameId()).orElseThrow();
-        assertEquals(firstOpponent, access.playerOf(Color.BLACK));
+        assertThrows(NoOpenColorException.class, () -> service.joinGame(game.gameId(), thirdVisitor));
     }
 
     @Test
-    void joiningWithAnUnknownTokenIsRejected() {
+    void joiningAnUnknownGameIsRejected() {
         PlayerRef requester = new PlayerRef.Anonymous(AnonymousId.random());
 
-        assertThrows(UnknownPlayerTokenException.class, () -> service.joinGame(PlayerToken.random(), requester));
+        assertThrows(GameNotFoundException.class, () -> service.joinGame(GameId.random(), requester));
+    }
+
+    @Test
+    void findMyAccessRecoversTheTokenAndColorFromIdentityAlone() {
+        CreatedGame game = service.createGame(GameVariant.GUESSCHESS, Color.WHITE, new PlayerRef.Anonymous(AnonymousId.random()));
+        PlayerRef requester = new PlayerRef.Anonymous(AnonymousId.random());
+        service.joinGame(game.gameId(), requester);
+
+        MyAccess found = service.findMyAccess(game.gameId(), requester).orElseThrow();
+
+        assertEquals(Color.BLACK, found.color());
+        assertEquals(game.blackToken(), found.token());
+    }
+
+    @Test
+    void findMyAccessIsEmptyForAnIdentityNotLinkedToEitherColor() {
+        CreatedGame game = service.createGame(GameVariant.GUESSCHESS, Color.WHITE, new PlayerRef.Anonymous(AnonymousId.random()));
+        PlayerRef stranger = new PlayerRef.Account(UserId.random());
+
+        assertTrue(service.findMyAccess(game.gameId(), stranger).isEmpty());
+    }
+
+    @Test
+    void findMyAccessWithAnUnresolvedIdentityIsEmpty() {
+        CreatedGame game = service.createGame(GameVariant.GUESSCHESS, Color.WHITE, new PlayerRef.Anonymous(AnonymousId.random()));
+
+        assertTrue(service.findMyAccess(game.gameId(), null).isEmpty());
+    }
+
+    @Test
+    void findMyAccessForAnUnknownGameIsRejected() {
+        PlayerRef requester = new PlayerRef.Anonymous(AnonymousId.random());
+
+        assertThrows(GameNotFoundException.class, () -> service.findMyAccess(GameId.random(), requester));
     }
 }

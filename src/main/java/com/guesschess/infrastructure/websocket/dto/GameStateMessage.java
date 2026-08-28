@@ -8,7 +8,9 @@ import java.util.List;
  * couleur+piece (ex. "wP", "bK"). lastRound est null tant qu'aucun round n'a encore
  * ete resolu. legalMoves liste les coups legaux du joueur au trait (sideToMove) :
  * a la fois pour son propre coup et pour la devinette de son adversaire, qui porte
- * sur les memes coups.
+ * sur les memes coups. full indique si les deux couleurs sont deja liees a un
+ * joueur reel - permet au frontend de masquer le bouton "Rejoindre cette partie"
+ * cote spectateur sans dependre d'un appel REST separe.
  */
 public record GameStateMessage(
         String gameId,
@@ -19,6 +21,7 @@ public record GameStateMessage(
         ResultMessage result,
         RoundSummaryMessage lastRound,
         List<LegalMoveMessage> legalMoves,
-        List<MoveHistoryEntry> moveHistory
+        List<MoveHistoryEntry> moveHistory,
+        boolean full
 ) {
 }

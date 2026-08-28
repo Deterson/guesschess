@@ -26,7 +26,7 @@ import java.util.List;
 @Component
 public class GameMessageMapper {
 
-    public GameStateMessage toGameStateMessage(GameSnapshot snapshot) {
+    public GameStateMessage toGameStateMessage(GameSnapshot snapshot, boolean full) {
         return new GameStateMessage(
                 snapshot.id().toString(),
                 snapshot.variant().name(),
@@ -36,7 +36,8 @@ public class GameMessageMapper {
                 toResultMessage(snapshot.result()),
                 toRoundSummaryMessage(snapshot.lastRoundResult()),
                 toLegalMoveMessages(snapshot.legalMoves()),
-                toMoveHistoryEntries(snapshot.moveHistory())
+                toMoveHistoryEntries(snapshot.moveHistory()),
+                full
         );
     }
 

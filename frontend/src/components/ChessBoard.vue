@@ -1,51 +1,62 @@
-<script setup>
+<script setup lang="ts">
 import { computed, ref } from 'vue'
+import type { Board, ColorLower, LegalMoveMessage, PieceCode, PromotionPieceType, RoundSummaryMessage } from '../types/api'
 
-const props = defineProps({
-  board: { type: Array, required: true },
-  legalMoves: { type: Array, default: () => [] },
-  orientation: { type: String, default: 'white' },
-  disabled: { type: Boolean, default: false },
-  lastRound: { type: Object, default: null },
-})
+const props = withDefaults(
+  defineProps<{
+    board: Board
+    legalMoves?: LegalMoveMessage[]
+    orientation?: ColorLower
+    disabled?: boolean
+    lastRound?: RoundSummaryMessage | null
+  }>(),
+  {
+    legalMoves: () => [],
+    orientation: 'white',
+    disabled: false,
+    lastRound: null,
+  },
+)
 
-const emit = defineEmits(['choose-move'])
+const emit = defineEmits<{
+  'choose-move': [{ from: string; to: string; promotionOptions: (PromotionPieceType | null)[] }]
+}>()
 
 const FILES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
 
-const GLYPHS = {
+const GLYPHS: Record<PieceCode, string> = {
   wK: '♔', wQ: '♕', wR: '♖', wB: '♗', wN: '♘', wP: '♙',
   bK: '♚', bQ: '♛', bR: '♜', bB: '♝', bN: '♞', bP: '♟',
 }
 
-const selectedFrom = ref(null)
+const selectedFrom = ref<string | null>(null)
 
 const displayRanks = computed(() => (props.orientation === 'white' ? [7, 6, 5, 4, 3, 2, 1, 0] : [0, 1, 2, 3, 4, 5, 6, 7]))
 const displayFiles = computed(() => (props.orientation === 'white' ? [0, 1, 2, 3, 4, 5, 6, 7] : [7, 6, 5, 4, 3, 2, 1, 0]))
 
 const legalFromSquares = computed(() => new Set(props.legalMoves.map((m) => m.from)))
 const legalDestinations = computed(() => {
-  if (!selectedFrom.value) return new Set()
+  if (!selectedFrom.value) return new Set<string>()
   return new Set(props.legalMoves.filter((m) => m.from === selectedFrom.value).map((m) => m.to))
 })
 
-function algebraic(file, rank) {
+function algebraic(file: number, rank: number): string {
   return FILES[file] + (rank + 1)
 }
 
-function pieceAt(file, rank) {
+function pieceAt(file: number, rank: number): PieceCode | null {
   return props.board[rank][file]
 }
 
-function glyphOf(code) {
+function glyphOf(code: PieceCode | null): string {
   return code ? GLYPHS[code] : ''
 }
 
-function isLastRoundSquare(square) {
+function isLastRoundSquare(square: string): boolean {
   return props.lastRound != null && (square === props.lastRound.actualFrom || square === props.lastRound.actualTo)
 }
 
-function onSquareClick(file, rank) {
+function onSquareClick(file: number, rank: number) {
   if (props.disabled) return
   const square = algebraic(file, rank)
 

@@ -1,39 +1,45 @@
-<script setup>
+<script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { createGame } from '../services/api'
+import { mark as markJustCreated } from '../services/justCreated'
+import { useGameStore } from '../stores/game'
 import AuthModal from '../components/AuthModal.vue'
+import type { Color } from '../types/api'
 
 const router = useRouter()
+const gameStore = useGameStore()
 const creating = ref(false)
 const showModal = ref(false)
-const error = ref(null)
+const error = ref<string | null>(null)
 const guessmate = ref(false)
-const color = ref('RANDOM')
+const color = ref<Color | 'RANDOM'>('RANDOM')
 
 function openModal() {
   error.value = null
   showModal.value = true
 }
 
-async function create(authToken) {
+async function create(authToken: string | null) {
   showModal.value = false
   creating.value = true
   error.value = null
   try {
     const variant = guessmate.value ? 'GUESSMATE' : 'GUESSCHESS'
     const created = await createGame(variant, color.value, authToken)
-    router.push({
-      path: `/game/${created.gameId}`,
-      query: {
-        token: created.creatorToken,
-        color: created.creatorColor.toLowerCase(),
-        inviteToken: created.opponentToken,
-        inviteColor: created.opponentColor.toLowerCase(),
-      },
+    markJustCreated(created.gameId)
+    // Le token/couleur revenus ici sont déjà vérifiés côté serveur - on peuple
+    // directement le store plutôt que de forcer GameView à les redécouvrir via
+    // /my-access, dont la fiabilité dépend de la propagation immédiate du cookie
+    // anonyme qu'on vient tout juste de poser (pas garanti au tout premier appel).
+    await gameStore.joinGame({
+      gameId: created.gameId,
+      token: created.creatorToken,
+      color: created.creatorColor.toLowerCase() as 'white' | 'black',
     })
+    router.push(`/game/${created.gameId}`)
   } catch (e) {
-    error.value = e.message
+    error.value = (e as Error).message
   } finally {
     creating.value = false
   }

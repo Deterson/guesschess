@@ -1,14 +1,17 @@
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
+import type { Color, RoundSummaryMessage } from '../types/api'
 
-const props = defineProps({
-  round: { type: Object, required: true },
-})
+const props = defineProps<{
+  round: RoundSummaryMessage
+}>()
 
-const emit = defineEmits(['dismiss'])
+const emit = defineEmits<{
+  dismiss: []
+}>()
 
-const COLOR_LABELS = { WHITE: 'les blancs', BLACK: 'les noirs' }
-const OF_LABELS = { WHITE: 'des blancs', BLACK: 'des noirs' }
+const COLOR_LABELS: Record<Color, string> = { WHITE: 'les blancs', BLACK: 'les noirs' }
+const OF_LABELS: Record<Color, string> = { WHITE: 'des blancs', BLACK: 'des noirs' }
 
 const text = computed(() => {
   const guesser = COLOR_LABELS[props.round.guesser]

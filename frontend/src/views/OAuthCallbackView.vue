@@ -1,13 +1,16 @@
-<script setup>
+<script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import { useGameStore } from '../stores/game'
 import { consume as consumePendingAction } from '../services/pendingAction'
+import { mark as markJustCreated } from '../services/justCreated'
 import { createGame, joinGame } from '../services/api'
 
 const router = useRouter()
 const authStore = useAuthStore()
-const error = ref(null)
+const gameStore = useGameStore()
+const error = ref<string | null>(null)
 
 onMounted(async () => {
   const params = new URLSearchParams(window.location.hash.replace(/^#/, ''))
@@ -28,23 +31,22 @@ onMounted(async () => {
   try {
     if (action.type === 'create') {
       const created = await createGame(action.variant, action.color, token)
-      router.replace({
-        path: `/game/${created.gameId}`,
-        query: {
-          token: created.creatorToken,
-          color: created.creatorColor.toLowerCase(),
-          inviteToken: created.opponentToken,
-          inviteColor: created.opponentColor.toLowerCase(),
-        },
+      markJustCreated(created.gameId)
+      await gameStore.joinGame({
+        gameId: created.gameId,
+        token: created.creatorToken,
+        color: created.creatorColor.toLowerCase() as 'white' | 'black',
       })
+      router.replace(`/game/${created.gameId}`)
     } else if (action.type === 'join') {
-      const joined = await joinGame(action.gameId, action.token, token)
-      router.replace({ path: `/game/${joined.gameId}`, query: { token: joined.token, color: joined.color.toLowerCase() } })
+      const joined = await joinGame(action.gameId, token)
+      await gameStore.joinGame({ gameId: joined.gameId, token: joined.token, color: joined.color.toLowerCase() as 'white' | 'black' })
+      router.replace(`/game/${action.gameId}`)
     } else {
       router.replace('/')
     }
   } catch (e) {
-    error.value = e.message
+    error.value = (e as Error).message
   }
 })
 </script>

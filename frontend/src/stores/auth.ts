@@ -4,10 +4,10 @@ import { computed, ref } from 'vue'
 const STORAGE_KEY = 'guesschess_jwt'
 
 export const useAuthStore = defineStore('auth', () => {
-  const token = ref(localStorage.getItem(STORAGE_KEY))
+  const token = ref<string | null>(localStorage.getItem(STORAGE_KEY))
   const isLoggedIn = computed(() => token.value !== null)
 
-  function login(newToken) {
+  function login(newToken: string) {
     token.value = newToken
     localStorage.setItem(STORAGE_KEY, newToken)
   }

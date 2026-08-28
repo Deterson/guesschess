@@ -1,9 +1,11 @@
-<script setup>
-defineProps({
-  moveHistory: { type: Array, required: true },
-})
+<script setup lang="ts">
+import type { MoveHistoryEntry } from '../types/api'
 
-function colorOf(entry) {
+defineProps<{
+  moveHistory: MoveHistoryEntry[]
+}>()
+
+function colorOf(entry: MoveHistoryEntry): string {
   return entry.piece.startsWith('w') ? 'Blancs' : 'Noirs'
 }
 </script>

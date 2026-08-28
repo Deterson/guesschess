@@ -69,6 +69,7 @@ class StompFlowIntegrationTest {
         assertEquals("WHITE", state.sideToMove());
         assertEquals(20, state.legalMoves().size());
         assertTrue(state.moveHistory().isEmpty());
+        assertFalse(state.full());
     }
 
     @Test
