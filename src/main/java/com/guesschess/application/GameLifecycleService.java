@@ -7,6 +7,7 @@ import com.guesschess.domain.game.GameRepository;
 import com.guesschess.domain.game.GameVariant;
 import com.guesschess.domain.game.PendingSubmission;
 import com.guesschess.domain.move.Move;
+import com.guesschess.domain.pggn.PggnWriter;
 import com.guesschess.domain.piece.Color;
 import org.springframework.stereotype.Service;
 
@@ -112,6 +113,16 @@ public class GameLifecycleService {
 
     public GameSnapshot viewGame(GameId id) {
         return gameRepository.withGame(id, GameSnapshot::of);
+    }
+
+    /**
+     * Export PGGN (etape 10 de la roadmap) - lecture seule, accessible sans jeton au
+     * meme titre que viewGame (le mode spectateur n'a jamais requis d'authentification,
+     * voir GameCreationController). Event/Date/White/Black restent "?" (voir
+     * PggnWriter) tant que la page profil de l'etape 8 n'existe pas.
+     */
+    public String exportPggn(GameId id) {
+        return gameRepository.withGame(id, PggnWriter::write);
     }
 
     /**

@@ -19,7 +19,9 @@ import java.util.List;
  * pas resolu (anti-triche). lastRoundResult n'est renseigne qu'apres resolution,
  * moment ou reveler la devinette jouee est le mecanisme voulu, pas une fuite.
  * legalMoves ne concerne que le joueur au trait (sideToMove) : les reveler ne fuite
- * jamais la devinette ou le coup en attente.
+ * jamais la devinette ou le coup en attente. playedMoveHistory porte les plateaux
+ * avant/apres chaque coup reellement joue, necessaires a GameMessageMapper pour
+ * generer la notation SAN de la liste de coups (voir Game.playedMoveHistory).
  */
 public record GameSnapshot(
         GameId id,
@@ -30,7 +32,7 @@ public record GameSnapshot(
         GameResult result,
         RoundResult lastRoundResult,
         List<Move> legalMoves,
-        List<Move> moveHistory
+        List<Game.PlayedMove> playedMoveHistory
 ) {
 
     public static GameSnapshot of(Game game) {
@@ -43,7 +45,7 @@ public record GameSnapshot(
                 game.result(),
                 game.lastRoundResult(),
                 game.legalMoves(),
-                game.moveHistory()
+                game.playedMoveHistory()
         );
     }
 }

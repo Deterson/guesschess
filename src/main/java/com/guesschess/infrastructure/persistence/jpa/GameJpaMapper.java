@@ -60,20 +60,19 @@ class GameJpaMapper {
                 ? new GameResult(entity.getResultWinner(), entity.getResultCause())
                 : null;
         List<Game.PositionRecord> positionHistory = state.positionHistory().stream().map(this::toPositionRecord).toList();
-        List<Move> moveHistory = state.moveHistory().stream().map(this::toMove).toList();
+        List<RoundResult> roundHistory = state.roundHistory().stream().map(this::toRoundResult).toList();
 
         Game.Memento memento = new Game.Memento(
                 new GameId(entity.getId()),
                 entity.getVariant(),
                 toBoard(state.board()),
                 positionHistory,
-                moveHistory,
+                roundHistory,
                 entity.getStatus(),
                 result,
                 toMove(state.pendingMove()),
                 state.guessSubmitted(),
                 toMove(state.pendingGuess()),
-                toRoundResult(state.lastRoundResult()),
                 toMove(state.whiteGuessedMove()),
                 state.whiteGuessedMoveStreak(),
                 toMove(state.blackGuessedMove()),
@@ -86,11 +85,10 @@ class GameJpaMapper {
         return new GameStateJson(
                 toBoardJson(memento.board()),
                 memento.positionHistory().stream().map(this::toPositionRecordJson).toList(),
-                memento.moveHistory().stream().map(this::toMoveJson).toList(),
                 toMoveJson(memento.pendingMove()),
                 memento.guessSubmitted(),
                 toMoveJson(memento.pendingGuess()),
-                toRoundResultJson(memento.lastRoundResult()),
+                memento.roundHistory().stream().map(this::toRoundResultJson).toList(),
                 toMoveJson(memento.whiteGuessedMove()),
                 memento.whiteGuessedMoveStreak(),
                 toMoveJson(memento.blackGuessedMove()),
@@ -183,8 +181,7 @@ class GameJpaMapper {
                 result.mover().name(),
                 result.guesser().name(),
                 toMoveJson(result.actualMove()),
-                toMoveJson(result.guessedMove()),
-                result.movePlayed()
+                toMoveJson(result.guessedMove())
         );
     }
 
@@ -196,8 +193,7 @@ class GameJpaMapper {
                 Color.valueOf(json.mover()),
                 Color.valueOf(json.guesser()),
                 toMove(json.actualMove()),
-                toMove(json.guessedMove()),
-                json.movePlayed()
+                toMove(json.guessedMove())
         );
     }
 }

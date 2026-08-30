@@ -19,6 +19,16 @@ Jeu d'échecs classique avec une règle additionnelle :
 - **Frontend** : VueJS 3
 - **Déploiement** : Docker + docker-compose, sur Raspberry Pi 4 (4 Go RAM) — si le Pi devient un jour insuffisant, la conteneurisation permet de redéployer les mêmes images sur du cloud sans réécrire l'application
 - **Modes de jeu** : temps réel (WebSocket) **et** asynchrone (façon correspondance), au choix des joueurs
+- attention : le docker tourne sur une VM remote 15.188.63.232:5432, le SSH est ouvert et le .pem est situé là: C:\Users\drde6\.ssh\guesschess-dev-docker.pem
+  - Pas de Docker local sur la machine de dev Windows (CLI `docker` absente du PATH, testé aussi bien en Git Bash qu'en PowerShell) : tout Docker (Postgres de dev inclus) vit uniquement sur cette VM distante, accessible via le `.pem` ci-dessus.
+  - Consequence directe : `spring.datasource.url` (application.properties) pointe par defaut sur `15.188.63.232:5432` — lancer le backend en local se connecte donc a cette base Postgres **partagee**, pas a une instance locale isolee. A garder en tete avant de la modifier ou d'y jouer une partie de test (les autres sessions/devs y accedent potentiellement aussi).
+  - Utilisateur SSH de la VM : `ubuntu` (dans le groupe `docker`, `docker ps`/`docker run` fonctionnent sans `sudo`). Alias configure dans `~/.ssh/config` (poste de dev de l'utilisateur) : `ssh guesschess-vm` suffit, pas besoin de repeter `-i .pem` ni l'utilisateur/IP a chaque fois.
+  - **Tests Maven qui necessitent Java 25** : le `JAVA_HOME` par defaut de cette machine de dev pointe vers un JDK 8 (`mvnw -v` le confirme), ce qui fait echouer la compilation de tout le code utilisant `record`/pattern matching avec des erreurs trompeuses ("class, interface, or enum expected") qui n'ont rien a voir avec une vraie erreur de syntaxe. Un JDK 25 est neanmoins deja installe localement (gere par IntelliJ) : `C:\Users\drde6\.jdks\ms-25.0.4.1`. Prefixer les commandes Maven avec, par exemple en Git Bash :
+    ```
+    JAVA_HOME="/c/Users/drde6/.jdks/ms-25.0.4.1" PATH="/c/Users/drde6/.jdks/ms-25.0.4.1/bin:$PATH" ./mvnw ...
+    ```
+    (chemin a verifier si l'utilisateur change de JDK gere par IntelliJ - lister `~/.jdks/` en cas de doute). Alternative durable : l'utilisateur peut positionner `JAVA_HOME` sur ce JDK 25 une bonne fois pour toutes dans son profil Windows, mais ce n'est pas fait automatiquement ici pour ne pas casser d'autres usages de JDK 8 sur la meme machine.
+  - **Tests d'integration bases sur Testcontainers** (`JpaGameRepositoryIntegrationTest`, `StompFlowIntegrationTest`, ... via `PostgresTestContainerConfig`) : ont besoin d'un **daemon Docker local** pour lancer un Postgres jetable, absent sur cette machine de dev (`Could not find a valid Docker environment`) — mais peuvent tourner sur la VM distante ci-dessus, qui en a un. Script pret a l'emploi : [`scripts/test-integration-remote.sh`](scripts/test-integration-remote.sh) `[filtre -Dtest optionnel]` — copie `pom.xml`/`mvnw`/`.mvn`/`src` vers la VM via SSH, lance les tests dans un conteneur Java 25 ephemere (`docker run --network host -v /var/run/docker.sock:...`, le pattern classique Docker-in-Docker par socket monte : `--network host` est necessaire pour que ce conteneur atteigne, via `localhost`, les conteneurs Testcontainers "freres" qu'il demarre lui-meme sur cette meme VM), puis nettoie sa copie (via un conteneur, les fichiers generes appartenant a `root`). L'image du conteneur runner (Java 25 + `unzip`/`curl`, necessaires au wrapper Maven mais absents de l'image de base) est construite une fois et reutilisee (`guesschess-mvn-runner:25`, deja en cache sur la VM). Seuls les tests unitaires domaine/application (aucune dependance Postgres/Docker) sont directement verifiables en local sans ce script.
 
 ## Décisions d'architecture
 
@@ -43,7 +53,7 @@ Jeu d'échecs classique avec une règle additionnelle :
 - **Temps réel** : WebSocket, connexion ouverte une fois à l'arrivée sur la partie. Chaque coup ou devinette est un message sur cette connexion déjà établie — pas une nouvelle requête HTTP par coup. Le round de devinette (double soumission cachée) se résout côté serveur puis le résultat est **poussé** aux deux joueurs sur cette même connexion (pas de polling).
 - **Asynchrone** : REST classique (ex. `POST /games/{id}/moves`), sans connexion persistante — logique vu que les deux joueurs ne sont pas connectés en même temps et que la fréquence est naturellement faible.
 - **Dimensionnement** : même à 1000 joueurs simultanés (~500 parties), le volume de messages reste faible (quelques dizaines à centaines par seconde, sur des connexions déjà ouvertes) — le vrai axe de dimensionnement, ce sont les connexions WebSocket maintenues ouvertes, pas le débit de requêtes. C'est ce que les threads virtuels de Java 25 encaissent bien.
-- Seule la soumission finale (coup ou devinette validé) part vers le serveur — les interactions UI (déplacer une pièce, hésiter) restent côté client. Le serveur revalide systématiquement chaque soumission (jamais confiance dans le client).
+- Seule la soumission finale (coup ou devinette validé) part vers le serveur — les interaction UI (déplacer une pièce, hésiter) restent côté client. Le serveur revalide systématiquement chaque soumission (jamais confiance dans le client).
 
 ## Performance et scalabilité
 
@@ -290,6 +300,45 @@ tout court (échec rapide voulu au boot Spring, pas seulement au moment du login
 - `JWT_SECRET` — **obligatoire**. Secret HMAC pour signer les JWT (≥ 32 octets aléatoires, ex. `openssl rand -base64 32`).
 - `OAUTH_POST_LOGIN_REDIRECT_URI` — URL du frontend vers laquelle rediriger après login, JWT en fragment d'URL (`#token=...`). Défaut : `http://localhost:5173/oauth-callback`.
 - `ANONYMOUS_COOKIE_SECURE` — (étape 6) `true`/`false`, flag `Secure` du cookie d'identité anonyme `guesschess_anon`. Défaut `false` (dev local en HTTP) ; mettre `true` derrière HTTPS (étape 10).
+
+## Accès au Raspberry Pi de déploiement (étape 10)
+
+Site public : `https://guesschess.fr`. Le Pi qui héberge la prod est sur le réseau local du
+propriétaire — voici ce qu'il faut savoir pour s'y connecter depuis une session de développement.
+
+- **Adresse** : `192.168.1.28` (LAN uniquement, hostname `raspberrypi`), utilisateur SSH `deterson`.
+- **Authentification par clé, une clé dédiée par machine** — jamais de mot de passe, jamais de
+  clé copiée d'une machine à l'autre :
+  - Clé attendue : `~/.ssh/id_ed25519_guesschess_pi`.
+  - **Si cette clé n'existe pas sur la machine courante** (plusieurs machines servent au
+    développement de ce projet) : ne pas réutiliser ni copier une clé depuis ailleurs. En
+    générer une nouvelle (`ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519_guesschess_pi -C
+    "<user>-<machine>@guesschess-pi" -N ""`), puis donner sa clé **publique** à l'utilisateur et
+    lui demander de l'ajouter lui-même à `~/.ssh/authorized_keys` sur le Pi — l'agent n'a (et ne
+    doit pas avoir) de moyen d'accéder au Pi pour s'auto-autoriser.
+  - Connexion : `ssh -i ~/.ssh/id_ed25519_guesschess_pi deterson@192.168.1.28`.
+- **`sudo`** : `deterson` a un accès complet mais protégé par mot de passe — **ne jamais
+  demander/taper ce mot de passe**. Un accès sans mot de passe, restreint à une liste précise de
+  commandes utiles au déploiement, est déjà configuré via `/etc/sudoers.d/guesschess-deploy`
+  (`mkdir`/`chown` sur `/opt/actions-runner`, `apt-get install -y`, `/opt/actions-runner/svc.sh`,
+  `systemctl … actions.runner.*`, `ufw`). Si une commande sudo hors de cette liste devient
+  nécessaire, demander à l'utilisateur de l'ajouter lui-même via
+  `sudo visudo -f /etc/sudoers.d/guesschess-deploy` (jamais éditer ce fichier directement par un
+  autre moyen — une erreur de syntaxe peut bloquer tout `sudo` sur la machine).
+- **Emplacements clés sur le Pi** :
+  - `/opt/guesschess/.env` — secrets de prod (`chmod 600`, `deterson` uniquement), référencé en
+    chemin absolu par `docker-compose.prod.yml`. Voir "Variables d'environnement" ci-dessus pour
+    son contenu attendu.
+  - `/opt/actions-runner` — runner GitHub Actions auto-hébergé (service systemd
+    `actions.runner.Deterson-guesschess.raspberrypi.service`), qui clone le dépôt à chaque job
+    dans `_work/guesschess/guesschess` et y exécute le déploiement
+    (`docker compose --env-file /opt/guesschess/.env -f docker-compose.prod.yml up -d`).
+  - GHCR (images privées) : `docker login ghcr.io` déjà fait sur le Pi avec un PAT
+    `read:packages` de l'utilisateur.
+- **Ne jamais lancer un `docker compose up` manuel en parallèle** de ce que la CI gère (même
+  projet ou un autre dossier) sans le redescendre (`down`) ensuite — deux stacks se disputant les
+  ports 80/443 ont déjà cassé un déploiement en laissant un conteneur avec une interface réseau
+  jamais attachée.
 
 ## Questions encore ouvertes (à trancher plus tard)
 

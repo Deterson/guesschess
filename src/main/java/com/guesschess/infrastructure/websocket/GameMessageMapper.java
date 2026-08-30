@@ -4,10 +4,12 @@ import com.guesschess.application.GameSnapshot;
 import com.guesschess.application.MoveIntent;
 import com.guesschess.domain.board.Board;
 import com.guesschess.domain.board.Position;
+import com.guesschess.domain.game.Game;
 import com.guesschess.domain.game.GameResult;
 import com.guesschess.domain.game.RoundResult;
 import com.guesschess.domain.game.PendingSubmission;
 import com.guesschess.domain.move.Move;
+import com.guesschess.domain.notation.SanGenerator;
 import com.guesschess.domain.piece.Color;
 import com.guesschess.domain.piece.Piece;
 import com.guesschess.domain.piece.PieceType;
@@ -47,7 +49,7 @@ public class GameMessageMapper {
                 toResultMessage(snapshot.result()),
                 toRoundSummaryMessage(snapshot.lastRoundResult()),
                 toLegalMoveMessages(snapshot.legalMoves()),
-                toMoveHistoryEntries(snapshot.moveHistory()),
+                toMoveHistoryEntries(snapshot.playedMoveHistory()),
                 full,
                 toMySubmissionMessage(mySubmission)
         );
@@ -80,8 +82,7 @@ public class GameMessageMapper {
                 roundResult.actualMove().to().toAlgebraic(),
                 roundResult.guessedMove() == null ? null : roundResult.guessedMove().from().toAlgebraic(),
                 roundResult.guessedMove() == null ? null : roundResult.guessedMove().to().toAlgebraic(),
-                roundResult.guessedCorrectly(),
-                roundResult.movePlayed()
+                roundResult.guessedCorrectly()
         );
     }
 
@@ -109,15 +110,11 @@ public class GameMessageMapper {
                 .toList();
     }
 
-    private List<MoveHistoryEntry> toMoveHistoryEntries(List<Move> moveHistory) {
-        return moveHistory.stream()
-                .map(move -> new MoveHistoryEntry(
-                        move.from().toAlgebraic(),
-                        move.to().toAlgebraic(),
-                        toCode(move.movedPiece()),
-                        move.capturedPiece() == null ? null : toCode(move.capturedPiece()),
-                        move.type().name(),
-                        move.promotionType() == null ? null : move.promotionType().name()))
+    private List<MoveHistoryEntry> toMoveHistoryEntries(List<Game.PlayedMove> playedMoveHistory) {
+        return playedMoveHistory.stream()
+                .map(played -> new MoveHistoryEntry(
+                        played.move().movedPiece().color().name(),
+                        SanGenerator.toSan(played.boardBefore(), played.move(), played.boardAfter())))
                 .toList();
     }
 

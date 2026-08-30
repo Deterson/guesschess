@@ -65,13 +65,12 @@ public final class Game {
     private final GameVariant variant;
     private Board board;
     private final List<PositionRecord> positionHistory = new ArrayList<>();
-    private final List<Move> moveHistory = new ArrayList<>();
+    private final List<RoundResult> roundHistory = new ArrayList<>();
     private GameStatus status = GameStatus.ONGOING;
     private GameResult result;
     private Move pendingMove;
     private boolean guessSubmitted;
     private Move pendingGuess;
-    private RoundResult lastRoundResult;
 
     /**
      * Suivi de la regle de "three guess repetition" : pour chaque couleur, le dernier
@@ -96,21 +95,20 @@ public final class Game {
         this.positionHistory.add(new PositionRecord(initialBoard, PositionOrigin.MOVE));
     }
 
-    private Game(GameId id, GameVariant variant, Board board, List<PositionRecord> positionHistory, List<Move> moveHistory,
+    private Game(GameId id, GameVariant variant, Board board, List<PositionRecord> positionHistory, List<RoundResult> roundHistory,
                  GameStatus status, GameResult result, Move pendingMove, boolean guessSubmitted,
-                 Move pendingGuess, RoundResult lastRoundResult, Move whiteGuessedMove, int whiteGuessedMoveStreak,
+                 Move pendingGuess, Move whiteGuessedMove, int whiteGuessedMoveStreak,
                  Move blackGuessedMove, int blackGuessedMoveStreak) {
         this.id = id;
         this.variant = variant;
         this.board = board;
         this.positionHistory.addAll(positionHistory);
-        this.moveHistory.addAll(moveHistory);
+        this.roundHistory.addAll(roundHistory);
         this.status = status;
         this.result = result;
         this.pendingMove = pendingMove;
         this.guessSubmitted = guessSubmitted;
         this.pendingGuess = pendingGuess;
-        this.lastRoundResult = lastRoundResult;
         this.whiteGuessedMove = whiteGuessedMove;
         this.whiteGuessedMoveStreak = whiteGuessedMoveStreak;
         this.blackGuessedMove = blackGuessedMove;
@@ -154,9 +152,9 @@ public final class Game {
      * ne pas utiliser dans le flux de jeu normal, qui passe par newGame/fromPosition).
      */
     public static Game fromMemento(Memento memento) {
-        return new Game(memento.id(), memento.variant(), memento.board(), memento.positionHistory(), memento.moveHistory(),
+        return new Game(memento.id(), memento.variant(), memento.board(), memento.positionHistory(), memento.roundHistory(),
                 memento.status(), memento.result(), memento.pendingMove(), memento.guessSubmitted(),
-                memento.pendingGuess(), memento.lastRoundResult(), memento.whiteGuessedMove(),
+                memento.pendingGuess(), memento.whiteGuessedMove(),
                 memento.whiteGuessedMoveStreak(), memento.blackGuessedMove(), memento.blackGuessedMoveStreak());
     }
 
@@ -184,12 +182,71 @@ public final class Game {
         return result;
     }
 
+    /**
+     * Coups reellement joues, derive de roundHistory (les rounds annules n'y figurent
+     * pas) plutot que stocke separement - une seule source de verite pour eviter une
+     * resynchronisation manuelle entre deux historiques qui ne feraient que doubler
+     * l'un l'autre.
+     */
     public List<Move> moveHistory() {
-        return Collections.unmodifiableList(moveHistory);
+        return roundHistory.stream().filter(RoundResult::movePlayed).map(RoundResult::actualMove).toList();
+    }
+
+    /**
+     * Historique complet des rounds resolus (coup reel + devinette), un par round, y
+     * compris les rounds annules par une devinette correcte - source de verite pour
+     * reconstruire le PGGN (etape 10 de la roadmap).
+     */
+    public List<RoundResult> roundHistory() {
+        return Collections.unmodifiableList(roundHistory);
     }
 
     public RoundResult lastRoundResult() {
-        return lastRoundResult;
+        return roundHistory.isEmpty() ? null : roundHistory.get(roundHistory.size() - 1);
+    }
+
+    /**
+     * Photo (avant/apres) de chaque coup reellement joue, pour la generation de
+     * notation SAN qui a besoin du plateau juste avant le coup (desambiguisation) et
+     * juste apres (suffixe echec/mat). positionHistory a toujours un element de plus
+     * que roundHistory (la position initiale en tete), donc positionHistory.get(i) est
+     * la position avant le round i et positionHistory.get(i + 1) la position apres.
+     */
+    public List<PlayedMove> playedMoveHistory() {
+        List<PlayedMove> played = new ArrayList<>();
+        for (int i = 0; i < roundHistory.size(); i++) {
+            RoundResult round = roundHistory.get(i);
+            if (round.movePlayed()) {
+                played.add(new PlayedMove(positionHistory.get(i).board(), round.actualMove(), positionHistory.get(i + 1).board()));
+            }
+        }
+        return played;
+    }
+
+    public record PlayedMove(Board boardBefore, Move move, Board boardAfter) {
+    }
+
+    /**
+     * Chaque round de roundHistory associe a son plateau juste avant (toujours
+     * disponible) et juste apres (nullable). boardAfter est absent dans le seul cas
+     * ou aucune entree n'a ete ajoutee a positionHistory pour ce round : le round
+     * terminal Guessmate (devinette correcte d'un coup qui parait un echec, partie
+     * terminee immediatement sans jamais appeler applyRealMove ni cancelRound - voir
+     * resolveRound). Utilise par le PGGN (etape 10 de la roadmap), qui a besoin du
+     * "avant" pour tout round (coup reel et/ou devine) mais du "apres" seulement pour
+     * calculer le suffixe echec/mat d'un coup reellement joue.
+     */
+    public record RoundContext(RoundResult round, Board boardBefore, Board boardAfter) {
+    }
+
+    public List<RoundContext> roundHistoryWithPositions() {
+        List<RoundContext> contexts = new ArrayList<>();
+        for (int i = 0; i < roundHistory.size(); i++) {
+            Board before = positionHistory.get(i).board();
+            Board after = (i + 1 < positionHistory.size()) ? positionHistory.get(i + 1).board() : null;
+            contexts.add(new RoundContext(roundHistory.get(i), before, after));
+        }
+        return contexts;
     }
 
     /**
@@ -294,13 +351,12 @@ public final class Game {
             applyRealMove(actualMove);
             roundResult = RoundResult.played(mover, guesser, actualMove, guess);
         }
-        this.lastRoundResult = roundResult;
+        this.roundHistory.add(roundResult);
         return roundResult;
     }
 
     private void applyRealMove(Move move) {
         board = board.applyMove(move);
-        moveHistory.add(move);
         positionHistory.add(new PositionRecord(board, PositionOrigin.MOVE));
         resetGuessedMoveStreaks();
 
@@ -402,8 +458,8 @@ public final class Game {
      * volontairement la devinette en attente).
      */
     public Memento toMemento() {
-        return new Memento(id, variant, board, List.copyOf(positionHistory), List.copyOf(moveHistory),
-                status, result, pendingMove, guessSubmitted, pendingGuess, lastRoundResult,
+        return new Memento(id, variant, board, List.copyOf(positionHistory), List.copyOf(roundHistory),
+                status, result, pendingMove, guessSubmitted, pendingGuess,
                 whiteGuessedMove, whiteGuessedMoveStreak, blackGuessedMove, blackGuessedMoveStreak);
     }
 
@@ -412,13 +468,12 @@ public final class Game {
             GameVariant variant,
             Board board,
             List<PositionRecord> positionHistory,
-            List<Move> moveHistory,
+            List<RoundResult> roundHistory,
             GameStatus status,
             GameResult result,
             Move pendingMove,
             boolean guessSubmitted,
             Move pendingGuess,
-            RoundResult lastRoundResult,
             Move whiteGuessedMove,
             int whiteGuessedMoveStreak,
             Move blackGuessedMove,

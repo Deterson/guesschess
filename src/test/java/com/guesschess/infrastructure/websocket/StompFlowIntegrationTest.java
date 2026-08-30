@@ -93,9 +93,8 @@ class StompFlowIntegrationTest {
 
         assertNotNull(state);
         assertEquals(1, state.moveHistory().size());
-        assertEquals("e2", state.moveHistory().get(0).from());
-        assertEquals("e4", state.moveHistory().get(0).to());
-        assertEquals("wP", state.moveHistory().get(0).piece());
+        assertEquals("WHITE", state.moveHistory().get(0).color());
+        assertEquals("e4", state.moveHistory().get(0).san());
         assertFalse(state.legalMoves().isEmpty());
     }
 
@@ -122,7 +121,6 @@ class StompFlowIntegrationTest {
         assertEquals("ONGOING", state.status());
         assertNotNull(state.lastRound());
         assertTrue(state.lastRound().guessedCorrectly());
-        assertFalse(state.lastRound().movePlayed());
         assertEquals("wP", state.board()[1][4]);
         assertNull(state.board()[3][4]);
     }
@@ -148,7 +146,6 @@ class StompFlowIntegrationTest {
 
         assertNotNull(state);
         assertEquals("BLACK", state.sideToMove());
-        assertTrue(state.lastRound().movePlayed());
         assertFalse(state.lastRound().guessedCorrectly());
     }
 
@@ -173,7 +170,6 @@ class StompFlowIntegrationTest {
         assertNotNull(state);
         assertEquals("BLACK", state.sideToMove());
         assertFalse(state.lastRound().guessedCorrectly());
-        assertTrue(state.lastRound().movePlayed());
         assertNull(state.board()[1][4]);
         assertEquals("wP", state.board()[3][4]);
     }

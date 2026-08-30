@@ -65,12 +65,8 @@ export interface LegalMoveMessage {
 }
 
 export interface MoveHistoryEntry {
-  from: string
-  to: string
-  piece: PieceCode
-  captured: PieceCode | null
-  type: MoveType
-  promotion: PromotionPieceType | null
+  color: Color
+  san: string
 }
 
 export interface ResultMessage {
@@ -87,7 +83,6 @@ export interface RoundSummaryMessage {
   guessedFrom: string | null
   guessedTo: string | null
   guessedCorrectly: boolean
-  movePlayed: boolean
 }
 
 /**

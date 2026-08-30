@@ -5,15 +5,16 @@ import com.guesschess.domain.piece.Color;
 
 /**
  * Resolution d'un round (coup reel + devinette). guessedMove est nullable (pas de
- * devinette soumise a temps). movePlayed indique si actualMove a ete applique au
- * plateau (devinette fausse ou absente) ou annule (devinette correcte).
+ * devinette soumise a temps). movePlayed() indique si actualMove a ete applique au
+ * plateau (devinette fausse ou absente) ou annule (devinette correcte) - derive de
+ * guessedCorrectly() plutot que stocke separement, les deux etant toujours l'exact
+ * inverse l'un de l'autre (Game.resolveRound n'a qu'un seul point de construction).
  */
 public record RoundResult(
         Color mover,
         Color guesser,
         Move actualMove,
-        Move guessedMove,
-        boolean movePlayed
+        Move guessedMove
 ) {
 
     public RoundResult {
@@ -29,11 +30,15 @@ public record RoundResult(
         return actualMove.equals(guessedMove);
     }
 
+    public boolean movePlayed() {
+        return !guessedCorrectly();
+    }
+
     static RoundResult played(Color mover, Color guesser, Move actualMove, Move guessedMove) {
-        return new RoundResult(mover, guesser, actualMove, guessedMove, true);
+        return new RoundResult(mover, guesser, actualMove, guessedMove);
     }
 
     static RoundResult cancelled(Color mover, Color guesser, Move actualMove, Move guessedMove) {
-        return new RoundResult(mover, guesser, actualMove, guessedMove, false);
+        return new RoundResult(mover, guesser, actualMove, guessedMove);
     }
 }

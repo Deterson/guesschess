@@ -6,6 +6,8 @@ ne rien implémenter dans ce TODO à moins que cela ait été explicitement dema
     je guess le coup de mon adversaire, il guess mon coup, le plateau est dans le même état qu'avant et mon pion devrait toujours être pris en passant, mais ce n'est pas le cas)
 
 --- FRONT
+- lorsqu'on surligne le "coup deviné" dans le front, on voit les cases entourées mais aucune pièce n'apparaît, il faudrait avoir exactement l'état du plateau si ce coup avait été joué
+- lorsqu'un joueur crée une partie et joue un coup, si quelqu'un rejoint la partie, le coup est réinitialisé. il faudrait faire en sorte qu'il n'ait pas à le rejouer
 - une page de règles (6 guess repetition, guessmate)
 - afficher dans l'historique les coups devinés. Changer l'historique parce qu'il est moche
 - enlever le bouton "ne pas deviner" (sera sûrement fait pendant l'étape du timer)

@@ -20,6 +20,7 @@ import com.guesschess.infrastructure.web.dto.MyAccessHttpResponse;
 import com.guesschess.infrastructure.websocket.GameMessageMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -137,6 +138,22 @@ class GameCreationController {
         }
         MyAccess found = access.get();
         return ResponseEntity.ok(new MyAccessHttpResponse(found.color().name(), found.token().toString()));
+    }
+
+    /**
+     * Export PGGN (etape 10 de la roadmap) - texte brut, lecture seule et accessible
+     * sans jeton comme my-access/viewGame (le mode spectateur n'a jamais requis
+     * d'authentification).
+     */
+    @GetMapping(value = "/{gameId}/pggn", produces = MediaType.TEXT_PLAIN_VALUE)
+    ResponseEntity<?> pggn(@PathVariable String gameId) {
+        try {
+            String pggn = gameLifecycleService.exportPggn(GameId.fromString(gameId));
+            return ResponseEntity.ok().contentType(MediaType.TEXT_PLAIN).body(pggn);
+        } catch (GameNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new ErrorResponse("GAME_NOT_FOUND", "Partie introuvable"));
+        }
     }
 
     private Color resolveColor(String requested) {
