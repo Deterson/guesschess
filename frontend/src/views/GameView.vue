@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useGameStore } from '../stores/game'
 import { useAuthStore } from '../stores/auth'
@@ -20,7 +20,9 @@ const props = defineProps<{
 
 const gameStore = useGameStore()
 const authStore = useAuthStore()
-const { state, error, pendingSubmission, pendingMove, myColor, canAct, chatMessages } = storeToRefs(gameStore)
+const { state, error, pendingSubmission, pendingMove, myColor, canAct, chatMessages, connectionStatus } = storeToRefs(gameStore)
+
+onUnmounted(() => gameStore.leaveGame())
 
 const pendingPromotion = ref<{ from: string; to: string; options: PromotionPieceType[] } | null>(null)
 const hoveredGuess = ref(false)
@@ -210,6 +212,10 @@ function submitNoGuess() {
               >
                 {{ joining ? 'Connexion…' : 'Rejoindre cette partie' }}
               </button>
+            </div>
+
+            <div v-if="connectionStatus !== 'connected'" class="mb-4 rounded-lg bg-amber-900/60 px-4 py-3 text-sm text-amber-100">
+              Connexion perdue, reconnexion en cours…
             </div>
 
             <GameStatusBar :state="state" :my-color="myColor" :my-role="myRole" :pending-submission="pendingSubmission" />

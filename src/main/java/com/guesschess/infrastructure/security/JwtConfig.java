@@ -35,8 +35,10 @@ class JwtConfig {
                 .build();
     }
 
+    private static final int MIN_SECRET_BYTES = 32;
+
     private SecretKeySpec hmacKey(String secret) {
-        if (secret == null || secret.isBlank()) {
+        if (secret == null || secret.getBytes(StandardCharsets.UTF_8).length < MIN_SECRET_BYTES) {
             throw new IllegalStateException("app.jwt.secret (JWT_SECRET) must be set to a random value of at least 32 bytes");
         }
         return new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");

@@ -1,4 +1,5 @@
 import { Client, type StompSubscription } from '@stomp/stompjs'
+import { useAuthStore } from '../stores/auth'
 
 /**
  * Même logique que api.ts : en prod, nginx proxifie /ws en same-origin vers le
@@ -11,31 +12,84 @@ const WS_URL =
     ? 'ws://localhost:8080/ws'
     : `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws`)
 
-let client: Client | null = null
-let connectPromise: Promise<Client> | null = null
+export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected'
 
-/**
- * STOMP brut sur le endpoint /ws du backend, sans SockJS (WebSocketConfig.java
- * n'active pas de fallback). Une seule connexion est réutilisée pour toute la session
- * (création de partie sur la home, puis jeu sur GameView).
- */
-export function connect(): Promise<Client> {
-  if (connectPromise) return connectPromise
+let client: Client | null = null
+let status: ConnectionStatus = 'connecting'
+const statusListeners = new Set<(status: ConnectionStatus) => void>()
+let connectWaiters: Array<{ resolve: (client: Client) => void; reject: (error: Error) => void }> = []
+
+function setStatus(next: ConnectionStatus) {
+  status = next
+  statusListeners.forEach((listener) => listener(next))
+}
+
+/** Appelé immédiatement avec le statut courant, puis à chaque changement. Retourne un désabonnement. */
+export function onStatusChange(listener: (status: ConnectionStatus) => void): () => void {
+  statusListeners.add(listener)
+  listener(status)
+  return () => statusListeners.delete(listener)
+}
+
+function ensureClient(): Client {
+  if (client) return client
 
   client = new Client({
     brokerURL: WS_URL,
     reconnectDelay: 2000,
   })
 
-  connectPromise = new Promise((resolve, reject) => {
-    client!.onConnect = () => resolve(client!)
-    client!.onStompError = (frame) => {
-      reject(new Error(frame.headers?.message || 'Erreur STOMP'))
-    }
-    client!.activate()
-  })
+  // Réévalué avant CHAQUE tentative de connexion (y compris les reconnexions
+  // automatiques), pas seulement à la création du Client - un login pendant la
+  // session doit être pris en compte dès la prochaine (re)connexion.
+  client.beforeConnect = () => {
+    const token = useAuthStore().token
+    client!.connectHeaders = token ? { Authorization: `Bearer ${token}` } : {}
+  }
 
-  return connectPromise
+  client.onConnect = () => {
+    setStatus('connected')
+    const waiters = connectWaiters
+    connectWaiters = []
+    waiters.forEach((waiter) => waiter.resolve(client!))
+  }
+
+  client.onWebSocketClose = () => {
+    // stompjs retente seul (reconnectDelay) tant que deactivate() n'est jamais
+    // appelé - on ne fait ici que refléter l'état et débloquer les appelants en
+    // attente d'une connexion qui ne viendra pas avant la prochaine tentative.
+    setStatus('disconnected')
+    const waiters = connectWaiters
+    connectWaiters = []
+    waiters.forEach((waiter) => waiter.reject(new Error('Connexion WebSocket perdue')))
+  }
+
+  client.onStompError = (frame) => {
+    const err = new Error(frame.headers?.message || 'Erreur STOMP')
+    setStatus('disconnected')
+    const waiters = connectWaiters
+    connectWaiters = []
+    waiters.forEach((waiter) => waiter.reject(err))
+  }
+
+  client.activate()
+  return client
+}
+
+/**
+ * Résout dès que la connexion STOMP est active. Chaque appel réévalue l'état courant
+ * plutôt que de réutiliser une promesse mise en cache pour toute la session : si une
+ * tentative précédente a échoué (erreur STOMP, socket coupé), l'appel suivant
+ * reconstruit une attente fraîche sur la prochaine connexion réussie au lieu de rester
+ * bloqué indéfiniment sur l'échec passé.
+ */
+export function connect(): Promise<Client> {
+  const c = ensureClient()
+  if (c.connected) return Promise.resolve(c)
+  setStatus('connecting')
+  return new Promise((resolve, reject) => {
+    connectWaiters.push({ resolve, reject })
+  })
 }
 
 export async function subscribe<T>(destination: string, onMessage: (payload: T) => void): Promise<StompSubscription> {

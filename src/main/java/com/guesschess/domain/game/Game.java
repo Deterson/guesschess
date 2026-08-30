@@ -118,7 +118,7 @@ public final class Game {
     }
 
     public static Game newGame() {
-        return newGame(GameId.random(), GameVariant.REGULAR);
+        return newGame(GameId.random(), GameVariant.GUESSCHESS);
     }
 
     public static Game newGame(GameVariant variant) {
@@ -126,7 +126,7 @@ public final class Game {
     }
 
     public static Game newGame(GameId id) {
-        return newGame(id, GameVariant.REGULAR);
+        return newGame(id, GameVariant.GUESSCHESS);
     }
 
     public static Game newGame(GameId id, GameVariant variant) {
@@ -134,7 +134,7 @@ public final class Game {
     }
 
     public static Game fromPosition(Board board) {
-        return fromPosition(GameId.random(), board, GameVariant.REGULAR);
+        return fromPosition(GameId.random(), board, GameVariant.GUESSCHESS);
     }
 
     public static Game fromPosition(Board board, GameVariant variant) {
@@ -142,7 +142,7 @@ public final class Game {
     }
 
     public static Game fromPosition(GameId id, Board board) {
-        return fromPosition(id, board, GameVariant.REGULAR);
+        return fromPosition(id, board, GameVariant.GUESSCHESS);
     }
 
     public static Game fromPosition(GameId id, Board board, GameVariant variant) {

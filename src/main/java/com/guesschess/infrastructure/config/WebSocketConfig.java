@@ -2,6 +2,7 @@ package com.guesschess.infrastructure.config;
 
 import com.guesschess.infrastructure.websocket.AnonymousIdentityHandshakeInterceptor;
 import com.guesschess.infrastructure.websocket.JwtStompChannelInterceptor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
@@ -14,8 +15,9 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
  * devinette en attente n'y transite jamais, cf. GameSnapshot). /user/queue/* porte
  * les reponses/erreurs privees a l'expediteur d'un message.
  *
- * setAllowedOriginPatterns("*") est un placeholder de developpement, a restreindre
- * au domaine reel du frontend au moment du deploiement (etape 7).
+ * L'Origin autorisee au handshake reutilise app.cors.allowed-origin (meme variable
+ * que le CORS REST, voir SecurityConfig) : a faire pointer vers le domaine reel du
+ * frontend au moment du deploiement (etape 10).
  *
  * AnonymousIdentityHandshakeInterceptor et JwtStompChannelInterceptor resolvent
  * l'identite du joueur connecte (etape 6 de la roadmap) - respectivement l'identite
@@ -29,6 +31,9 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     private final AnonymousIdentityHandshakeInterceptor anonymousIdentityHandshakeInterceptor;
     private final JwtStompChannelInterceptor jwtStompChannelInterceptor;
 
+    @Value("${app.cors.allowed-origin:http://localhost:5173}")
+    private String allowedOrigin;
+
     public WebSocketConfig(AnonymousIdentityHandshakeInterceptor anonymousIdentityHandshakeInterceptor,
                             JwtStompChannelInterceptor jwtStompChannelInterceptor) {
         this.anonymousIdentityHandshakeInterceptor = anonymousIdentityHandshakeInterceptor;
@@ -38,7 +43,7 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         registry.addEndpoint("/ws")
-                .setAllowedOriginPatterns("*")
+                .setAllowedOriginPatterns(allowedOrigin)
                 .addInterceptors(anonymousIdentityHandshakeInterceptor);
     }
 

@@ -205,7 +205,7 @@ class GameLifecycleServiceTest {
     void creatingAGameWithAChosenColorLinksOnlyThatColor() {
         PlayerRef creator = new PlayerRef.Account(UserId.random());
 
-        CreatedGame game = service.createGame(GameVariant.REGULAR, Color.BLACK, creator);
+        CreatedGame game = service.createGame(GameVariant.GUESSCHESS, Color.BLACK, creator);
 
         GameAccess access = gameAccessRepository.findByGameId(game.gameId()).orElseThrow();
         assertEquals(creator, access.playerOf(Color.BLACK));
@@ -214,7 +214,7 @@ class GameLifecycleServiceTest {
 
     @Test
     void joiningClaimsTheOnlyOpenColorAndReportsSuccess() {
-        CreatedGame game = service.createGame(GameVariant.REGULAR, Color.WHITE, new PlayerRef.Anonymous(AnonymousId.random()));
+        CreatedGame game = service.createGame(GameVariant.GUESSCHESS, Color.WHITE, new PlayerRef.Anonymous(AnonymousId.random()));
         PlayerRef opponent = new PlayerRef.Anonymous(AnonymousId.random());
 
         JoinResult result = service.joinGame(game.gameId(), opponent);
@@ -229,7 +229,7 @@ class GameLifecycleServiceTest {
 
     @Test
     void joiningAGameThatIsAlreadyFullIsRejected() {
-        CreatedGame game = service.createGame(GameVariant.REGULAR, Color.WHITE, new PlayerRef.Anonymous(AnonymousId.random()));
+        CreatedGame game = service.createGame(GameVariant.GUESSCHESS, Color.WHITE, new PlayerRef.Anonymous(AnonymousId.random()));
         service.joinGame(game.gameId(), new PlayerRef.Anonymous(AnonymousId.random()));
         PlayerRef thirdVisitor = new PlayerRef.Account(UserId.random());
 
@@ -245,7 +245,7 @@ class GameLifecycleServiceTest {
 
     @Test
     void findMyAccessRecoversTheTokenAndColorFromIdentityAlone() {
-        CreatedGame game = service.createGame(GameVariant.REGULAR, Color.WHITE, new PlayerRef.Anonymous(AnonymousId.random()));
+        CreatedGame game = service.createGame(GameVariant.GUESSCHESS, Color.WHITE, new PlayerRef.Anonymous(AnonymousId.random()));
         PlayerRef requester = new PlayerRef.Anonymous(AnonymousId.random());
         service.joinGame(game.gameId(), requester);
 
@@ -257,7 +257,7 @@ class GameLifecycleServiceTest {
 
     @Test
     void findMyAccessIsEmptyForAnIdentityNotLinkedToEitherColor() {
-        CreatedGame game = service.createGame(GameVariant.REGULAR, Color.WHITE, new PlayerRef.Anonymous(AnonymousId.random()));
+        CreatedGame game = service.createGame(GameVariant.GUESSCHESS, Color.WHITE, new PlayerRef.Anonymous(AnonymousId.random()));
         PlayerRef stranger = new PlayerRef.Account(UserId.random());
 
         assertTrue(service.findMyAccess(game.gameId(), stranger).isEmpty());
@@ -265,7 +265,7 @@ class GameLifecycleServiceTest {
 
     @Test
     void findMyAccessWithAnUnresolvedIdentityIsEmpty() {
-        CreatedGame game = service.createGame(GameVariant.REGULAR, Color.WHITE, new PlayerRef.Anonymous(AnonymousId.random()));
+        CreatedGame game = service.createGame(GameVariant.GUESSCHESS, Color.WHITE, new PlayerRef.Anonymous(AnonymousId.random()));
 
         assertTrue(service.findMyAccess(game.gameId(), null).isEmpty());
     }

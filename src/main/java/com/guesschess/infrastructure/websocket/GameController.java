@@ -67,7 +67,7 @@ public class GameController {
     @SendToUser("/queue/games.created")
     public CreateGameResponse createGame(@Payload(required = false) CreateGameRequest request) {
         GameVariant variant = request == null || request.variant() == null
-                ? GameVariant.REGULAR
+                ? GameVariant.GUESSCHESS
                 : GameVariant.valueOf(request.variant());
         CreatedGame created = gameLifecycleService.createGame(variant);
         return new CreateGameResponse(

@@ -6,7 +6,7 @@
 
 export type Color = 'WHITE' | 'BLACK'
 export type ColorLower = 'white' | 'black'
-export type GameVariant = 'REGULAR' | 'GUESSMATE'
+export type GameVariant = 'GUESSCHESS' | 'GUESSMATE'
 export type GameStatus = 'ONGOING' | 'FINISHED'
 export type PieceType = 'PAWN' | 'KNIGHT' | 'BISHOP' | 'ROOK' | 'QUEEN' | 'KING'
 export type PromotionPieceType = Exclude<PieceType, 'PAWN' | 'KING'>

@@ -15,6 +15,7 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.Duration;
 import java.util.HexFormat;
 
@@ -38,7 +39,7 @@ public class AnonymousIdentityFilter extends OncePerRequestFilter {
     private final boolean secureCookie;
 
     public AnonymousIdentityFilter(@Value("${app.jwt.secret}") String secret,
-                                    @Value("${app.anonymous-cookie.secure:false}") boolean secureCookie) {
+                                    @Value("${app.anonymous-cookie.secure:true}") boolean secureCookie) {
         this.secret = secret;
         this.secureCookie = secureCookie;
     }
@@ -78,7 +79,10 @@ public class AnonymousIdentityFilter extends OncePerRequestFilter {
         }
         String rawId = value.substring(0, separator);
         String signature = value.substring(separator + 1);
-        if (!signature.equals(sign(rawId))) {
+        boolean valid = MessageDigest.isEqual(
+                signature.getBytes(StandardCharsets.UTF_8),
+                sign(rawId).getBytes(StandardCharsets.UTF_8));
+        if (!valid) {
             return null;
         }
         try {
@@ -94,7 +98,7 @@ public class AnonymousIdentityFilter extends OncePerRequestFilter {
         return ResponseCookie.from(COOKIE_NAME, value)
                 .httpOnly(true)
                 .secure(secureCookie)
-                .sameSite("Lax")
+                .sameSite("Strict")
                 .path("/")
                 .maxAge(COOKIE_MAX_AGE)
                 .build();

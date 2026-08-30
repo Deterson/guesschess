@@ -29,7 +29,7 @@ public class GameLifecycleService {
     }
 
     public CreatedGame createGame() {
-        return createGame(GameVariant.REGULAR);
+        return createGame(GameVariant.GUESSCHESS);
     }
 
     public CreatedGame createGame(GameVariant variant) {

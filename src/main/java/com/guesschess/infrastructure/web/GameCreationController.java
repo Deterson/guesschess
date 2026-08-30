@@ -69,7 +69,7 @@ class GameCreationController {
                                                         HttpServletRequest httpRequest,
                                                         @AuthenticationPrincipal Jwt jwt) {
         GameVariant variant = request == null || request.variant() == null
-                ? GameVariant.REGULAR
+                ? GameVariant.GUESSCHESS
                 : GameVariant.valueOf(request.variant());
         Color creatorColor = resolveColor(request == null ? null : request.color());
         PlayerRef creator = identityResolver.resolve(httpRequest, jwt);

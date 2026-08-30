@@ -162,6 +162,32 @@ Jeu d'échecs classique avec une règle additionnelle :
    toucher aux données de dev.
 10. Déploiement sur le Raspberry Pi (reverse proxy, HTTPS, limites mémoire/CPU, dimensionnement JVM)
 11. Tests et peaufinage (tests unitaires du moteur, tests de la mécanique de devinette, UX)
+12. Format PGGN (Portable Game Guess Notation) — notation inspirée du PGN, avec le
+    coup deviné entre parenthèses juste après le coup réel (ex. `1. e4(e3) e5(Nc6)`).
+    Si la devinette est correcte (round annulé, coup réel == deviné par définition),
+    seule la devinette entre parenthèses apparaît (`2. (Nf3) Nc6(a5)`) — pas de
+    redondance puisque coup réel et deviné sont alors identiques. Si aucune devinette
+    n'a été soumise, les parenthèses sont omises (juste `e4`). `+`/`#` uniquement sur
+    un coup réellement joué qui met en échec/mat ; jamais sur une devinette dans un
+    round annulé non-terminal (le plateau revient à l'état d'avant, rien à tester) —
+    sauf le cas terminal Guessmate (roi capturé via devinette correcte en échec,
+    ex. `16. (Ke2)#`), seul cas où l'annulation elle-même termine la partie. En-têtes
+    façon PGN (`[Event]`, `[Date]`, `[White]`/`[Black]` à `"?"` tant que la page profil
+    de l'étape 8 n'existe pas, `[Variant]`, `[Result]`, `[Termination]` — ce dernier
+    portant directement la valeur de `GameResultCause`, plus précis qu'un `[Result]`
+    seul qui ne distingue pas la cause). Parseur en extraction simple (pas de
+    revalidation contre le moteur de règles) : un .pggn réimporté n'est donc pas une
+    source de vérité fiable. Exposition probable via `GET /api/games/{id}/pggn`.
+
+    **Implique de changer le stockage de l'état de partie** : `Game`/`GameStateJson`
+    ne gardent aujourd'hui que `lastRoundResult` (le dernier round), pas l'historique
+    complet — à remplacer par un `roundHistory` (liste de `RoundResult`, un par round,
+    y compris les rounds annulés), qui devient la source de vérité pour reconstruire
+    le PGGN (avec l'aide de `positionHistory`, qui a déjà un instantané par round,
+    pour la désambiguïsation SAN). Une fois `roundHistory` en place, `moveHistory`
+    devient redondant (dérivable des rounds où `movePlayed = true`) et doit être
+    supprimé plutôt que maintenu en double, plutôt que gardé comme information
+    dupliquée à synchroniser à la main.
 
 ## Liaison compte/session ↔ partie (étapes 6-7)
 
@@ -215,6 +241,7 @@ tout court (échec rapide voulu au boot Spring, pas seulement au moment du login
   connecte ensuite et voudrait récupérer son historique) — hors scope v1 (voir section "Liaison
   compte/session ↔ partie")
 
-## Ne jamais laisser tourner le back ou le front à la fin d'un prompt
-Cela permet de libérer les ports pour qu'ils puissent être lancées directement depuis la machine locale
-Cependant il ne faut pas down le docker compose
+## Procédée
+- Ne jamais laisser tourner le back ou le front à la fin d'un prompt. Cela permet de libérer les ports pour qu'ils puissent être lancées directement depuis la machine locale 
+- Cependant il ne faut pas down le docker compose
+- Ne jamais toucher à git, l'utilisateur gère les commits / push 

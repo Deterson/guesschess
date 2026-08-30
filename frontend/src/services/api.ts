@@ -10,6 +10,8 @@ import type { Color, CreateGameHttpResponse, ErrorResponse, GameVariant, JoinGam
  */
 const API_URL = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://localhost:8080' : '')
 
+const REQUEST_TIMEOUT_MS = 15000
+
 export class ApiError extends Error {
   status: number
   code?: string
@@ -37,12 +39,28 @@ async function request<T>(path: string, { method = 'GET', body, token }: Request
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   if (token) headers.Authorization = `Bearer ${token}`
 
-  const response = await fetch(`${API_URL}${path}`, {
-    method,
-    headers,
-    credentials: 'include',
-    body: body === undefined ? undefined : JSON.stringify(body),
-  })
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+
+  let response: Response
+  try {
+    response = await fetch(`${API_URL}${path}`, {
+      method,
+      headers,
+      credentials: 'include',
+      body: body === undefined ? undefined : JSON.stringify(body),
+      signal: controller.signal,
+    })
+  } catch (e) {
+    const timedOut = e instanceof DOMException && e.name === 'AbortError'
+    throw new ApiError(
+      timedOut ? 'Le serveur ne répond pas, réessayez.' : 'Impossible de contacter le serveur.',
+      0,
+      timedOut ? 'TIMEOUT' : 'NETWORK_ERROR',
+    )
+  } finally {
+    clearTimeout(timeoutId)
+  }
 
   if (response.status === 401 && token) {
     // Spring Security rejette une requête portant un Bearer invalide/expiré avec 401
