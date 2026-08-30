@@ -160,9 +160,7 @@ Jeu d'échecs classique avec une règle additionnelle :
    volume Postgres si lancés depuis le même dossier sans `-p` — utiliser un nom de projet distinct
    (`docker compose -p ... -f docker-compose.prod.yml ...`) pour tester la stack prod en local sans
    toucher aux données de dev.
-10. Déploiement sur le Raspberry Pi (reverse proxy, HTTPS, limites mémoire/CPU, dimensionnement JVM)
-11. Tests et peaufinage (tests unitaires du moteur, tests de la mécanique de devinette, UX)
-12. Format PGGN (Portable Game Guess Notation) — notation inspirée du PGN, avec le
+10. Format PGGN (Portable Game Guess Notation) — notation inspirée du PGN, avec le
     coup deviné entre parenthèses juste après le coup réel (ex. `1. e4(e3) e5(Nc6)`).
     Si la devinette est correcte (round annulé, coup réel == deviné par définition),
     seule la devinette entre parenthèses apparaît (`2. (Nf3) Nc6(a5)`) — pas de
@@ -188,6 +186,66 @@ Jeu d'échecs classique avec une règle additionnelle :
     devient redondant (dérivable des rounds où `movePlayed = true`) et doit être
     supprimé plutôt que maintenu en double, plutôt que gardé comme information
     dupliquée à synchroniser à la main.
+
+11. Historique de partie navigable (front), façon lichess.org : liste des coups affichée à
+    gauche de l'échiquier, chaque coup cliquable. Cliquer un coup fait afficher l'état du
+    plateau à ce moment de la partie (dérivé de `positionHistory`, déjà introduit à l'étape
+    10 pour le PGGN — même source de vérité, pas de nouvelle donnée à faire remonter du
+    backend) plutôt que l'état courant, avec le coup deviné à ce round affiché en
+    transparence sur le plateau (case/pièce fantôme, cohérent avec le rendu entre
+    parenthèses du PGGN pour ce même round). Cliquer le dernier coup de la liste revient à
+    l'état courant de la partie (le mode "navigation" doit rester distinct côté client de la
+    partie réellement en cours : parcourir l'historique ne doit ni permettre de jouer un
+    coup depuis une position passée, ni interférer avec la réception en direct des mises à
+    jour WebSocket sur la partie live — un round résolu pendant qu'un joueur navigue dans
+    l'historique doit rafraîchir la liste sans forcer un retour à la position courante tant
+    que l'utilisateur n'a pas cliqué le dernier coup lui-même).
+
+12. Timers (temps de réflexion + timer de devinette) : configuration du contrôle de temps
+    au moment de la création de la partie (étape 7), façon échecs classique — un temps total
+    par joueur + un bonus (incrément) ajouté après chaque coup joué (type Fischer). Timer
+    géré et arbitré côté backend (jamais côté client, cohérent avec le principe "le serveur
+    revalide tout") : le décompte réel vit dans l'agrégat `Game`/le round en cours, le
+    frontend ne fait qu'afficher un countdown dérivé d'un timestamp reçu, pas sa propre
+    source de vérité. Quand le temps d'un joueur tombe à zéro, la partie se termine
+    immédiatement (perte au temps) — nouvelle valeur de cause dans `GameResultCause` (voir
+    section "Résultat d'une partie"). Nécessite un mécanisme serveur pour détecter le
+    flag-fall même en l'absence de toute action du joueur (personne ne soumet rien, donc
+    rien ne déclenche naturellement la vérification) — un scheduler (threads virtuels /
+    `ScheduledExecutorService`) qui surveille les timers actifs, pas une vérification
+    dépendant de la prochaine soumission.
+
+    **Timer de devinette** : distinct du timer de réflexion, il ne consomme pas le temps
+    total du devineur. Démarre au moment où le joueur au trait a soumis son coup réel et
+    tant que le devineur n'a pas encore soumis sa devinette ; s'arrête dès que la devinette
+    est soumise. Durée proportionnelle au temps total choisi à la création (ex. 15s pour une
+    partie 5 min/side, 30s pour 10 min/side — ratio à figer précisément, éventuellement aussi
+    fonction du bonus par coup). À expiration sans devinette soumise : aucune devinette n'est
+    considérée faite et le coup réel est simplement joué (résolution identique au cas
+    "devinette incorrecte", sans pénalité de temps côté devineur au-delà de ne pas avoir
+    deviné) — le round se résout sans attendre davantage, ce qui reste cohérent avec la règle
+    "le serveur ne doit jamais exposer une soumission avant que les deux soient là" puisqu'il
+    n'y a alors jamais de seconde soumission à attendre.
+
+    **Portée mode asynchrone** : les deux timers tels que décrits (décompte live à la
+    seconde) n'ont de sens qu'en temps réel — en asynchrone les joueurs ne sont pas connectés
+    simultanément, donc ni perte au temps classique ni fenêtre de devinette chronométrée à la
+    seconde près. Reste une question ouverte séparée si l'asynchrone doit avoir son
+    propre contrôle de temps (ex. temps par coup en jours, façon correspondance) ; hors
+    périmètre de cette étape.
+
+13. Tutoriel des règles : lien depuis la page d'accueil (`HomeView`) vers une page dédiée
+    (ex. `/how-to-play`, route publique côté front, aucune auth requise — au même titre que
+    la lecture d'une partie en spectateur) qui explique le concept du jeu en texte, illustré
+    par des échiquiers représentant des positions d'exemple (coup réel vs devinette révélés
+    côte à côte, cas devinette correcte → coup annulé et tour qui passe au devineur, cas
+    devinette incorrecte → coup joué normalement, cas particulier Guessmate → roi capturé).
+    Plutôt que des images statiques à maintenir séparément, réutiliser le composant
+    d'échiquier déjà existant (étape 5) en mode non-interactif/lecture seule, alimenté par
+    des positions figées codées en dur pour chaque exemple — reste cohérent visuellement
+    avec le vrai plateau (mêmes assets de pièces, même thème) et évite un jeu d'images à
+    régénérer si le thème du plateau change. Contenu purement statique, pas de backend
+    impliqué.
 
 ## Liaison compte/session ↔ partie (étapes 6-7)
 
@@ -235,8 +293,9 @@ tout court (échec rapide voulu au boot Spring, pas seulement au moment du login
 
 ## Questions encore ouvertes (à trancher plus tard)
 
-- Mode spectateur
-- Gestion du temps / timer par coup
+- Contrôle de temps en mode asynchrone (voir étape 12 — hors périmètre pour l'instant, le
+  décompte live et le timer de devinette à la seconde tels que décrits ne concernent que le
+  temps réel)
 - Fusion d'une identité anonyme vers un compte après coup (ex. un joueur qui a joué en anonyme se
   connecte ensuite et voudrait récupérer son historique) — hors scope v1 (voir section "Liaison
   compte/session ↔ partie")
