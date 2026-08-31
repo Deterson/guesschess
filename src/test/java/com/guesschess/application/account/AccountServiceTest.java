@@ -54,12 +54,36 @@ class AccountServiceTest {
         assertThrows(IllegalArgumentException.class, () -> accountService.getById(UserId.random()));
     }
 
+    @Test
+    void updateDisplayNameChangesTheStoredName() {
+        AccountSnapshot created = accountService.findOrCreateByOAuthIdentity(
+                OAuthProvider.GOOGLE, "google-123", "Alice", "alice@example.com");
+
+        AccountSnapshot updated = accountService.updateDisplayName(created.id(), "Alicia");
+
+        assertEquals("Alicia", updated.displayName());
+        assertEquals("Alicia", accountService.getById(created.id()).displayName());
+    }
+
+    @Test
+    void updateDisplayNameRejectsFewerThanThreeCharacters() {
+        AccountSnapshot created = accountService.findOrCreateByOAuthIdentity(
+                OAuthProvider.GOOGLE, "google-123", "Alice", "alice@example.com");
+
+        assertThrows(IllegalArgumentException.class, () -> accountService.updateDisplayName(created.id(), "Al"));
+    }
+
     private static class InMemoryUserRepository implements UserRepository {
 
         private final Map<UserId, User> byId = new HashMap<>();
 
         @Override
         public void insert(User user) {
+            byId.put(user.id(), user);
+        }
+
+        @Override
+        public void update(User user) {
             byId.put(user.id(), user);
         }
 

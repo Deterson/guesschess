@@ -1,8 +1,10 @@
 package com.guesschess.application;
 
+import com.guesschess.domain.account.UserId;
 import com.guesschess.domain.game.GameId;
 import com.guesschess.domain.piece.Color;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -28,4 +30,21 @@ public interface GameAccessRepository {
      * d'une couleur deja prise par quelqu'un d'autre.
      */
     PlayerRef linkPlayer(GameId gameId, Color color, PlayerRef ref);
+
+    /**
+     * Parties (etape 8) ou userId tient une des deux couleurs, triees par recence
+     * (creation) decroissante - pagination simple par page/taille, suffisante pour le
+     * volume attendu (voir CLAUDE.md, "curseur ou offset simple pour la v1").
+     */
+    List<GameAccess> findAllByAccount(UserId userId, int page, int size);
+
+    /**
+     * Fusion identite anonyme -> compte (etape 8) : reecrit en une fois tous les
+     * game_access ou l'identite anonyme "from" tenait une couleur, pour qu'ils
+     * pointent desormais vers le compte "to" - sinon ces parties resteraient
+     * invisibles dans "Mes parties" une fois l'utilisateur connecte. Seule exception
+     * volontaire a l'immuabilite du lien une fois pose (voir GameAccess.withPlayerLinked) :
+     * a n'appeler qu'au moment du login reussi (voir OAuthLoginSuccessHandler).
+     */
+    void relinkAnonymousToAccount(PlayerRef.Anonymous from, PlayerRef.Account to);
 }

@@ -3,11 +3,13 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { createGame } from '../services/api'
 import { useGameStore } from '../stores/game'
+import { useAuthStore } from '../stores/auth'
 import AuthModal from '../components/AuthModal.vue'
 import type { Color } from '../types/api'
 
 const router = useRouter()
 const gameStore = useGameStore()
+const authStore = useAuthStore()
 const creating = ref(false)
 const showModal = ref(false)
 const error = ref<string | null>(null)
@@ -16,7 +18,11 @@ const color = ref<Color | 'RANDOM'>('RANDOM')
 
 function openModal() {
   error.value = null
-  showModal.value = true
+  if (authStore.isLoggedIn) {
+    create(authStore.token)
+  } else {
+    showModal.value = true
+  }
 }
 
 async function create(authToken: string | null) {

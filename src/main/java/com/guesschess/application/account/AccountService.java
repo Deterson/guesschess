@@ -38,6 +38,21 @@ public class AccountService {
         return toSnapshot(user);
     }
 
+    /**
+     * Nom d'affichage modifiable par l'utilisateur (etape 8 de la roadmap) - contrainte
+     * minimale de 3 caracteres, distinct du futur login unique et immuable (etape 14).
+     */
+    public AccountSnapshot updateDisplayName(UserId id, String newDisplayName) {
+        if (newDisplayName == null || newDisplayName.trim().length() < 3) {
+            throw new IllegalArgumentException("displayName must be at least 3 characters");
+        }
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("no user found for id: " + id));
+        User updated = new User(user.id(), newDisplayName.trim(), user.email(), user.identities(), user.createdAt());
+        userRepository.update(updated);
+        return toSnapshot(updated);
+    }
+
     private AccountSnapshot toSnapshot(User user) {
         return new AccountSnapshot(user.id(), user.displayName(), user.email());
     }

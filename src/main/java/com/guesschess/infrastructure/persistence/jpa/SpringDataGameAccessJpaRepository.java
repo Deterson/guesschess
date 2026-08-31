@@ -1,16 +1,39 @@
 package com.guesschess.infrastructure.persistence.jpa;
 
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 interface SpringDataGameAccessJpaRepository extends JpaRepository<GameAccessEntity, UUID> {
 
     Optional<GameAccessEntity> findByWhiteTokenOrBlackToken(UUID whiteToken, UUID blackToken);
+
+    @Query("select a from GameAccessEntity a where "
+            + "(a.whitePlayerType = 'ACCOUNT' and a.whitePlayerId = :userId) "
+            + "or (a.blackPlayerType = 'ACCOUNT' and a.blackPlayerId = :userId) "
+            + "order by a.createdAt desc")
+    List<GameAccessEntity> findAllByAccount(@Param("userId") UUID userId, Pageable pageable);
+
+    /**
+     * Fusion anonyme -> compte (etape 8) : deux requetes (colonnes blanc/noir separees)
+     * plutot qu'une seule avec OR, une mise a jour SQL ne pouvant pas conditionner
+     * quelle paire de colonnes toucher au sein d'une meme ligne selon laquelle matche.
+     */
+    @Modifying
+    @Query("update GameAccessEntity a set a.whitePlayerType = 'ACCOUNT', a.whitePlayerId = :userId "
+            + "where a.whitePlayerType = 'ANONYMOUS' and a.whitePlayerId = :anonymousId")
+    void relinkWhitePlayer(@Param("anonymousId") UUID anonymousId, @Param("userId") UUID userId);
+
+    @Modifying
+    @Query("update GameAccessEntity a set a.blackPlayerType = 'ACCOUNT', a.blackPlayerId = :userId "
+            + "where a.blackPlayerType = 'ANONYMOUS' and a.blackPlayerId = :anonymousId")
+    void relinkBlackPlayer(@Param("anonymousId") UUID anonymousId, @Param("userId") UUID userId);
 
     /**
      * Ecriture conditionnelle atomique ("premier arrive, premier lie") : une seule

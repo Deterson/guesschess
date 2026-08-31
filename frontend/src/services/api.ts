@@ -1,9 +1,11 @@
 import { useAuthStore } from '../stores/auth'
 import type {
+  AccountResponse,
   Color,
   CreateGameHttpResponse,
   ErrorResponse,
   GameHistoryHttpResponse,
+  GameSummaryHttpResponse,
   GameVariant,
   JoinGameHttpResponse,
   MyAccessHttpResponse,
@@ -102,3 +104,12 @@ export const myAccess = (gameId: string, authToken: string | null) =>
 
 export const getGameHistory = (gameId: string) =>
   request<GameHistoryHttpResponse>(`/api/games/${gameId}/history`)
+
+export const getMe = (authToken: string) =>
+  request<AccountResponse>('/api/account/me', { token: authToken })
+
+export const updateDisplayName = (displayName: string, authToken: string) =>
+  request<AccountResponse>('/api/account/me', { method: 'PATCH', body: { displayName }, token: authToken })
+
+export const listMyGames = (page: number, size: number, authToken: string) =>
+  request<GameSummaryHttpResponse[]>(`/api/account/games?page=${page}&size=${size}`, { token: authToken })

@@ -5,6 +5,7 @@ const STORAGE_KEY = 'guesschess_pending_action'
 export type PendingAction =
   | { type: 'create'; variant: GameVariant; color: Color | 'RANDOM' }
   | { type: 'join'; gameId: string }
+  | { type: 'login'; returnTo: string }
 
 /**
  * Traverse une redirection OAuth complète (sortie du SPA) : ce que l'utilisateur

@@ -58,4 +58,13 @@ class UserEntity {
     Instant getUpdatedAt() {
         return updatedAt;
     }
+
+    /**
+     * Entite managee : le dirty-checking JPA repercute ce changement au flush/commit,
+     * pas besoin d'un save() explicite (voir JpaUserRepository.update).
+     */
+    void updateDisplayName(String displayName, Instant updatedAt) {
+        this.displayName = displayName;
+        this.updatedAt = updatedAt;
+    }
 }

@@ -23,7 +23,7 @@ async function copy() {
     <div class="flex gap-2">
       <input readonly class="flex-1 truncate rounded bg-stone-900 px-2 py-1 text-xs" :value="link" />
       <button type="button" class="rounded bg-stone-700 px-3 py-1 text-sm hover:bg-stone-600" @click="copy">
-        {{ copied ? 'Copié !' : 'Copier' }}
+        {{ copied ? 'Copié' : 'Copier' }}
       </button>
       <button type="button" class="rounded bg-stone-700 px-3 py-1 text-sm hover:bg-stone-600" @click="emit('dismiss')">
         ✕

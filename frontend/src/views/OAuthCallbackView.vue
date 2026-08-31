@@ -40,6 +40,8 @@ onMounted(async () => {
       const joined = await joinGame(action.gameId, token)
       await gameStore.joinGame({ gameId: joined.gameId, token: joined.token, color: joined.color.toLowerCase() as 'white' | 'black' })
       router.replace(`/game/${action.gameId}`)
+    } else if (action.type === 'login') {
+      router.replace(action.returnTo || '/')
     } else {
       router.replace('/')
     }

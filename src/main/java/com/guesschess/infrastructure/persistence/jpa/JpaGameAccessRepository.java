@@ -8,10 +8,12 @@ import com.guesschess.domain.account.AnonymousId;
 import com.guesschess.domain.account.UserId;
 import com.guesschess.domain.game.GameId;
 import com.guesschess.domain.piece.Color;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -74,6 +76,23 @@ class JpaGameAccessRepository implements GameAccessRepository {
         return color == Color.WHITE
                 ? toPlayerRef(reloaded.getWhitePlayerType(), reloaded.getWhitePlayerId())
                 : toPlayerRef(reloaded.getBlackPlayerType(), reloaded.getBlackPlayerId());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<GameAccess> findAllByAccount(UserId userId, int page, int size) {
+        return springDataRepository.findAllByAccount(userId.value(), PageRequest.of(page, size)).stream()
+                .map(this::toDomain)
+                .toList();
+    }
+
+    @Override
+    @Transactional
+    public void relinkAnonymousToAccount(PlayerRef.Anonymous from, PlayerRef.Account to) {
+        UUID anonymousId = from.anonymousId().value();
+        UUID userId = to.userId().value();
+        springDataRepository.relinkWhitePlayer(anonymousId, userId);
+        springDataRepository.relinkBlackPlayer(anonymousId, userId);
     }
 
     private GameAccess toDomain(GameAccessEntity entity) {

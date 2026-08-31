@@ -42,6 +42,14 @@ class JpaUserRepository implements UserRepository {
     }
 
     @Override
+    @Transactional
+    public void update(User user) {
+        UserEntity entity = users.findById(user.id().value())
+                .orElseThrow(() -> new IllegalArgumentException("no user found for id: " + user.id()));
+        entity.updateDisplayName(user.displayName(), Instant.now());
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public Optional<User> findByOAuthIdentity(OAuthProvider provider, String externalId) {
         return identities.findByProviderAndExternalId(provider.name(), externalId)

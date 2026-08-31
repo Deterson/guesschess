@@ -1,10 +1,17 @@
 package com.guesschess.infrastructure.security;
 
+import com.guesschess.application.GameAccess;
+import com.guesschess.application.GameAccessRepository;
+import com.guesschess.application.PlayerRef;
+import com.guesschess.application.PlayerToken;
 import com.guesschess.application.account.AccountService;
+import com.guesschess.domain.account.AnonymousId;
 import com.guesschess.domain.account.OAuthProvider;
 import com.guesschess.domain.account.User;
 import com.guesschess.domain.account.UserId;
 import com.guesschess.domain.account.UserRepository;
+import com.guesschess.domain.game.GameId;
+import com.guesschess.domain.piece.Color;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -19,6 +26,7 @@ import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -41,7 +49,9 @@ class OAuthLoginSuccessHandlerTest {
         JwtEncoder jwtEncoder = new NimbusJwtEncoder(new ImmutableSecret<>(
                 new SecretKeySpec("unit-test-jwt-secret-at-least-32-bytes-long".getBytes(StandardCharsets.UTF_8), "HmacSHA256")));
         JwtService jwtService = new JwtService(jwtEncoder, Duration.ofHours(1));
-        OAuthLoginSuccessHandler handler = new OAuthLoginSuccessHandler(accountService, jwtService, "http://localhost:5173/oauth-callback");
+        RecordingGameAccessRepository gameAccessRepository = new RecordingGameAccessRepository();
+        OAuthLoginSuccessHandler handler = new OAuthLoginSuccessHandler(
+                accountService, jwtService, gameAccessRepository, "http://localhost:5173/oauth-callback");
 
         Map<String, Object> attributes = new HashMap<>();
         attributes.put("sub", "google-999");
@@ -51,6 +61,8 @@ class OAuthLoginSuccessHandlerTest {
         OAuth2AuthenticationToken token = new OAuth2AuthenticationToken(principal, principal.getAuthorities(), "google");
 
         MockHttpServletRequest request = new MockHttpServletRequest();
+        AnonymousId anonymousId = AnonymousId.random();
+        request.setAttribute(AnonymousIdentityFilter.REQUEST_ATTRIBUTE, anonymousId);
         MockHttpServletResponse response = new MockHttpServletResponse();
 
         handler.onAuthenticationSuccess(request, response, token);
@@ -58,6 +70,49 @@ class OAuthLoginSuccessHandlerTest {
         assertEquals(1, userRepository.count());
         String location = response.getRedirectedUrl();
         assertTrue(location != null && location.startsWith("http://localhost:5173/oauth-callback#token="));
+
+        // Fusion identite anonyme -> compte (etape 8) : le cookie anonyme de CETTE
+        // requete doit avoir ete relie au compte qui vient de se connecter.
+        assertEquals(1, gameAccessRepository.relinkCalls.size());
+        assertEquals(anonymousId, gameAccessRepository.relinkCalls.get(0).from().anonymousId());
+    }
+
+    private record RelinkCall(PlayerRef.Anonymous from, PlayerRef.Account to) {
+    }
+
+    private static class RecordingGameAccessRepository implements GameAccessRepository {
+
+        private final List<RelinkCall> relinkCalls = new ArrayList<>();
+
+        @Override
+        public void save(GameAccess access) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Optional<GameAccess> findByToken(PlayerToken token) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Optional<GameAccess> findByGameId(GameId gameId) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public PlayerRef linkPlayer(GameId gameId, Color color, PlayerRef ref) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<GameAccess> findAllByAccount(UserId userId, int page, int size) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void relinkAnonymousToAccount(PlayerRef.Anonymous from, PlayerRef.Account to) {
+            relinkCalls.add(new RelinkCall(from, to));
+        }
     }
 
     private static class InMemoryUserRepository implements UserRepository {
@@ -66,6 +121,11 @@ class OAuthLoginSuccessHandlerTest {
 
         @Override
         public void insert(User user) {
+            byId.put(user.id(), user);
+        }
+
+        @Override
+        public void update(User user) {
             byId.put(user.id(), user);
         }
 

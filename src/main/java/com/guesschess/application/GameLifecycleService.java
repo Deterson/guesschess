@@ -1,10 +1,13 @@
 package com.guesschess.application;
 
+import com.guesschess.domain.account.UserId;
 import com.guesschess.domain.board.Board;
 import com.guesschess.domain.game.Game;
 import com.guesschess.domain.game.GameId;
 import com.guesschess.domain.game.GameNotFoundException;
 import com.guesschess.domain.game.GameRepository;
+import com.guesschess.domain.game.GameResult;
+import com.guesschess.domain.game.GameStatus;
 import com.guesschess.domain.game.GameVariant;
 import com.guesschess.domain.game.PendingSubmission;
 import com.guesschess.domain.move.Move;
@@ -238,6 +241,49 @@ public class GameLifecycleService {
         return gameAccessRepository.findByToken(token)
                 .filter(access -> access.gameId().equals(id))
                 .map(access -> access.colorOf(token));
+    }
+
+    /**
+     * Photo d'une partie du point de vue d'un compte (etape 8, "Mes parties") : sa
+     * couleur, l'adversaire (encore inconnu tant que l'autre siege n'est pas pris),
+     * et de quoi deriver l'issue (outcome()) et une miniature du plateau cote appelant.
+     */
+    public record GameSummary(GameId gameId, Color myColor, PlayerRef opponent, GameStatus status, GameResult result,
+                               Board board) {
+
+        public enum Outcome {
+            WON, LOST, DRAW, ONGOING
+        }
+
+        public Outcome outcome() {
+            if (status != GameStatus.FINISHED) {
+                return Outcome.ONGOING;
+            }
+            if (result.isDraw()) {
+                return Outcome.DRAW;
+            }
+            return result.winner() == myColor ? Outcome.WON : Outcome.LOST;
+        }
+    }
+
+    /**
+     * Parties d'un compte (etape 8), triees par recence - voir
+     * GameAccessRepository.findAllByAccount. Chaque partie est relue via withGame comme
+     * viewGame/gameHistory : un verrou pessimiste bref par ligne, largement suffisant a
+     * l'echelle visee (mesurer avant d'optimiser, voir CLAUDE.md).
+     */
+    public List<GameSummary> listGamesForAccount(UserId userId, int page, int size) {
+        PlayerRef me = new PlayerRef.Account(userId);
+        return gameAccessRepository.findAllByAccount(userId, page, size).stream()
+                .map(access -> toSummary(access, me))
+                .toList();
+    }
+
+    private GameSummary toSummary(GameAccess access, PlayerRef me) {
+        Color myColor = me.equals(access.playerOf(Color.WHITE)) ? Color.WHITE : Color.BLACK;
+        PlayerRef opponent = access.playerOf(myColor.opposite());
+        return gameRepository.withGame(access.gameId(), game ->
+                new GameSummary(access.gameId(), myColor, opponent, game.status(), game.result(), game.board()));
     }
 
     private GameAccess requireAccess(PlayerToken token) {

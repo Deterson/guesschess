@@ -1,7 +1,10 @@
 package com.guesschess.infrastructure.security;
 
+import com.guesschess.application.GameAccessRepository;
+import com.guesschess.application.PlayerRef;
 import com.guesschess.application.account.AccountService;
 import com.guesschess.application.account.AccountSnapshot;
+import com.guesschess.domain.account.AnonymousId;
 import com.guesschess.infrastructure.security.oauth.OAuthAttributes;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -27,12 +30,14 @@ class OAuthLoginSuccessHandler implements AuthenticationSuccessHandler {
 
     private final AccountService accountService;
     private final JwtService jwtService;
+    private final GameAccessRepository gameAccessRepository;
     private final String postLoginRedirectUri;
 
-    OAuthLoginSuccessHandler(AccountService accountService, JwtService jwtService,
+    OAuthLoginSuccessHandler(AccountService accountService, JwtService jwtService, GameAccessRepository gameAccessRepository,
                               @Value("${app.oauth.post-login-redirect-uri}") String postLoginRedirectUri) {
         this.accountService = accountService;
         this.jwtService = jwtService;
+        this.gameAccessRepository = gameAccessRepository;
         this.postLoginRedirectUri = postLoginRedirectUri;
     }
 
@@ -46,6 +51,13 @@ class OAuthLoginSuccessHandler implements AuthenticationSuccessHandler {
 
         AccountSnapshot account = accountService.findOrCreateByOAuthIdentity(
                 attributes.provider(), attributes.externalId(), attributes.displayName(), attributes.email());
+
+        // Fusion identite anonyme -> compte (etape 8) : toute partie deja liee au
+        // cookie anonyme de CE navigateur bascule vers le compte qui vient de se
+        // connecter, pour apparaitre dans "Mes parties". Seule exception documentee a
+        // l'immuabilite du lien - voir GameAccessRepository.relinkAnonymousToAccount.
+        AnonymousId anonymousId = (AnonymousId) request.getAttribute(AnonymousIdentityFilter.REQUEST_ATTRIBUTE);
+        gameAccessRepository.relinkAnonymousToAccount(new PlayerRef.Anonymous(anonymousId), new PlayerRef.Account(account.id()));
 
         String token = jwtService.generateToken(account.id(), account.displayName());
         String redirectUrl = postLoginRedirectUri + "#token=" + URLEncoder.encode(token, StandardCharsets.UTF_8);

@@ -5,8 +5,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.oauth2.client.web.OAuth2LoginAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -27,6 +27,15 @@ import static org.springframework.security.config.Customizer.withDefaults;
  * que l'identite anonyme resolue soit disponible en attribut de requete des le
  * handshake WebSocket, qui passe par cette meme chaine de filtres (voir
  * AnonymousIdentityHandshakeInterceptor).
+ *
+ * Positionne explicitement avant OAuth2LoginAuthenticationFilter (pas
+ * UsernamePasswordAuthenticationFilter, qui s'execute apres lui dans l'ordre par
+ * defaut de Spring Security) : OAuthLoginSuccessHandler (etape 8, fusion identite
+ * anonyme -> compte) lit l'attribut pose par AnonymousIdentityFilter de facon
+ * synchrone DANS le traitement d'OAuth2LoginAuthenticationFilter, avant que la chaine
+ * ne continue - le placer seulement avant UsernamePasswordAuthenticationFilter le
+ * faisait executer trop tard sur cette requete precise (attribut encore absent,
+ * IllegalArgumentException a la connexion).
  */
 @Configuration
 @EnableWebSecurity
@@ -48,7 +57,7 @@ class SecurityConfig {
         http
                 .csrf(csrf -> csrf.disable())
                 .cors(withDefaults())
-                .addFilterBefore(anonymousIdentityFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(anonymousIdentityFilter, OAuth2LoginAuthenticationFilter.class)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/ws/**", "/oauth2/**", "/login/**", "/actuator/health").permitAll()
                         .requestMatchers("/api/account/**").authenticated()
@@ -62,7 +71,7 @@ class SecurityConfig {
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(List.of(allowedOrigin));
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedMethods(List.of("GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
 

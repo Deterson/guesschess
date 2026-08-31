@@ -83,6 +83,23 @@ export interface GameHistoryHttpResponse {
   rounds: GameHistoryEntry[]
 }
 
+export interface AccountResponse {
+  id: string
+  displayName: string
+  email: string | null
+}
+
+export type GameOutcome = 'WON' | 'LOST' | 'DRAW' | 'ONGOING'
+
+/** Une ligne de "Mes parties" (etape 8 - GET /api/account/games). */
+export interface GameSummaryHttpResponse {
+  gameId: string
+  myColor: Color
+  opponentName: string | null
+  outcome: GameOutcome
+  board: Board
+}
+
 // ---- WebSocket STOMP (infrastructure/websocket/dto) ----
 
 export interface LegalMoveMessage {

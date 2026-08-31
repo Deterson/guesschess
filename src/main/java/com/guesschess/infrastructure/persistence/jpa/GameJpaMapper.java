@@ -59,8 +59,19 @@ class GameJpaMapper {
         GameResult result = entity.getResultCause() != null
                 ? new GameResult(entity.getResultWinner(), entity.getResultCause())
                 : null;
-        List<Game.PositionRecord> positionHistory = state.positionHistory().stream().map(this::toPositionRecord).toList();
-        List<RoundResult> roundHistory = state.roundHistory().stream().map(this::toRoundResult).toList();
+        // roundHistory (etape 10) et positionHistory (etape 10 egalement, sur le meme
+        // schema) sont absents du JSON de parties persistees par un code plus ancien -
+        // null a la deserialisation plutot qu'une liste vide (Jackson ne peut pas
+        // deviner un defaut sur un record). Traite comme "aucun round/position connu"
+        // plutot que de faire planter tout endpoint qui retomberait sur une de ces
+        // parties (ex. "Mes parties", etape 8, qui parcourt tout l'historique d'un
+        // compte plutot qu'une seule partie choisie par id).
+        List<Game.PositionRecord> positionHistory = state.positionHistory() == null
+                ? List.of()
+                : state.positionHistory().stream().map(this::toPositionRecord).toList();
+        List<RoundResult> roundHistory = state.roundHistory() == null
+                ? List.of()
+                : state.roundHistory().stream().map(this::toRoundResult).toList();
 
         Game.Memento memento = new Game.Memento(
                 new GameId(entity.getId()),

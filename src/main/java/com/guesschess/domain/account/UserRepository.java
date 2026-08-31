@@ -9,6 +9,8 @@ public interface UserRepository {
 
     void insert(User user);
 
+    void update(User user);
+
     Optional<User> findByOAuthIdentity(OAuthProvider provider, String externalId);
 
     Optional<User> findById(UserId id);

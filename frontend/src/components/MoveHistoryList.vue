@@ -60,7 +60,7 @@ function isActive(index: number): boolean {
 <template>
   <div class="rounded-lg bg-stone-800 px-4 py-3 text-sm">
     <p class="mb-2 font-semibold text-stone-300">Historique</p>
-    <p v-if="rounds.length === 0" class="text-stone-500">Aucun coup joué pour l'instant.</p>
+    <p v-if="rounds.length === 0" class="text-stone-500">-</p>
     <ol v-else class="space-y-0.5 text-stone-400">
       <li>
         <button

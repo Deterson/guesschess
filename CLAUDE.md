@@ -119,78 +119,28 @@ Jeu d'échecs classique avec une règle additionnelle :
    compte/session ↔ partie" plus bas.
 7. ✅ Page d'accueil — création de partie (fait, avec durcissement de l'accès aux coups/devinettes
    ultérieur) — flux détaillé dans la section "Liaison compte/session ↔ partie" plus bas.
-8. Page de profil (historique des parties, nom de joueur, etc.) — état actuel vérifié : aucun
-   header/nav n'existe encore (`App.vue` ne rend qu'un `<router-view>`), aucun garde de route,
-   `GET /api/account/me` existe déjà (`id`/`displayName`/`email`), rien côté backend pour lister
-   les parties d'un joueur.
+8. ✅ Page de profil (fait) : header global (`AppHeader.vue`, "Jouer"/"Tutoriel"/"Profil"-ou-
+   "Connexion") monté dans `App.vue`. Routes imbriquées `/profile` → `/profile/games`
+   (`ProfileLayout.vue`/`ProfileGamesView.vue`), réservées aux comptes connectés (garde
+   `router.beforeEach` côté front + `/api/account/**` `.authenticated()` côté back). "Mes
+   parties" : `GET /api/account/games?page=&size=` (`GameLifecycleService.listGamesForAccount`),
+   miniature du plateau + issue (`GameSummary.Outcome`) calculées côté serveur. Nom affiché
+   modifiable via `PATCH /api/account/me` (3 caractères minimum). Fusion identité anonyme →
+   compte au login (`GameAccessRepository.relinkAnonymousToAccount`, appelée dans
+   `OAuthLoginSuccessHandler`) — seule exception à l'immuabilité du lien posée aux étapes 6/7.
+   Modale "comment voulez-vous jouer" sautée si déjà connecté ; bouton "Connexion" du header
+   ouvre une mini-modale dédiée (Google/GitHub uniquement).
 
-   **Header global**, ajouté sur toutes les pages (nouveau composant, ex. `AppHeader.vue`,
-   monté une fois dans `App.vue` au-dessus du `<router-view>`) : à gauche "Jouer" (renvoie
-   vers `/`, la `HomeView` existante, inchangée) et "Tutoriel" (nouvelle route, ex.
-   `/how-to-play` — pour cette étape, page **volontairement vide**, juste "tutoriel en
-   cours" centré en petit ; le contenu réel est le périmètre de l'étape 13 déjà décrite
-   plus bas, cette étape-ci ne fait que poser le lien et la route vide) ; à droite "Profil"
-   si `authStore.isLoggedIn`, sinon "Connexion" (ouvre le même `AuthModal` que
-   création/join, ou redirige vers `/` si plus simple à cadrer techniquement).
+   **Pièges rencontrés et corrigés** : `AnonymousIdentityFilter` doit être positionné avant
+   `OAuth2LoginAuthenticationFilter` (pas `UsernamePasswordAuthenticationFilter`, qui s'exécute
+   après lui dans l'ordre par défaut de Spring Security) pour que l'identité anonyme soit
+   résolue avant `OAuthLoginSuccessHandler` ; `roundHistory`/`positionHistory` peuvent être
+   `null` sur les parties créées avant l'étape 10 (traité comme liste vide dans
+   `GameJpaMapper.toDomain` plutôt que de planter) ; CORS n'autorisait pas `PATCH` (ajouté à
+   `SecurityConfig`) ; `mx-auto` sur la racine de `ProfileLayout` désactivait l'étirement flex
+   attendu de `<router-view class="flex-1">` (marge `auto` sur l'axe transversal = pas de
+   `stretch`), retiré au profit de `w-full`.
 
-   **Page Profil** (nouvelle route, ex. `/profile`) : **réservée aux comptes connectés**,
-   pas accessible à un joueur anonyme — protégée à la fois côté front (garde de route,
-   inexistante aujourd'hui donc à créer, qui redirige vers `/` si `!authStore.isLoggedIn`)
-   et côté back (les nouveaux endpoints listés ci-dessous exigent un JWT valide, 401/403
-   sinon — aucune donnée de profil ne doit être atteignable via un cookie anonyme seul).
-   En haut : nom du joueur (`GET /api/account/me`, déjà existant, champ `displayName`).
-   À gauche : menu, pour l'instant seulement "Mes parties".
-
-   **"Mes parties"** (nouvelle route, ex. `/profile/games`) : liste déroulante des parties
-   passées et en cours du compte. Nécessite une nouvelle capacité backend absente
-   aujourd'hui — `GameAccessRepository` n'expose que `save`/`findByToken`/`findByGameId`/
-   `linkPlayer`, rien d'indexé par joueur — donc une requête "toutes les parties où ce
-   `PlayerRef` (compte) apparaît, triées par récence" à ajouter, exposée par un nouvel
-   endpoint protégé (ex. `GET /api/account/games?cursor=...&limit=...`). "Fetch
-   intelligent qui limite le nombre de parties envoyées" = pagination par curseur (ou
-   offset simple pour la v1), pas tout l'historique d'un coup — le nombre de parties d'un
-   compte actif peut grossir indéfiniment. Chaque ligne : miniature de l'état final (ou
-   actuel si en cours) du plateau — même logique de réutilisation du composant échiquier
-   en lecture seule que prévu à l'étape 13 (pas d'images statiques à maintenir), alimentée
-   par la dernière position de `positionHistory` de la partie ; couleur de fond de la
-   ligne selon l'issue **du point de vue de ce compte** : vert si gagnée, rouge si perdue,
-   gris si nulle, noir/normal si toujours en cours (dérivé de `GameResultCause` côté
-   Game + de la couleur jouée par ce compte). Pour l'instant, seule autre information
-   affichée : le nom de l'adversaire. D'autres colonnes viendront plus tard (date, contrôle
-   de temps une fois l'étape 12 faite, etc.) — pas la peine de figer le format de ligne
-   dès maintenant au-delà de ces champs.
-
-   **Nom affiché (`display_name`)** : la colonne existe déjà (`V3__create_users_table.sql`,
-   `users.display_name`), posée une seule fois à la création du compte à partir du nom
-   fourni par Google/GitHub (`AccountService.findOrCreateByOAuthIdentity`) et jamais
-   retouchée aux logins suivants. Cette étape la rend **modifiable par l'utilisateur**
-   depuis la page de profil (nouvel endpoint, ex. `PATCH /api/account/me`), avec une
-   contrainte minimale de 3 caractères. Ce `display_name` reste pour l'instant un simple
-   nom d'affichage libre (pas unique, pas garanti stable) — voir l'étape 14 pour la
-   distinction avec le futur identifiant unique et immuable, un sujet volontairement
-   séparé de celui-ci.
-
-   **Point de vigilance — modale "comment voulez-vous jouer" pour un utilisateur déjà
-   connecté** : vérifié que ce n'est *pas* déjà géré — `HomeView.openModal()` affiche
-   aujourd'hui `AuthModal` inconditionnellement, y compris quand `authStore.isLoggedIn`
-   est déjà vrai. À corriger dans cette étape : si un JWT valide est présent, la création
-   (et le join) d'une partie doivent se faire directement avec l'identité du compte déjà
-   connu, sans jamais afficher la modale de choix connexion/anonyme.
-
-   **Point de vigilance — fusion identité anonyme → compte** : si un visiteur qui a déjà
-   les droits d'une ou plusieurs parties en tant qu'anonyme (cookie `guesschess_anon`) se
-   connecte ensuite avec un compte Google/GitHub, tous les `game_access` actuellement liés
-   à cette identité anonyme doivent être **réécrits pour pointer vers le compte** plutôt que
-   dupliqués ou laissés orphelins côté "Mes parties" — sans quoi ces parties resteraient
-   invisibles depuis le profil du compte. Point de bascule naturel : au moment du login
-   réussi (`OAuthLoginSuccessHandler`, qui a déjà accès à la requête donc au cookie anonyme
-   en cours), après find-or-create du compte, relier en une fois tous les `game_access` de
-   cette `AnonymousId` au `UserId` du compte (nouvelle capacité repository à ajouter, le
-   pendant "réécriture" de `linkPlayer`). **Exception explicite** à la règle d'immuabilité
-   du lien posée aux étapes 6/7 ("jamais modifié une fois posé") : ce cas précis de fusion
-   anonyme → compte est la seule situation où un `game_access` déjà lié change de titulaire
-   après coup ; à documenter comme tel dans le code (commentaire sur la méthode concernée)
-   pour ne pas surprendre un lecteur qui s'attend à l'invariant habituel.
 9. ✅ Dockerisation (fait) : `Dockerfile` racine (backend, multi-stage, JVM bornée par
    `-XX:MaxRAMPercentage`) et `frontend/Dockerfile` (multi-stage, servi par nginx qui proxifie
    `/api`, `/ws`, `/oauth2`, `/login` vers le backend en **same-origin** — CORS obsolète en prod,
@@ -278,7 +228,7 @@ Jeu d'échecs classique avec une règle additionnelle :
     périmètre de cette étape.
 
 13. Tutoriel des règles : lien depuis le header global (posé à l'étape 8, qui crée déjà la
-    route `/how-to-play` avec un contenu vide "tutoriel en cours") vers une page dédiée,
+    route `/how-to-play` avec un contenu vide "tutoriel en création") vers une page dédiée,
     route publique côté front, aucune auth requise — au même titre que la lecture d'une
     partie en spectateur — qui explique le concept du jeu en texte, illustré
     par des échiquiers représentant des positions d'exemple (coup réel vs devinette révélés
@@ -399,3 +349,4 @@ propriétaire — voici ce qu'il faut savoir pour s'y connecter depuis une sessi
 - Ne jamais laisser tourner le back ou le front à la fin d'un prompt. Cela permet de libérer les ports pour qu'ils puissent être lancées directement depuis la machine locale 
 - Cependant il ne faut pas down le docker compose
 - Ne jamais toucher à git, l'utilisateur gère les commits / push 
+- les ajouts des étapes réalisées sur le CLAUDE.md doivent être succinctes, il ne faut garder que ce qui est pertinent.

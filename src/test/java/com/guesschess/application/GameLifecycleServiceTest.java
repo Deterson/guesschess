@@ -276,4 +276,51 @@ class GameLifecycleServiceTest {
 
         assertThrows(GameNotFoundException.class, () -> service.findMyAccess(GameId.random(), requester));
     }
+
+    @Test
+    void listGamesForAccountIsEmptyBeforeAnyGameIsLinked() {
+        UserId account = UserId.random();
+
+        assertTrue(service.listGamesForAccount(account, 0, 10).isEmpty());
+    }
+
+    @Test
+    void listGamesForAccountReportsOngoingWithNoOpponentYet() {
+        UserId creator = UserId.random();
+        CreatedGame game = service.createGame(GameVariant.GUESSCHESS, Color.WHITE, new PlayerRef.Account(creator));
+
+        GameLifecycleService.GameSummary summary = service.listGamesForAccount(creator, 0, 10).get(0);
+
+        assertEquals(game.gameId(), summary.gameId());
+        assertEquals(Color.WHITE, summary.myColor());
+        assertNull(summary.opponent());
+        assertEquals(GameLifecycleService.GameSummary.Outcome.ONGOING, summary.outcome());
+    }
+
+    @Test
+    void listGamesForAccountReportsWonAndLostFromEachSidesPerspective() {
+        UserId whiteAccount = UserId.random();
+        UserId blackAccount = UserId.random();
+        CreatedGame game = service.createGame(GameVariant.GUESSCHESS, Color.WHITE, new PlayerRef.Account(whiteAccount));
+        service.joinGame(game.gameId(), new PlayerRef.Account(blackAccount));
+
+        // Fool's mate : mat en 4 demi-coups, gagne par les noirs.
+        playRoundWithoutGuessing(game.whiteToken(), game.blackToken(), "f2", "f3");
+        playRoundWithoutGuessing(game.blackToken(), game.whiteToken(), "e7", "e5");
+        playRoundWithoutGuessing(game.whiteToken(), game.blackToken(), "g2", "g4");
+        playRoundWithoutGuessing(game.blackToken(), game.whiteToken(), "d8", "h4");
+
+        GameLifecycleService.GameSummary whiteSummary = service.listGamesForAccount(whiteAccount, 0, 10).get(0);
+        GameLifecycleService.GameSummary blackSummary = service.listGamesForAccount(blackAccount, 0, 10).get(0);
+
+        assertEquals(new PlayerRef.Account(blackAccount), whiteSummary.opponent());
+        assertEquals(GameLifecycleService.GameSummary.Outcome.LOST, whiteSummary.outcome());
+        assertEquals(GameLifecycleService.GameSummary.Outcome.WON, blackSummary.outcome());
+    }
+
+    private void playRoundWithoutGuessing(PlayerToken moverToken, PlayerToken guesserToken, String from, String to) {
+        MoveIntent intent = MoveIntent.of(Position.fromAlgebraic(from), Position.fromAlgebraic(to));
+        service.submitMove(moverToken, intent);
+        service.submitGuess(guesserToken, null);
+    }
 }
