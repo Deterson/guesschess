@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '../stores/auth'
 import { ApiError, getMe, updateDisplayName as apiUpdateDisplayName } from '../services/api'
 
 const authStore = useAuthStore()
+const { t } = useI18n()
 const displayName = ref<string | null>(null)
 const editing = ref(false)
 const draft = ref('')
@@ -29,7 +31,7 @@ async function save() {
     displayName.value = updated.displayName
     editing.value = false
   } catch (e) {
-    error.value = e instanceof ApiError ? e.message : "Impossible d'enregistrer ce nom."
+    error.value = e instanceof ApiError ? e.message : t('profile.saveError')
   } finally {
     saving.value = false
   }
@@ -41,7 +43,7 @@ async function save() {
     <aside class="sm:w-48 sm:shrink-0">
       <div v-if="!editing" class="mb-6 flex items-center gap-2">
         <h1 class="truncate text-lg font-semibold">{{ displayName ?? '…' }}</h1>
-        <button type="button" class="text-xs text-stone-500 hover:text-stone-300" @click="startEditing">Modifier</button>
+        <button type="button" class="text-xs text-stone-500 hover:text-stone-300" @click="startEditing">{{ t('profile.modify') }}</button>
       </div>
       <div v-else class="mb-6 space-y-2">
         <input
@@ -54,9 +56,9 @@ async function save() {
         <p v-if="error" class="text-xs text-red-400">{{ error }}</p>
         <div class="flex gap-2 text-xs">
           <button type="button" class="rounded bg-emerald-600 px-2 py-1 font-semibold hover:bg-emerald-500" :disabled="saving" @click="save">
-            Enregistrer
+            {{ t('profile.save') }}
           </button>
-          <button type="button" class="text-stone-500 hover:text-stone-300" @click="editing = false">Annuler</button>
+          <button type="button" class="text-stone-500 hover:text-stone-300" @click="editing = false">{{ t('common.cancel') }}</button>
         </div>
       </div>
 
@@ -66,7 +68,7 @@ async function save() {
           class="rounded px-2 py-1 hover:bg-stone-800"
           active-class="bg-stone-800 text-white"
         >
-          Mes parties
+          {{ t('profile.myGames') }}
         </router-link>
       </nav>
     </aside>

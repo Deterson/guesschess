@@ -1,4 +1,5 @@
 import { useAuthStore } from '../stores/auth'
+import { i18n } from '../i18n'
 import type {
   AccountResponse,
   Color,
@@ -64,7 +65,7 @@ async function request<T>(path: string, { method = 'GET', body, token }: Request
   } catch (e) {
     const timedOut = e instanceof DOMException && e.name === 'AbortError'
     throw new ApiError(
-      timedOut ? 'Le serveur ne répond pas, réessayez.' : 'Impossible de contacter le serveur.',
+      timedOut ? i18n.global.t('errors.timeout') : i18n.global.t('errors.network'),
       0,
       timedOut ? 'TIMEOUT' : 'NETWORK_ERROR',
     )
@@ -85,7 +86,7 @@ async function request<T>(path: string, { method = 'GET', body, token }: Request
 
   if (!response.ok) {
     const errorBody: ErrorResponse | null = await response.json().catch(() => null)
-    throw new ApiError(errorBody?.message || `Erreur ${response.status}`, response.status, errorBody?.error)
+    throw new ApiError(errorBody?.message || i18n.global.t('errors.generic', { status: response.status }), response.status, errorBody?.error)
   }
 
   return response.status === 204 ? (null as T) : response.json()

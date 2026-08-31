@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { Board, ColorLower, LegalMoveMessage, PieceCode, PromotionPieceType, RoundSummaryMessage } from '../types/api'
 
 import wK from '../assets/pieces/wK.svg'
@@ -42,6 +43,8 @@ const props = withDefaults(
 const emit = defineEmits<{
   'choose-move': [{ from: string; to: string; promotionOptions: (PromotionPieceType | null)[] }]
 }>()
+
+const { t } = useI18n()
 
 const FILES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
 
@@ -291,7 +294,7 @@ function onSquarePointerCancel(event: PointerEvent) {
           disabled ? 'cursor-default' : 'cursor-pointer',
         ]"
         :data-square="algebraic(file, rank)"
-        :aria-label="algebraic(file, rank) + (pieceAt(file, rank) ? ' ' + pieceAt(file, rank) : ' vide')"
+        :aria-label="algebraic(file, rank) + (pieceAt(file, rank) ? ' ' + pieceAt(file, rank) : ' ' + t('common.emptySquareSuffix'))"
         @click="onSquareClick(file, rank)"
         @pointerdown="onSquarePointerDown($event, file, rank)"
         @pointermove="onSquarePointerMove"

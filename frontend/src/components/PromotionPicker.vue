@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { ColorLower, PromotionPieceType } from '../types/api'
 
 const props = defineProps<{
@@ -9,7 +11,13 @@ const emit = defineEmits<{
   select: [PromotionPieceType]
 }>()
 
-const LABELS: Record<PromotionPieceType, string> = { QUEEN: 'Dame', ROOK: 'Tour', BISHOP: 'Fou', KNIGHT: 'Cavalier' }
+const { t } = useI18n()
+const LABELS = computed<Record<PromotionPieceType, string>>(() => ({
+  QUEEN: t('promotion.queen'),
+  ROOK: t('promotion.rook'),
+  BISHOP: t('promotion.bishop'),
+  KNIGHT: t('promotion.knight'),
+}))
 const GLYPHS: Record<ColorLower, Record<PromotionPieceType, string>> = {
   white: { QUEEN: '♕', ROOK: '♖', BISHOP: '♗', KNIGHT: '♘' },
   black: { QUEEN: '♛', ROOK: '♜', BISHOP: '♝', KNIGHT: '♞' },
@@ -19,7 +27,7 @@ const GLYPHS: Record<ColorLower, Record<PromotionPieceType, string>> = {
 <template>
   <div class="fixed inset-0 z-10 flex items-center justify-center bg-black/60">
     <div class="rounded-lg bg-stone-800 p-6 shadow-xl">
-      <p class="mb-4 text-center text-stone-200">Promotion en :</p>
+      <p class="mb-4 text-center text-stone-200">{{ t('promotion.title') }}</p>
       <div class="flex gap-3">
         <button
           v-for="option in options"

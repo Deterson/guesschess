@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { ColorLower, RoundSummaryMessage } from '../types/api'
 
 const props = withDefaults(
@@ -16,9 +17,14 @@ const emit = defineEmits<{
   hover: [boolean]
 }>()
 
+const { t } = useI18n()
+
 const text = computed(() => {
-  if (!props.round.guessedFrom || !props.round.guessedTo) return 'pas de devinette'
-  return `coup deviné : ${props.round.guessedFrom} (${props.round.guessedCorrectly ? 'bingo' : 'raté'})`
+  if (!props.round.guessedFrom || !props.round.guessedTo) return t('roundResult.noGuess')
+  return t('roundResult.guessResult', {
+    square: props.round.guessedFrom,
+    outcome: props.round.guessedCorrectly ? t('roundResult.bingo') : t('roundResult.missed'),
+  })
 })
 
 const colorClass = computed(() => {

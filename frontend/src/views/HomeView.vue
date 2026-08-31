@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { createGame } from '../services/api'
 import { useGameStore } from '../stores/game'
 import { useAuthStore } from '../stores/auth'
@@ -10,6 +11,7 @@ import type { Color } from '../types/api'
 const router = useRouter()
 const gameStore = useGameStore()
 const authStore = useAuthStore()
+const { t } = useI18n()
 const creating = ref(false)
 const showModal = ref(false)
 const error = ref<string | null>(null)
@@ -58,23 +60,23 @@ function continueAnonymously() {
   <div class="mx-auto flex max-w-xl flex-col items-center gap-6 px-4 py-16 text-center">
     <h1 class="text-3xl font-bold">Guesschess</h1>
     <p class="text-stone-400">
-      Les échecs, mais si vous devinez le coup de votre adversaire, il ne joue pas.
+      {{ t('home.tagline') }}
     </p>
 
     <fieldset class="w-full rounded-lg bg-stone-800 px-4 py-3 text-left">
-      <legend class="px-1 text-sm font-semibold">Votre couleur</legend>
+      <legend class="px-1 text-sm font-semibold">{{ t('home.colorLegend') }}</legend>
       <div class="flex gap-4 text-sm text-stone-300">
         <label class="flex items-center gap-2">
           <input type="radio" v-model="color" value="WHITE" class="accent-emerald-600" />
-          Blancs
+          {{ t('common.white') }}
         </label>
         <label class="flex items-center gap-2">
           <input type="radio" v-model="color" value="BLACK" class="accent-emerald-600" />
-          Noirs
+          {{ t('common.black') }}
         </label>
         <label class="flex items-center gap-2">
           <input type="radio" v-model="color" value="RANDOM" class="accent-emerald-600" />
-          Aléatoire
+          {{ t('home.random') }}
         </label>
       </div>
     </fieldset>
@@ -82,11 +84,10 @@ function continueAnonymously() {
     <label class="flex items-center gap-3 rounded-lg bg-stone-800 px-4 py-3 text-sm">
       <input type="checkbox" v-model="guessmate" class="h-4 w-4 accent-emerald-600" />
       <span class="text-left">
-        <span class="font-semibold">Variante Guessmate</span>
+        <span class="font-semibold">{{ t('home.guessmateTitle') }}</span>
         <br />
         <span class="text-stone-400">
-          Deviner correctement le coup qui pare un échec met fin à la partie immédiatement, au lieu de simplement
-          annuler le coup.
+          {{ t('home.guessmateDescription') }}
         </span>
       </span>
     </label>
@@ -99,7 +100,7 @@ function continueAnonymously() {
       :disabled="creating"
       @click="openModal"
     >
-      {{ creating ? 'Création…' : `Créer une partie${guessmate ? ' (Guessmate)' : ''}` }}
+      {{ creating ? t('home.creating') : `${t('home.createButton')}${guessmate ? t('home.guessmateSuffix') : ''}` }}
     </button>
 
     <AuthModal

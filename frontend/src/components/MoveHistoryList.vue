@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type { GameHistoryEntry } from '../types/api'
 
 const props = defineProps<{
@@ -10,6 +11,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   select: [index: number | null]
 }>()
+
+const { t } = useI18n()
 
 /**
  * Regroupe les rounds par paire (blancs/noirs) pour l'affichage façon PGGN
@@ -59,7 +62,7 @@ function isActive(index: number): boolean {
 
 <template>
   <div class="rounded-lg bg-stone-800 px-4 py-3 text-sm">
-    <p class="mb-2 font-semibold text-stone-300">Historique</p>
+    <p class="mb-2 font-semibold text-stone-300">{{ t('moveHistory.title') }}</p>
     <p v-if="rounds.length === 0" class="text-stone-500">-</p>
     <ol v-else class="space-y-0.5 text-stone-400">
       <li>
@@ -69,7 +72,7 @@ function isActive(index: number): boolean {
           :class="historyIndex === -1 ? 'bg-stone-700 text-stone-100' : ''"
           @click="emit('select', -1)"
         >
-          Position de départ
+          {{ t('moveHistory.startingPosition') }}
         </button>
       </li>
       <li v-for="pair in movePairs" :key="pair.moveNumber" class="flex gap-2">

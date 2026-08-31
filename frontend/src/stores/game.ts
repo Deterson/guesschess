@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
 import { connect, onStatusChange, publish, subscribe, type ConnectionStatus } from '../services/stompClient'
 import { getGameHistory } from '../services/api'
+import { i18n } from '../i18n'
 import type { StompSubscription } from '@stomp/stompjs'
 import type {
   Board,
@@ -150,7 +151,7 @@ export const useGameStore = defineStore('game', () => {
     } catch {
       error.value = {
         code: 'NETWORK_ERROR',
-        message: 'Connexion au serveur perdue. Nouvelle tentative automatique...',
+        message: i18n.global.t('errors.connectionLost'),
       }
     } finally {
       subscribing = false
@@ -233,7 +234,7 @@ export const useGameStore = defineStore('game', () => {
     publish(`/app/games/${gameId.value}/move`, { token: token.value, from, to, promotion: promotion ?? null }).catch(() => {
       pendingSubmission.value = false
       pendingMove.value = null
-      error.value = { code: 'NETWORK_ERROR', message: "Connexion perdue : réessayez." }
+      error.value = { code: 'NETWORK_ERROR', message: i18n.global.t('errors.connectionLostRetry') }
     })
   }
 
@@ -243,7 +244,7 @@ export const useGameStore = defineStore('game', () => {
     publish(`/app/games/${gameId.value}/guess`, { token: token.value, from, to, promotion: promotion ?? null }).catch(() => {
       pendingSubmission.value = false
       pendingMove.value = null
-      error.value = { code: 'NETWORK_ERROR', message: "Connexion perdue : réessayez." }
+      error.value = { code: 'NETWORK_ERROR', message: i18n.global.t('errors.connectionLostRetry') }
     })
   }
 

@@ -1,0 +1,115 @@
+{
+  "common": {
+    "cancel": "Annuler",
+    "continueWithGoogle": "Continuer avec Google",
+    "continueWithGithub": "Continuer avec GitHub",
+    "white": "Blancs",
+    "black": "Noirs",
+    "connecting": "Connexion…",
+    "backToHome": "Retour à l'accueil",
+    "emptySquareSuffix": "vide"
+  },
+  "footer": {
+    "piecesCredit": "Pièces d'échecs : Cburnett, CC BY-SA 3.0"
+  },
+  "header": {
+    "play": "Jouer",
+    "tutorial": "Tutoriel",
+    "profile": "Profil",
+    "login": "Connexion",
+    "logout": "Déconnexion",
+    "loginModalTitle": "Se connecter"
+  },
+  "authModal": {
+    "howToPlayTitle": "Comment voulez-vous jouer ?",
+    "playAnonymously": "Jouer en anonyme"
+  },
+  "chat": {
+    "title": "Chat",
+    "empty": "Aucun message.",
+    "placeholder": "Écrire un message…",
+    "send": "Envoyer"
+  },
+  "gameStatusBar": {
+    "spectating": "Vous observez cette partie",
+    "resultDraw": "Partie terminée : nulle",
+    "resultWin": "Partie terminée : victoire {winner}",
+    "resultDrawGuessRepetition": "Partie terminée : nulle ({link})",
+    "guessRepetitionLinkText": "6 guess repetition",
+    "waitingOpponentToStart": "En attente d'un adversaire pour commencer à jouer…",
+    "waitingOpponentSubmission": "En attente de l'adversaire…",
+    "yourTurnToPlay": "À vous de jouer",
+    "yourTurnToGuess": "À vous de deviner",
+    "sideToMove": "Trait {side}",
+    "traitWhite": "aux blancs",
+    "traitBlack": "aux noirs",
+    "winnerWhite": "des blancs",
+    "winnerBlack": "des noirs"
+  },
+  "profile": {
+    "myGames": "Mes parties",
+    "modify": "Modifier",
+    "save": "Enregistrer",
+    "saveError": "Impossible d'enregistrer ce nom.",
+    "noGamesYet": "Aucune partie pour l'instant.",
+    "waitingOpponent": "En attente d’un adversaire",
+    "loading": "Chargement…",
+    "loadMore": "Charger plus de parties"
+  },
+  "inviteBanner": {
+    "created": "Partie créée — invitez votre adversaire :",
+    "copy": "Copier",
+    "copied": "Copié"
+  },
+  "moveHistory": {
+    "title": "Historique",
+    "startingPosition": "Position de départ"
+  },
+  "promotion": {
+    "title": "Promotion en :",
+    "queen": "Dame",
+    "rook": "Tour",
+    "bishop": "Fou",
+    "knight": "Cavalier"
+  },
+  "roundResult": {
+    "noGuess": "pas de devinette",
+    "guessResult": "coup deviné : {square} ({outcome})",
+    "bingo": "bingo",
+    "missed": "raté"
+  },
+  "game": {
+    "backHome": "← Accueil",
+    "accessDenied": "Impossible de retrouver votre accès à cette partie.",
+    "spectatorLinkTaken": "Vous regardez cette partie en spectateur : quelqu'un d'autre s'est déjà connecté avec ce lien.",
+    "spectatorFull": "Vous regardez cette partie en spectateur : elle est déjà complète.",
+    "spectatorGeneric": "Vous regardez cette partie en spectateur.",
+    "joinButton": "Rejoindre cette partie",
+    "gameFullError": "Cette partie est déjà complète.",
+    "connectionLostReconnecting": "Connexion perdue, reconnexion en cours…",
+    "dontGuess": "Ne pas deviner"
+  },
+  "home": {
+    "tagline": "Les échecs, mais si vous devinez le coup de votre adversaire, il ne joue pas.",
+    "colorLegend": "Votre couleur",
+    "random": "Aléatoire",
+    "guessmateTitle": "Variante Guessmate",
+    "guessmateDescription": "Deviner correctement le coup qui pare un échec met fin à la partie immédiatement, au lieu de simplement annuler le coup.",
+    "createButton": "Créer une partie",
+    "creating": "Création…",
+    "guessmateSuffix": " (Guessmate)"
+  },
+  "howToPlay": {
+    "placeholder": "Tutoriel en création"
+  },
+  "oauthCallback": {
+    "connecting": "Connexion en cours…"
+  },
+  "errors": {
+    "timeout": "Le serveur ne répond pas, réessayez.",
+    "network": "Impossible de contacter le serveur.",
+    "generic": "Erreur {status}",
+    "connectionLost": "Connexion au serveur perdue. Nouvelle tentative automatique...",
+    "connectionLostRetry": "Connexion perdue : réessayez."
+  }
+}

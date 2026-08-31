@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useI18n } from 'vue-i18n'
 import { useGameStore } from '../stores/game'
 import { useAuthStore } from '../stores/auth'
 import { ApiError, myAccess, joinGame as apiJoinGame } from '../services/api'
@@ -20,6 +21,7 @@ const props = defineProps<{
 
 const gameStore = useGameStore()
 const authStore = useAuthStore()
+const { t } = useI18n()
 const { state, error, pendingSubmission, pendingMove, myColor, canAct, chatMessages, connectionStatus, historyRounds, historyInitialBoard, historyIndex } =
   storeToRefs(gameStore)
 
@@ -113,7 +115,7 @@ async function performJoin(authToken: string | null) {
     const joined = await apiJoinGame(props.gameId, authToken)
     gameStore.joinGame({ gameId: props.gameId, token: joined.token, color: joined.color.toLowerCase() as 'white' | 'black' })
   } catch (e) {
-    joinError.value = e instanceof ApiError && e.status === 409 ? "Cette partie est déjà complète." : (e as Error).message
+    joinError.value = e instanceof ApiError && e.status === 409 ? t('game.gameFullError') : (e as Error).message
   } finally {
     joining.value = false
   }
@@ -303,14 +305,14 @@ function submitNoGuess() {
 
 <template>
   <div class="@container mx-auto flex w-full max-w-7xl flex-col items-center gap-4 px-4 py-8">
-    <router-link to="/" class="self-start text-sm text-stone-400 hover:text-stone-200">← Accueil</router-link>
+    <router-link to="/" class="self-start text-sm text-stone-400 hover:text-stone-200">{{ t('game.backHome') }}</router-link>
 
     <div v-if="accessDenied" class="text-stone-400">
-      Impossible de retrouver votre accès à cette partie.
-      <router-link to="/" class="text-emerald-500 hover:text-emerald-400">Retour à l'accueil</router-link>
+      {{ t('game.accessDenied') }}
+      <router-link to="/" class="text-emerald-500 hover:text-emerald-400">{{ t('common.backToHome') }}</router-link>
     </div>
 
-    <div v-else-if="!state" class="text-stone-400">Connexion…</div>
+    <div v-else-if="!state" class="text-stone-400">{{ t('common.connecting') }}</div>
 
     <template v-else>
       <div class="grid w-full grid-cols-1 items-start gap-6 @min-[67rem]:grid-cols-[minmax(0,1fr)_36rem_minmax(0,1fr)]">
@@ -330,13 +332,13 @@ function submitNoGuess() {
             <InviteBanner v-if="showInvite" :game-id="gameId" @dismiss="inviteDismissed = true" />
 
             <div v-if="myColor && !canAct" class="mb-4 rounded-lg bg-stone-800 px-4 py-3 text-sm text-stone-300">
-              Vous regardez cette partie en spectateur : quelqu'un d'autre s'est déjà connecté avec ce lien.
+              {{ t('game.spectatorLinkTaken') }}
             </div>
             <div v-else-if="!myColor && state.full" class="mb-4 rounded-lg bg-stone-800 px-4 py-3 text-sm text-stone-300">
-              Vous regardez cette partie en spectateur : elle est déjà complète.
+              {{ t('game.spectatorFull') }}
             </div>
             <div v-else-if="!myColor" class="mb-4 space-y-2 rounded-lg bg-stone-800 px-4 py-3 text-sm text-stone-300">
-              <p>Vous regardez cette partie en spectateur.</p>
+              <p>{{ t('game.spectatorGeneric') }}</p>
               <p v-if="joinError" class="text-red-400">{{ joinError }}</p>
               <button
                 type="button"
@@ -344,12 +346,12 @@ function submitNoGuess() {
                 :disabled="joining"
                 @click="startJoin"
               >
-                {{ joining ? 'Connexion…' : 'Rejoindre cette partie' }}
+                {{ joining ? t('common.connecting') : t('game.joinButton') }}
               </button>
             </div>
 
             <div v-if="connectionStatus !== 'connected'" class="mb-4 rounded-lg bg-amber-900/60 px-4 py-3 text-sm text-amber-100">
-              Connexion perdue, reconnexion en cours…
+              {{ t('game.connectionLostReconnecting') }}
             </div>
 
             <GameStatusBar :state="state" :my-color="myColor" :my-role="myRole" :pending-submission="pendingSubmission" />
@@ -392,7 +394,7 @@ function submitNoGuess() {
             class="rounded-lg bg-stone-700 px-4 py-2 text-sm hover:bg-stone-600"
             @click="submitNoGuess"
           >
-            Ne pas deviner
+            {{ t('game.dontGuess') }}
           </button>
         </div>
 

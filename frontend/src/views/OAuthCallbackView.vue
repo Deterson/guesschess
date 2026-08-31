@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '../stores/auth'
 import { useGameStore } from '../stores/game'
 import { consume as consumePendingAction } from '../services/pendingAction'
@@ -9,6 +10,7 @@ import { createGame, joinGame } from '../services/api'
 const router = useRouter()
 const authStore = useAuthStore()
 const gameStore = useGameStore()
+const { t } = useI18n()
 const error = ref<string | null>(null)
 
 onMounted(async () => {
@@ -53,10 +55,10 @@ onMounted(async () => {
 
 <template>
   <div class="mx-auto flex max-w-xl flex-col items-center gap-4 px-4 py-16 text-center">
-    <p v-if="!error" class="text-stone-300">Connexion en cours…</p>
+    <p v-if="!error" class="text-stone-300">{{ t('oauthCallback.connecting') }}</p>
     <template v-else>
       <p class="text-red-400">{{ error }}</p>
-      <router-link to="/" class="rounded-lg bg-stone-700 px-4 py-2 hover:bg-stone-600">Retour à l'accueil</router-link>
+      <router-link to="/" class="rounded-lg bg-stone-700 px-4 py-2 hover:bg-stone-600">{{ t('common.backToHome') }}</router-link>
     </template>
   </div>
 </template>

@@ -1,0 +1,115 @@
+{
+  "common": {
+    "cancel": "Cancel",
+    "continueWithGoogle": "Continue with Google",
+    "continueWithGithub": "Continue with GitHub",
+    "white": "White",
+    "black": "Black",
+    "connecting": "Connecting…",
+    "backToHome": "Back to home",
+    "emptySquareSuffix": "empty"
+  },
+  "footer": {
+    "piecesCredit": "Chess pieces: Cburnett, CC BY-SA 3.0"
+  },
+  "header": {
+    "play": "Play",
+    "tutorial": "Tutorial",
+    "profile": "Profile",
+    "login": "Log in",
+    "logout": "Logout",
+    "loginModalTitle": "Log in"
+  },
+  "authModal": {
+    "howToPlayTitle": "How would you like to play?",
+    "playAnonymously": "Play anonymously"
+  },
+  "chat": {
+    "title": "Chat",
+    "empty": "No messages.",
+    "placeholder": "Write a message…",
+    "send": "Send"
+  },
+  "gameStatusBar": {
+    "spectating": "You are watching this game",
+    "resultDraw": "Game over: draw",
+    "resultWin": "Game over: {winner} win",
+    "resultDrawGuessRepetition": "Game over: draw ({link})",
+    "guessRepetitionLinkText": "6 guess repetition",
+    "waitingOpponentToStart": "Waiting for an opponent to start playing…",
+    "waitingOpponentSubmission": "Waiting for your opponent…",
+    "yourTurnToPlay": "Your turn to play",
+    "yourTurnToGuess": "Your turn to guess",
+    "sideToMove": "{side} to move",
+    "traitWhite": "White",
+    "traitBlack": "Black",
+    "winnerWhite": "White",
+    "winnerBlack": "Black"
+  },
+  "profile": {
+    "myGames": "My games",
+    "modify": "Edit",
+    "save": "Save",
+    "saveError": "Could not save this name.",
+    "noGamesYet": "No games yet.",
+    "waitingOpponent": "Waiting for an opponent",
+    "loading": "Loading…",
+    "loadMore": "Load more games"
+  },
+  "inviteBanner": {
+    "created": "Game created — invite your opponent:",
+    "copy": "Copy",
+    "copied": "Copied"
+  },
+  "moveHistory": {
+    "title": "History",
+    "startingPosition": "Starting position"
+  },
+  "promotion": {
+    "title": "Promote to:",
+    "queen": "Queen",
+    "rook": "Rook",
+    "bishop": "Bishop",
+    "knight": "Knight"
+  },
+  "roundResult": {
+    "noGuess": "no guess",
+    "guessResult": "guessed move: {square} ({outcome})",
+    "bingo": "correct",
+    "missed": "missed"
+  },
+  "game": {
+    "backHome": "← Home",
+    "accessDenied": "Could not find your access to this game.",
+    "spectatorLinkTaken": "You are watching this game as a spectator: someone else has already connected with this link.",
+    "spectatorFull": "You are watching this game as a spectator: it is already full.",
+    "spectatorGeneric": "You are watching this game as a spectator.",
+    "joinButton": "Join this game",
+    "gameFullError": "This game is already full.",
+    "connectionLostReconnecting": "Connection lost, reconnecting…",
+    "dontGuess": "Don't guess"
+  },
+  "home": {
+    "tagline": "Chess, but if you guess your opponent's move, it isn't played.",
+    "colorLegend": "Your color",
+    "random": "Random",
+    "guessmateTitle": "Guessmate variant",
+    "guessmateDescription": "Correctly guessing the move that parries a check ends the game immediately, instead of simply cancelling the move.",
+    "createButton": "Create a game",
+    "creating": "Creating…",
+    "guessmateSuffix": " (Guessmate)"
+  },
+  "howToPlay": {
+    "placeholder": "Tutorial coming soon"
+  },
+  "oauthCallback": {
+    "connecting": "Signing in…"
+  },
+  "errors": {
+    "timeout": "The server isn't responding, please try again.",
+    "network": "Could not reach the server.",
+    "generic": "Error {status}",
+    "connectionLost": "Connection to the server lost. Retrying automatically...",
+    "connectionLostRetry": "Connection lost: please try again."
+  }
+}
