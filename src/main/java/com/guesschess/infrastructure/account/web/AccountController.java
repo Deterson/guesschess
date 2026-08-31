@@ -71,7 +71,7 @@ class AccountController {
                                          @RequestParam(defaultValue = "0") int page,
                                          @RequestParam(defaultValue = "20") int size) {
         UserId userId = UserId.fromString(jwt.getSubject());
-        int boundedSize = Math.min(Math.max(size, 1), 50);
+        int boundedSize = Math.clamp(size, 1, 50);
         return gameLifecycleService.listGamesForAccount(userId, Math.max(page, 0), boundedSize).stream()
                 .map(this::toResponse)
                 .toList();
@@ -81,10 +81,15 @@ class AccountController {
         String opponentName = switch (summary.opponent()) {
             case null -> null;
             case PlayerRef.Account account -> accountService.getById(account.userId()).displayName();
-            case PlayerRef.Anonymous anonymous -> "Joueur anonyme";
+            case PlayerRef.Anonymous anonymous -> null;
+        };
+        GameSummaryHttpResponse.OpponentType opponentType = switch (summary.opponent()) {
+            case null -> GameSummaryHttpResponse.OpponentType.NONE;
+            case PlayerRef.Account account -> GameSummaryHttpResponse.OpponentType.ACCOUNT;
+            case PlayerRef.Anonymous anonymous -> GameSummaryHttpResponse.OpponentType.ANONYMOUS;
         };
         return new GameSummaryHttpResponse(
-                summary.gameId().toString(), summary.myColor().name(), opponentName,
+                summary.gameId().toString(), summary.myColor().name(), opponentName, opponentType,
                 summary.outcome().name(), mapper.toBoardCells(summary.board()));
     }
 }

@@ -53,6 +53,7 @@
     "saveError": "Impossible d'enregistrer ce nom.",
     "noGamesYet": "Aucune partie pour l'instant.",
     "waitingOpponent": "En attente d’un adversaire",
+    "anonymousOpponent": "Joueur anonyme",
     "loading": "Chargement…",
     "loadMore": "Charger plus de parties"
   },

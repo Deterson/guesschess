@@ -23,6 +23,17 @@ const OUTCOME_ROW_CLASS: Record<GameSummaryHttpResponse['outcome'], string> = {
   ONGOING: 'bg-stone-900 hover:bg-stone-800',
 }
 
+function opponentLabel(game: GameSummaryHttpResponse): string {
+  switch (game.opponentType) {
+    case 'ACCOUNT':
+      return game.opponentName ?? ''
+    case 'ANONYMOUS':
+      return t('profile.anonymousOpponent')
+    default:
+      return t('profile.waitingOpponent')
+  }
+}
+
 async function loadMore() {
   loading.value = true
   error.value = null
@@ -60,7 +71,7 @@ onMounted(loadMore)
           </div>
           <div class="min-w-0 flex-1">
             <p class="truncate text-sm font-medium">
-              {{ game.opponentName ?? t('profile.waitingOpponent') }}
+              {{ opponentLabel(game) }}
             </p>
             <p class="text-xs text-stone-400">
               {{ game.myColor === 'WHITE' ? t('common.white') : t('common.black') }}

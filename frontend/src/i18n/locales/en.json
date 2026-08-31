@@ -53,6 +53,7 @@
     "saveError": "Could not save this name.",
     "noGamesYet": "No games yet.",
     "waitingOpponent": "Waiting for an opponent",
+    "anonymousOpponent": "Anonymous player",
     "loading": "Loading…",
     "loadMore": "Load more games"
   },

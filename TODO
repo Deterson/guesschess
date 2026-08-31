@@ -8,9 +8,9 @@ ne rien implémenter dans ce TODO à moins que cela ait été explicitement dema
 - réfléchir au volume des données. Combien de taille fait une partie dans la db ? imaginons que 10 000 joueurs jouent une partie par jour, combien de Mo par jour ?
 - protéger contre les abus (empêcher de créer 1000000 de parties, empêcher de spammer de coups en mode DDoS)
 - il reste du français hardcodé dans le back "Joueur anonyme" par exemple) trouver un moyen pour "joueur anonyme" de l'écrire d'une certaine manière pour que le front puisse le détecter et le traduire
+
 --- FRONT
 - proposer la nulle
-- en cas d'échec, surbriller le roi mis en échec en rouge
 - enlever toute la verbosité typique d'IA ("vous regardez cette partie en mode spectateur : elle est déjà complète" ou "quelqu'un d'autre s'est connecté avec le lien" on s'en fout, enlever cette infobulle parce que c'est écrit en dessous "Vous observez cette partie")
 - une page de règles (6 guess repetition, guessmate) (sera sûrement fais dans le tutoriel)
 - enlever le bouton "ne pas deviner" (sera sûrement fait pendant l'étape du timer)

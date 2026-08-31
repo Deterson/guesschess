@@ -92,10 +92,13 @@ export interface AccountResponse {
 export type GameOutcome = 'WON' | 'LOST' | 'DRAW' | 'ONGOING'
 
 /** Une ligne de "Mes parties" (etape 8 - GET /api/account/games). */
+export type OpponentType = 'NONE' | 'ACCOUNT' | 'ANONYMOUS'
+
 export interface GameSummaryHttpResponse {
   gameId: string
   myColor: Color
   opponentName: string | null
+  opponentType: OpponentType
   outcome: GameOutcome
   board: Board
 }
