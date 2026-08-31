@@ -112,53 +112,17 @@ Jeu d'échecs classique avec une règle additionnelle :
 2. Modéliser la règle de devinette comme extension du moteur (état du round, résolution)
 3. Architecture applicative Spring Boot (couches, WebSocket vs STOMP, cycle de vie d'une partie)
 4. ✅ Persistance et comptes joueurs (fait) : PostgreSQL (Spring Data JPA, migrations Flyway),
-   comptes joueurs en OAuth uniquement (Google/GitHub), sessions JWT stateless pour les
-   endpoints REST du contexte "Compte joueur". Game/GameAccess sont passés de l'implémentation
-   en mémoire à Postgres (voir `infrastructure/persistence/jpa`) ; le flux WebSocket/
-   `PlayerToken` du contexte "Partie" reste inchangé et non authentifié pour l'instant — le
-   lien compte↔partie (historique) est prévu à l'étape 6 (voir section dédiée plus bas).
+   comptes OAuth uniquement (Google/GitHub), sessions JWT stateless pour les endpoints REST du
+   contexte "Compte joueur".
 5. ✅ Frontend VueJS 3 (échiquier interactif, client WebSocket, UI de devinette) (fait)
-6. ✅ Compte joueur lié à une partie (fait) : `game_access` porte désormais, par couleur, un lien
-   optionnel-puis-immuable vers un `PlayerRef` (compte ou identité anonyme) — jamais les deux,
-   jamais modifié une fois posé (`GameAccess.withPlayerLinked`, écriture SQL conditionnelle
-   `... where white_player_type is null`). Identité anonyme : cookie HttpOnly signé HMAC
-   (`AnonymousIdentityFilter`, réutilise `app.jwt.secret`), résolue au handshake WebSocket
-   (`AnonymousIdentityHandshakeInterceptor`). Compte : JWT en header `Authorization` du CONNECT
-   STOMP (`JwtStompChannelInterceptor`, absent de la requête HTTP handshake elle-même — les
-   navigateurs n'autorisent pas de header custom dessus). Le lien se pose au premier coup/
-   devinette soumis par chaque couleur (`GameLifecycleService.submitMove/submitGuess(..., PlayerRef)`) ;
-   aucun choix de couleur ni flux d'invitation n'existe encore (prévu étape 7), donc la création de
-   partie elle-même ne lie personne pour l'instant. Le flux WebSocket reste par ailleurs non
-   authentifiant à ce stade (jeton = seul mécanisme d'autorisation) : l'identité résolue n'est
-   encore que la métadonnée à lier, pas un contrôle d'accès — durci à l'étape 7.
-7. ✅ Page d'accueil — création de partie (fait, avec durcissement ultérieur) : choix de couleur
-   (blancs/noirs/aléatoire) sur `HomeView`, création via REST (`POST /api/games`, pas STOMP — doit
-   s'enchaîner avec une redirection OAuth complète du navigateur) qui lie immédiatement le
-   créateur à la couleur choisie (`GameLifecycleService.createGame(variant, color, creator)`).
-   **Un seul lien par partie** (`/game/{gameId}`, jamais de jeton dans une URL) : quiconque l'ouvre
-   est résolu par sa seule identité via `GET /api/games/{id}/my-access`
-   (`GameLifecycleService.findMyAccess`) — déjà lié → joueur ; pas lié → spectateur avec un bouton
-   « Rejoindre cette partie » qui revendique l'unique siège encore libre
-   (`POST /api/games/{id}/join`, sans corps, `GameLifecycleService.joinGame(gameId, requester)` ;
-   partie déjà complète → `409 GAME_FULL`, `NoOpenColorException`). Le contrôle d'accès aux
-   coups/devinettes a été durci en conséquence : `GameLifecycleService.requireOwnership` rejette
-   (`NotYourColorException`) toute action dont l'identité ne correspond pas à celle déjà liée à la
-   couleur — le jeton (`PlayerToken`) redevient un détail d'implémentation interne (routage dans
-   les messages STOMP `submitMove`/`submitGuess`), jamais exposé côté client ; ce filet de sécurité
-   protège contre un jeton forgé même s'il ne peut plus fuiter par une URL. Résolution d'identité
-   HTTP compte/anonyme via `HttpPlayerIdentityResolver`, symétrique à `WebSocketPlayerIdentity`
-   côté STOMP. L'endpoint STOMP `/app/games.create` existant n'a pas été touché (toujours utilisé
-   par les tests d'intégration STOMP), simplement plus appelé par le frontend. UI de login complète
-   ajoutée (elle n'existait pas avant cette étape) : `AuthModal` (composant partagé create/join),
-   `OAuthCallbackView` (`/oauth-callback`, lit le JWT dans le fragment d'URL), store `auth` (JWT en
-   localStorage), intention différée (`services/pendingAction.js`, sessionStorage) pour reprendre
-   création/join après une redirection OAuth complète (sortie du SPA).
-8. Page de profil (historique des parties, nom de joueur, etc.). Détail de ce qui est prévu
-   (état actuel du code vérifié avant d'écrire cette section : aucun header/nav n'existe
-   encore — `App.vue` ne rend qu'un `<router-view>` et un footer statique ; le router
-   (`frontend/src/router/index.ts`) n'a que `/`, `/game/:gameId`, `/oauth-callback`, sans
-   aucun garde de route ; `GET /api/account/me` existe déjà et renvoie `id`/`displayName`/
-   `email` ; rien côté backend ne permet aujourd'hui de lister les parties d'un joueur).
+6. ✅ Compte joueur lié à une partie (fait) — modèle détaillé dans la section "Liaison
+   compte/session ↔ partie" plus bas.
+7. ✅ Page d'accueil — création de partie (fait, avec durcissement de l'accès aux coups/devinettes
+   ultérieur) — flux détaillé dans la section "Liaison compte/session ↔ partie" plus bas.
+8. Page de profil (historique des parties, nom de joueur, etc.) — état actuel vérifié : aucun
+   header/nav n'existe encore (`App.vue` ne rend qu'un `<router-view>`), aucun garde de route,
+   `GET /api/account/me` existe déjà (`id`/`displayName`/`email`), rien côté backend pour lister
+   les parties d'un joueur.
 
    **Header global**, ajouté sur toutes les pages (nouveau composant, ex. `AppHeader.vue`,
    monté une fois dans `App.vue` au-dessus du `<router-view>`) : à gauche "Jouer" (renvoie
@@ -227,23 +191,16 @@ Jeu d'échecs classique avec une règle additionnelle :
    anonyme → compte est la seule situation où un `game_access` déjà lié change de titulaire
    après coup ; à documenter comme tel dans le code (commentaire sur la méthode concernée)
    pour ne pas surprendre un lecteur qui s'attend à l'invariant habituel.
-9. ✅ Dockerisation (fait) : `Dockerfile` racine (backend, multi-stage `eclipse-temurin:25-jdk`
-   → `25-jre`, wrapper Maven car pas de tag `maven:*-eclipse-temurin-25` garanti, JVM bornée par
-   `-XX:MaxRAMPercentage=75.0`) et `frontend/Dockerfile` (multi-stage `node:22-alpine` → build servi
-   par `nginx:1.27-alpine`). `frontend/nginx.conf` proxifie `/api`, `/ws`, `/oauth2`, `/login` vers le
-   backend en **same-origin** — `api.ts`/`stompClient.ts` retombent sur des URLs relatives en prod
-   (au lieu de `localhost:8080` en dur), donc une même image fonctionne derrière n'importe quel
-   domaine sans le connaître au moment du build ; CORS devient obsolète en prod. `spring-boot-starter-actuator`
-   ajouté (`/actuator/health` seul exposé, `permitAll`) pour un vrai `HEALTHCHECK` Docker plutôt qu'un
-   test TCP aveugle. `docker-compose.prod.yml` : postgres sans port publié, `image:`+`build:` sur
-   backend/frontend (même fichier sert au build local et au `pull` depuis GHCR à l'étape 10),
-   `depends_on: condition: service_healthy` en chaîne, `.env.prod.example` documenté. Vérifié
-   localement (build + up + partie anonyme jouée de bout en bout via le proxy nginx, coup envoyé et
-   round persisté en base). **Piège à retenir** : `docker-compose.prod.yml` et le `docker-compose.yml`
-   de dev partagent le même nom de projet Compose par défaut (dossier `Guesschess`) donc le même
-   volume Postgres si lancés depuis le même dossier sans `-p` — utiliser un nom de projet distinct
-   (`docker compose -p ... -f docker-compose.prod.yml ...`) pour tester la stack prod en local sans
-   toucher aux données de dev.
+9. ✅ Dockerisation (fait) : `Dockerfile` racine (backend, multi-stage, JVM bornée par
+   `-XX:MaxRAMPercentage`) et `frontend/Dockerfile` (multi-stage, servi par nginx qui proxifie
+   `/api`, `/ws`, `/oauth2`, `/login` vers le backend en **same-origin** — CORS obsolète en prod,
+   une même image fonctionne derrière n'importe quel domaine). `spring-boot-starter-actuator`
+   pour un vrai `HEALTHCHECK` Docker (`/actuator/health`). `docker-compose.prod.yml` : postgres
+   sans port publié, `depends_on: condition: service_healthy` en chaîne. **Piège à retenir** :
+   `docker-compose.prod.yml` et le `docker-compose.yml` de dev partagent le même nom de projet
+   Compose par défaut (donc le même volume Postgres) si lancés depuis le même dossier sans `-p` —
+   utiliser un nom de projet distinct pour tester la stack prod en local sans toucher aux données
+   de dev.
 10. Format PGGN (Portable Game Guess Notation) — notation inspirée du PGN, avec le
     coup deviné entre parenthèses juste après le coup réel (ex. `1. e4(e3) e5(Nc6)`).
     Si la devinette est correcte (round annulé, coup réel == deviné par définition),
@@ -271,57 +228,21 @@ Jeu d'échecs classique avec une règle additionnelle :
     supprimé plutôt que maintenu en double, plutôt que gardé comme information
     dupliquée à synchroniser à la main.
 
-11. ✅ Historique de partie navigable (fait), façon lichess.org : contrairement à
-    l'hypothèse initiale de cette étape, une **nouvelle donnée structurée a bien dû
-    remonter du backend** — `GameStateMessage.moveHistory`/`RoundSummaryMessage`
-    n'exposaient que les coups réellement joués (pas les devinettes, pas les rounds
-    annulés, pas de plateau par round), insuffisant pour une liste façon PGGN et un
-    fantôme de devinette ; `positionHistory`/`Game.roundHistoryWithPositions()`
-    existaient déjà côté domaine (étape 10) mais n'étaient consommés que par
-    `PggnWriter` (texte brut), jamais exposés en JSON. Nouvel endpoint
+11. ✅ Historique de partie navigable (fait), façon lichess.org : nouvel endpoint
     `GET /api/games/{gameId}/history` (lecture seule, sans jeton, même posture que
-    `/pggn`/`/my-access`) : `GameHistoryHttpResponse`/`GameHistoryEntryHttpResponse`
-    (`infrastructure/web/dto`), construits dans `GameCreationController` à partir de
-    `GameLifecycleService.gameHistory` (nouveau, retourne un `GameHistorySnapshot`
-    nested record) et de `Game.roundHistoryWithPositions()`. Réutilise telles quelles
-    la recette SAN de `PggnWriter.toPly` (rendue `public`, seul changement sur ce
-    fichier) et la conversion plateau→JSON de `GameMessageMapper.toBoardCells`
-    (rendue `public`) — pas de nouvelle logique de sérialisation dupliquée.
-    `GameSnapshot`/`GameStateMessage` gagnent un champ `roundCount` (nombre de rounds
-    déjà résolus) pour que le frontend sache quand refetch l'historique détaillé sans
-    diffuser tout cet historique sur chaque message d'état live.
+    `/pggn`/`/my-access`), exposant le détail par round (coup joué, devinette, plateau) —
+    nécessaire car `GameStateMessage.moveHistory` n'exposait que les coups réellement joués, pas
+    assez pour une liste façon PGGN avec fantôme de devinette. `GameSnapshot`/`GameStateMessage`
+    gagnent `roundCount` pour que le frontend sache quand refetch l'historique détaillé sans le
+    diffuser à chaque message d'état live.
 
-    Front : `MoveHistoryList.vue` réécrit pour consommer cet historique détaillé et
-    rendre une notation façon PGGN cliquable (`1. e4(d4) e5(Nc6)`, mêmes règles
-    d'omission que `PggnWriter.renderPly`), avec une entrée "Position de départ".
-    `ChessBoard.vue` gagne une prop `ghostMove` dédiée (rendu `opacity-40 grayscale`,
-    délibérément distincte de `hoverGuess` qui reste l'affichage opaque du survol
-    manuel en direct sur `RoundResultBanner`) pour le fantôme de la devinette en
-    navigation historique. Store `game` : `historyRounds`/`historyInitialBoard`/
-    `historyIndex` (`null`=direct, `-1`=position de départ, `0..n-1`=après le round i),
-    navigation `null ↔ n-1 ↔ ... ↔ -1` symétrique aux deux bouts. Navigation clavier
-    ←/→ (`GameView.vue`, ignorée si le focus est dans le champ de chat) en plus du
-    clic. Cliquer le dernier coup de la liste renvoie explicitement à `null` (direct)
-    plutôt qu'à son propre index, conformément à l'exigence ci-dessous. Un round
-    résolu pendant la navigation met à jour `historyRounds` en silence (`watch` sur
-    `roundCount`) sans jamais changer `historyIndex` tant que l'utilisateur n'a pas
-    cliqué lui-même le dernier coup. Vérifié de bout en bout dans un vrai navigateur
-    (création de partie, deux rounds résolus dont un round annulé, navigation
-    clavier/souris, fantôme affiché, plateau non-interactif pendant la navigation).
-
-    **Point de vigilance corrigé après coup** :
-    `myAccessRecoversTheTokenFromTheAnonymousCookieAloneAfterLosingTheUrl`
-    (`GameCreationControllerIntegrationTest`) échouait de façon reproductible (404 au
-    lieu de 200). Cause réelle : `app.anonymous-cookie.secure` valait `true` par
-    défaut dans `application.properties` (et dans le `@Value` de
-    `AnonymousIdentityFilter`), alors que `.env.example`/`.env.prod.example` et la
-    section "Variables d'environnement" documentaient déjà un défaut `false` — un
-    cookie `Secure` posé sur une connexion HTTP simple (dev local, et le client HTTP
-    du test) est silencieusement ignoré au rappel par tout client conforme RFC 6265
-    (`java.net.CookieManager` y compris), donc le second appel ne renvoyait jamais le
-    cookie, une identité anonyme différente était générée, et `/my-access` ne
-    trouvait logiquement aucun accès lié. Corrigé en alignant les deux défauts sur
-    `false`.
+    Front : `MoveHistoryList.vue` rend une notation PGGN cliquable (mêmes règles d'omission que
+    `PggnWriter`), `ChessBoard.vue` gagne une prop `ghostMove` dédiée (distincte de `hoverGuess`,
+    l'affichage du survol manuel en direct) pour le fantôme de la devinette en navigation
+    historique. Navigation clavier ←/→ et souris, `historyIndex` (`null`=direct,
+    `-1`=position de départ, `0..n-1`=après le round i) ; un round résolu pendant la navigation
+    met à jour la liste sans changer l'index tant que l'utilisateur n'a pas cliqué lui-même le
+    dernier coup.
 
 12. Timers (temps de réflexion + timer de devinette) : configuration du contrôle de temps
     au moment de la création de la partie (étape 7), façon échecs classique — un temps total
@@ -427,6 +348,7 @@ tout court (échec rapide voulu au boot Spring, pas seulement au moment du login
 - `JWT_SECRET` — **obligatoire**. Secret HMAC pour signer les JWT (≥ 32 octets aléatoires, ex. `openssl rand -base64 32`).
 - `OAUTH_POST_LOGIN_REDIRECT_URI` — URL du frontend vers laquelle rediriger après login, JWT en fragment d'URL (`#token=...`). Défaut : `http://localhost:5173/oauth-callback`.
 - `ANONYMOUS_COOKIE_SECURE` — (étape 6) `true`/`false`, flag `Secure` du cookie d'identité anonyme `guesschess_anon`. Défaut `false` (dev local en HTTP) ; mettre `true` derrière HTTPS (étape 10).
+  Piège déjà rencontré : un cookie `Secure` posé sur une connexion HTTP simple est silencieusement ignoré au rappel par tout client conforme RFC 6265 — si un test/flux d'identité anonyme échoue étrangement en dev local, vérifier d'abord ce flag avant de chercher plus loin.
 
 ## Accès au Raspberry Pi de déploiement (étape 10)
 

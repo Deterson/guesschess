@@ -5,10 +5,11 @@ ne rien implémenter dans ce TODO à moins que cela ait été explicitement dema
 - garder la possibilité d'en passant si c'est le dernier coup effectif (mon pion avance de 2 et peut être pris en passant, je guess le coup de mon adversaire, il guess mon coup, le plateau est dans le même état qu'avant et mon pion devrait toujours être pris en passant, mais ce n'est pas le cas)
 
 --- FRONT
+- en cas d'échec, surbriller le roi mis en échec en rouge
 - enlever toute la verbosité typique d'IA ("vous regardez cette partie en mode spectateur : elle est déjà complète" ou "quelqu'un d'autre s'est connecté avec le lien" on s'en fout, enlever cette infobulle parce que c'est écrit en dessous "Vous observez cette partie")
 - traduction intégrale en anglais (avec un switch pour le français)
 - lorsqu'un joueur crée une partie et joue un coup, si quelqu'un rejoint la partie, le coup est réinitialisé. il faudrait faire en sorte qu'il n'ait pas à le rejouer
-- une page de règles (6 guess repetition, guessmate)
+- une page de règles (6 guess repetition, guessmate) (sera sûrement fais dans le tutoriel)
 - enlever le bouton "ne pas deviner" (sera sûrement fait pendant l'étape du timer)
 - rajouter du son
 - un favicon et un logo stylé
