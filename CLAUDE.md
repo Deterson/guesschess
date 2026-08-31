@@ -153,7 +153,80 @@ Jeu d'échecs classique avec une règle additionnelle :
    `OAuthCallbackView` (`/oauth-callback`, lit le JWT dans le fragment d'URL), store `auth` (JWT en
    localStorage), intention différée (`services/pendingAction.js`, sessionStorage) pour reprendre
    création/join après une redirection OAuth complète (sortie du SPA).
-8. Page de profil (historique des parties, nom de joueur, etc.)
+8. Page de profil (historique des parties, nom de joueur, etc.). Détail de ce qui est prévu
+   (état actuel du code vérifié avant d'écrire cette section : aucun header/nav n'existe
+   encore — `App.vue` ne rend qu'un `<router-view>` et un footer statique ; le router
+   (`frontend/src/router/index.ts`) n'a que `/`, `/game/:gameId`, `/oauth-callback`, sans
+   aucun garde de route ; `GET /api/account/me` existe déjà et renvoie `id`/`displayName`/
+   `email` ; rien côté backend ne permet aujourd'hui de lister les parties d'un joueur).
+
+   **Header global**, ajouté sur toutes les pages (nouveau composant, ex. `AppHeader.vue`,
+   monté une fois dans `App.vue` au-dessus du `<router-view>`) : à gauche "Jouer" (renvoie
+   vers `/`, la `HomeView` existante, inchangée) et "Tutoriel" (nouvelle route, ex.
+   `/how-to-play` — pour cette étape, page **volontairement vide**, juste "tutoriel en
+   cours" centré en petit ; le contenu réel est le périmètre de l'étape 13 déjà décrite
+   plus bas, cette étape-ci ne fait que poser le lien et la route vide) ; à droite "Profil"
+   si `authStore.isLoggedIn`, sinon "Connexion" (ouvre le même `AuthModal` que
+   création/join, ou redirige vers `/` si plus simple à cadrer techniquement).
+
+   **Page Profil** (nouvelle route, ex. `/profile`) : **réservée aux comptes connectés**,
+   pas accessible à un joueur anonyme — protégée à la fois côté front (garde de route,
+   inexistante aujourd'hui donc à créer, qui redirige vers `/` si `!authStore.isLoggedIn`)
+   et côté back (les nouveaux endpoints listés ci-dessous exigent un JWT valide, 401/403
+   sinon — aucune donnée de profil ne doit être atteignable via un cookie anonyme seul).
+   En haut : nom du joueur (`GET /api/account/me`, déjà existant, champ `displayName`).
+   À gauche : menu, pour l'instant seulement "Mes parties".
+
+   **"Mes parties"** (nouvelle route, ex. `/profile/games`) : liste déroulante des parties
+   passées et en cours du compte. Nécessite une nouvelle capacité backend absente
+   aujourd'hui — `GameAccessRepository` n'expose que `save`/`findByToken`/`findByGameId`/
+   `linkPlayer`, rien d'indexé par joueur — donc une requête "toutes les parties où ce
+   `PlayerRef` (compte) apparaît, triées par récence" à ajouter, exposée par un nouvel
+   endpoint protégé (ex. `GET /api/account/games?cursor=...&limit=...`). "Fetch
+   intelligent qui limite le nombre de parties envoyées" = pagination par curseur (ou
+   offset simple pour la v1), pas tout l'historique d'un coup — le nombre de parties d'un
+   compte actif peut grossir indéfiniment. Chaque ligne : miniature de l'état final (ou
+   actuel si en cours) du plateau — même logique de réutilisation du composant échiquier
+   en lecture seule que prévu à l'étape 13 (pas d'images statiques à maintenir), alimentée
+   par la dernière position de `positionHistory` de la partie ; couleur de fond de la
+   ligne selon l'issue **du point de vue de ce compte** : vert si gagnée, rouge si perdue,
+   gris si nulle, noir/normal si toujours en cours (dérivé de `GameResultCause` côté
+   Game + de la couleur jouée par ce compte). Pour l'instant, seule autre information
+   affichée : le nom de l'adversaire. D'autres colonnes viendront plus tard (date, contrôle
+   de temps une fois l'étape 12 faite, etc.) — pas la peine de figer le format de ligne
+   dès maintenant au-delà de ces champs.
+
+   **Nom affiché (`display_name`)** : la colonne existe déjà (`V3__create_users_table.sql`,
+   `users.display_name`), posée une seule fois à la création du compte à partir du nom
+   fourni par Google/GitHub (`AccountService.findOrCreateByOAuthIdentity`) et jamais
+   retouchée aux logins suivants. Cette étape la rend **modifiable par l'utilisateur**
+   depuis la page de profil (nouvel endpoint, ex. `PATCH /api/account/me`), avec une
+   contrainte minimale de 3 caractères. Ce `display_name` reste pour l'instant un simple
+   nom d'affichage libre (pas unique, pas garanti stable) — voir l'étape 14 pour la
+   distinction avec le futur identifiant unique et immuable, un sujet volontairement
+   séparé de celui-ci.
+
+   **Point de vigilance — modale "comment voulez-vous jouer" pour un utilisateur déjà
+   connecté** : vérifié que ce n'est *pas* déjà géré — `HomeView.openModal()` affiche
+   aujourd'hui `AuthModal` inconditionnellement, y compris quand `authStore.isLoggedIn`
+   est déjà vrai. À corriger dans cette étape : si un JWT valide est présent, la création
+   (et le join) d'une partie doivent se faire directement avec l'identité du compte déjà
+   connu, sans jamais afficher la modale de choix connexion/anonyme.
+
+   **Point de vigilance — fusion identité anonyme → compte** : si un visiteur qui a déjà
+   les droits d'une ou plusieurs parties en tant qu'anonyme (cookie `guesschess_anon`) se
+   connecte ensuite avec un compte Google/GitHub, tous les `game_access` actuellement liés
+   à cette identité anonyme doivent être **réécrits pour pointer vers le compte** plutôt que
+   dupliqués ou laissés orphelins côté "Mes parties" — sans quoi ces parties resteraient
+   invisibles depuis le profil du compte. Point de bascule naturel : au moment du login
+   réussi (`OAuthLoginSuccessHandler`, qui a déjà accès à la requête donc au cookie anonyme
+   en cours), après find-or-create du compte, relier en une fois tous les `game_access` de
+   cette `AnonymousId` au `UserId` du compte (nouvelle capacité repository à ajouter, le
+   pendant "réécriture" de `linkPlayer`). **Exception explicite** à la règle d'immuabilité
+   du lien posée aux étapes 6/7 ("jamais modifié une fois posé") : ce cas précis de fusion
+   anonyme → compte est la seule situation où un `game_access` déjà lié change de titulaire
+   après coup ; à documenter comme tel dans le code (commentaire sur la méthode concernée)
+   pour ne pas surprendre un lecteur qui s'attend à l'invariant habituel.
 9. ✅ Dockerisation (fait) : `Dockerfile` racine (backend, multi-stage `eclipse-temurin:25-jdk`
    → `25-jre`, wrapper Maven car pas de tag `maven:*-eclipse-temurin-25` garanti, JVM bornée par
    `-XX:MaxRAMPercentage=75.0`) et `frontend/Dockerfile` (multi-stage `node:22-alpine` → build servi
@@ -236,12 +309,19 @@ Jeu d'échecs classique avec une règle additionnelle :
     (création de partie, deux rounds résolus dont un round annulé, navigation
     clavier/souris, fantôme affiché, plateau non-interactif pendant la navigation).
 
-    **Point de vigilance ouvert (non corrigé, hors périmètre de cette étape)** :
+    **Point de vigilance corrigé après coup** :
     `myAccessRecoversTheTokenFromTheAnonymousCookieAloneAfterLosingTheUrl`
-    (`GameCreationControllerIntegrationTest`) échoue de façon reproductible (404 au
-    lieu de 200), y compris complètement isolé sur une base fraîche — probable bug
-    dans `AnonymousIdentityFilter`/`HttpPlayerIdentityResolver` (étape 6/7), pas un
-    flake. Non corrigé ici (aucun rapport avec l'historique navigable).
+    (`GameCreationControllerIntegrationTest`) échouait de façon reproductible (404 au
+    lieu de 200). Cause réelle : `app.anonymous-cookie.secure` valait `true` par
+    défaut dans `application.properties` (et dans le `@Value` de
+    `AnonymousIdentityFilter`), alors que `.env.example`/`.env.prod.example` et la
+    section "Variables d'environnement" documentaient déjà un défaut `false` — un
+    cookie `Secure` posé sur une connexion HTTP simple (dev local, et le client HTTP
+    du test) est silencieusement ignoré au rappel par tout client conforme RFC 6265
+    (`java.net.CookieManager` y compris), donc le second appel ne renvoyait jamais le
+    cookie, une identité anonyme différente était générée, et `/my-access` ne
+    trouvait logiquement aucun accès lié. Corrigé en alignant les deux défauts sur
+    `false`.
 
 12. Timers (temps de réflexion + timer de devinette) : configuration du contrôle de temps
     au moment de la création de la partie (étape 7), façon échecs classique — un temps total
@@ -276,9 +356,10 @@ Jeu d'échecs classique avec une règle additionnelle :
     propre contrôle de temps (ex. temps par coup en jours, façon correspondance) ; hors
     périmètre de cette étape.
 
-13. Tutoriel des règles : lien depuis la page d'accueil (`HomeView`) vers une page dédiée
-    (ex. `/how-to-play`, route publique côté front, aucune auth requise — au même titre que
-    la lecture d'une partie en spectateur) qui explique le concept du jeu en texte, illustré
+13. Tutoriel des règles : lien depuis le header global (posé à l'étape 8, qui crée déjà la
+    route `/how-to-play` avec un contenu vide "tutoriel en cours") vers une page dédiée,
+    route publique côté front, aucune auth requise — au même titre que la lecture d'une
+    partie en spectateur — qui explique le concept du jeu en texte, illustré
     par des échiquiers représentant des positions d'exemple (coup réel vs devinette révélés
     côte à côte, cas devinette correcte → coup annulé et tour qui passe au devineur, cas
     devinette incorrecte → coup joué normalement, cas particulier Guessmate → roi capturé).
@@ -289,6 +370,17 @@ Jeu d'échecs classique avec une règle additionnelle :
     régénérer si le thème du plateau change. Contenu purement statique, pas de backend
     impliqué.
 
+14. Identifiant unique de compte (login) : à choisir une seule fois, à la toute première
+    connexion Google ou GitHub (écran dédié avant d'entrer dans l'app, une seule fois par
+    compte), **immuable** une fois posé — distinct du `display_name` libre et modifiable
+    posé à l'étape 8, qui reste par ailleurs inchangé (il sera peut-être supprimé plus tard
+    au profit de ce login unique, décision à prendre à ce moment-là, pas avant). Objectif :
+    permettre à deux joueurs de se retrouver l'un l'autre de façon fiable (recherche de
+    profil, invitation directe, futur système d'amis...), ce qu'un simple nom d'affichage
+    modifiable et potentiellement dupliqué entre comptes ne permet pas. Détails de
+    validation (charset, longueur, unicité en base) et d'écran de sélection à préciser au
+    moment d'attaquer cette étape — non développée ici au-delà de cette intention.
+
 ## Liaison compte/session ↔ partie (étapes 6-7)
 
 - **Lien immuable** : chaque partie référence, par couleur, soit un compte (`userId`), soit une
@@ -297,8 +389,11 @@ Jeu d'échecs classique avec une règle additionnelle :
 - **Identité anonyme** : cookie **HttpOnly signé côté serveur** (pas de JWT en localStorage, pour
   éviter l'exposition XSS), longue durée (~1 an), régénéré uniquement si absent. Réutilisée pour
   toutes les parties jouées depuis le même navigateur, ce qui permet un mini-historique pour les
-  joueurs non connectés (utile pour la page de profil, étape 8) sans nécessiter de compte. Fusion
-  ultérieure anonyme → compte : hors scope v1, à trancher plus tard si besoin.
+  joueurs non connectés sans nécessiter de compte — mais la page de profil (étape 8) est elle-même
+  réservée aux comptes connectés, donc ce mini-historique anonyme n'est exposé nulle part pour
+  l'instant. Fusion anonyme → compte : tranchée à l'étape 8 (voir cette section) — au login, tous
+  les `game_access` liés à l'identité anonyme du cookie en cours sont réécrits vers le compte, seule
+  exception documentée à l'immuabilité du lien décrite juste au-dessus.
 - **Page d'accueil (étape 7)** : choix de couleur à la création (blancs / noirs / aléatoire). Que
   le créateur soit déjà connecté ou non, il passe par la **même modale** "se connecter / jouer en
   anonyme" que l'adversaire avant que la partie soit effectivement créée et son lien posé —
@@ -377,9 +472,6 @@ propriétaire — voici ce qu'il faut savoir pour s'y connecter depuis une sessi
 - Contrôle de temps en mode asynchrone (voir étape 12 — hors périmètre pour l'instant, le
   décompte live et le timer de devinette à la seconde tels que décrits ne concernent que le
   temps réel)
-- Fusion d'une identité anonyme vers un compte après coup (ex. un joueur qui a joué en anonyme se
-  connecte ensuite et voudrait récupérer son historique) — hors scope v1 (voir section "Liaison
-  compte/session ↔ partie")
 
 ## Procédée
 - Ne jamais laisser tourner le back ou le front à la fin d'un prompt. Cela permet de libérer les ports pour qu'ils puissent être lancées directement depuis la machine locale 

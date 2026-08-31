@@ -39,7 +39,7 @@ public class AnonymousIdentityFilter extends OncePerRequestFilter {
     private final boolean secureCookie;
 
     public AnonymousIdentityFilter(@Value("${app.jwt.secret}") String secret,
-                                    @Value("${app.anonymous-cookie.secure:true}") boolean secureCookie) {
+                                    @Value("${app.anonymous-cookie.secure:false}") boolean secureCookie) {
         this.secret = secret;
         this.secureCookie = secureCookie;
     }
