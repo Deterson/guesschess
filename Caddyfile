@@ -1,3 +1,7 @@
-guesschess.fr, www.guesschess.fr {
+guesschess.fr {
 	reverse_proxy frontend:80
+}
+
+www.guesschess.fr {
+	redir https://guesschess.fr{uri} permanent
 }
