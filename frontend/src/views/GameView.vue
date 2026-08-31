@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useGameStore } from '../stores/game'
 import { useAuthStore } from '../stores/auth'
@@ -12,7 +12,7 @@ import MoveHistoryList from '../components/MoveHistoryList.vue'
 import ChatPanel from '../components/ChatPanel.vue'
 import InviteBanner from '../components/InviteBanner.vue'
 import AuthModal from '../components/AuthModal.vue'
-import type { PromotionPieceType } from '../types/api'
+import type { Board, PromotionPieceType, RoundSummaryMessage } from '../types/api'
 
 const props = defineProps<{
   gameId: string
@@ -20,9 +20,13 @@ const props = defineProps<{
 
 const gameStore = useGameStore()
 const authStore = useAuthStore()
-const { state, error, pendingSubmission, pendingMove, myColor, canAct, chatMessages, connectionStatus } = storeToRefs(gameStore)
+const { state, error, pendingSubmission, pendingMove, myColor, canAct, chatMessages, connectionStatus, historyRounds, historyInitialBoard, historyIndex } =
+  storeToRefs(gameStore)
 
-onUnmounted(() => gameStore.leaveGame())
+onUnmounted(() => {
+  gameStore.leaveGame()
+  window.removeEventListener('keydown', onKeydown)
+})
 
 const pendingPromotion = ref<{ from: string; to: string; options: PromotionPieceType[] } | null>(null)
 const hoveredGuess = ref(false)
@@ -128,8 +132,70 @@ const myRole = computed(() => {
 })
 
 const boardDisabled = computed(
-  () => !state.value || state.value.status === 'FINISHED' || pendingSubmission.value || !canAct.value,
+  () =>
+    !state.value ||
+    state.value.status === 'FINISHED' ||
+    pendingSubmission.value ||
+    !canAct.value ||
+    historyIndex.value !== null,
 )
+
+/**
+ * Round de l'historique actuellement affiché (null en direct, ou en dehors des
+ * bornes de historyRounds - jamais le cas normalement, garde défensive).
+ */
+const viewedRound = computed(() => {
+  if (historyIndex.value === null || historyIndex.value < 0) return null
+  return historyRounds.value[historyIndex.value] ?? null
+})
+
+/** Plateau affiché : en direct par défaut, sinon dérivé de l'historique (étape 11). */
+const displayBoard = computed<Board | null>(() => {
+  if (historyIndex.value === null) return state.value?.board ?? null
+  if (historyIndex.value === -1) return historyInitialBoard.value
+  // boardAfter ne vaut null que pour le round terminal Guessmate : le plateau live
+  // reflète déjà cette position finale (partie FINISHED), pas la peine d'en garder
+  // une copie séparée côté backend pour ce seul cas.
+  return viewedRound.value?.boardAfter ?? state.value?.board ?? null
+})
+
+/** Coup deviné du round consulté en navigation historique - null en direct (voir hoverGuessSquares pour le survol souris). */
+const displayGhost = computed(() => {
+  const round = viewedRound.value
+  if (!round?.guessedFrom || !round.guessedTo) return null
+  return { from: round.guessedFrom, to: round.guessedTo }
+})
+
+/** Réutilise le surlignage sky/rouge déjà géré par ChessBoard pour le round consulté en navigation. */
+const displayLastRound = computed<RoundSummaryMessage | null>(() => {
+  if (historyIndex.value === null) return state.value?.lastRound ?? null
+  const round = viewedRound.value
+  if (!round) return null
+  return {
+    mover: round.mover,
+    guesser: round.guesser,
+    actualFrom: round.actualFrom,
+    actualTo: round.actualTo,
+    guessedFrom: round.guessedFrom,
+    guessedTo: round.guessedTo,
+    guessedCorrectly: round.guessedCorrectly,
+  }
+})
+
+function onHistorySelect(index: number | null) {
+  historyIndex.value = index
+}
+
+function onKeydown(event: KeyboardEvent) {
+  const target = document.activeElement
+  if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return
+  if (event.key === 'ArrowLeft') gameStore.historyPrev()
+  else if (event.key === 'ArrowRight') gameStore.historyNext()
+}
+
+onMounted(() => {
+  window.addEventListener('keydown', onKeydown)
+})
 
 function submitChosenMove({ from, to, promotion }: { from: string; to: string; promotion: PromotionPieceType | null }) {
   if (myRole.value === 'mover') {
@@ -240,13 +306,14 @@ function submitNoGuess() {
 
         <div class="order-2 mx-auto flex w-full max-w-xl flex-col items-center gap-4 @min-[67rem]:order-none @min-[67rem]:col-start-2 @min-[67rem]:mx-0 @min-[67rem]:max-w-none">
           <ChessBoard
-            :board="state.board"
+            :board="displayBoard ?? state.board"
             :legal-moves="state.legalMoves"
             :orientation="myColor ?? 'white'"
             :disabled="boardDisabled"
-            :last-round="state.lastRound"
+            :last-round="displayLastRound"
             :pending-move="pendingMove"
             :hover-guess="hoverGuessSquares"
+            :ghost-move="displayGhost"
             @choose-move="onChooseMove"
           />
 
@@ -261,7 +328,7 @@ function submitNoGuess() {
         </div>
 
         <div class="order-4 mx-auto w-full max-w-xl @min-[67rem]:order-none @min-[67rem]:col-start-3 @min-[67rem]:mx-0 @min-[67rem]:max-w-none">
-          <MoveHistoryList :move-history="state.moveHistory" />
+          <MoveHistoryList :rounds="historyRounds" :history-index="historyIndex" @select="onHistorySelect" />
         </div>
       </div>
 

@@ -56,6 +56,33 @@ export interface MyAccessHttpResponse {
   token: string
 }
 
+/**
+ * Un round de l'historique detaille (etape 11 - GET /api/games/{id}/history).
+ * realSan est null quand le round a ete annule (devinette correcte) - aucun coup
+ * n'a alors ete reellement joue. guessedFrom/guessedTo/guessedSan sont null quand
+ * aucune devinette n'a ete soumise. boardAfter est null uniquement pour le round
+ * terminal Guessmate (roi capture via devinette correcte en echec - voir
+ * GameHistoryEntryHttpResponse.java).
+ */
+export interface GameHistoryEntry {
+  moveNumber: number
+  mover: Color
+  guesser: Color
+  actualFrom: string
+  actualTo: string
+  realSan: string | null
+  guessedFrom: string | null
+  guessedTo: string | null
+  guessedSan: string | null
+  guessedCorrectly: boolean
+  boardAfter: Board | null
+}
+
+export interface GameHistoryHttpResponse {
+  initialBoard: Board
+  rounds: GameHistoryEntry[]
+}
+
 // ---- WebSocket STOMP (infrastructure/websocket/dto) ----
 
 export interface LegalMoveMessage {
@@ -112,6 +139,7 @@ export interface GameStateMessage {
   moveHistory: MoveHistoryEntry[]
   full: boolean
   mySubmission: MySubmissionMessage
+  roundCount: number
 }
 
 export interface ErrorMessage {

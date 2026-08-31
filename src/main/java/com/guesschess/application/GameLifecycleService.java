@@ -1,5 +1,6 @@
 package com.guesschess.application;
 
+import com.guesschess.domain.board.Board;
 import com.guesschess.domain.game.Game;
 import com.guesschess.domain.game.GameId;
 import com.guesschess.domain.game.GameNotFoundException;
@@ -11,6 +12,7 @@ import com.guesschess.domain.pggn.PggnWriter;
 import com.guesschess.domain.piece.Color;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -123,6 +125,25 @@ public class GameLifecycleService {
      */
     public String exportPggn(GameId id) {
         return gameRepository.withGame(id, PggnWriter::write);
+    }
+
+    /**
+     * Historique detaille rond par rond (etape 11 de la roadmap) - lecture seule,
+     * accessible sans jeton comme exportPggn/viewGame. initialBoard est le plateau
+     * avant le premier round (ou le plateau courant si aucun round n'a encore ete
+     * resolu) ; rounds porte, pour chaque round (y compris annules), le plateau
+     * avant/apres (Game.roundHistoryWithPositions) necessaire au frontend pour
+     * naviguer dans l'historique et afficher la devinette en fantome.
+     */
+    public record GameHistorySnapshot(Board initialBoard, List<Game.RoundContext> rounds) {
+    }
+
+    public GameHistorySnapshot gameHistory(GameId id) {
+        return gameRepository.withGame(id, game -> {
+            List<Game.RoundContext> contexts = game.roundHistoryWithPositions();
+            Board initial = contexts.isEmpty() ? game.board() : contexts.get(0).boardBefore();
+            return new GameHistorySnapshot(initial, contexts);
+        });
     }
 
     /**

@@ -1,8 +1,18 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { connect, onStatusChange, publish, subscribe, type ConnectionStatus } from '../services/stompClient'
+import { getGameHistory } from '../services/api'
 import type { StompSubscription } from '@stomp/stompjs'
-import type { ChatMessage, ColorLower, ErrorMessage, GameStateMessage, MySubmissionMessage, PromotionPieceType } from '../types/api'
+import type {
+  Board,
+  ChatMessage,
+  ColorLower,
+  ErrorMessage,
+  GameHistoryEntry,
+  GameStateMessage,
+  MySubmissionMessage,
+  PromotionPieceType,
+} from '../types/api'
 
 interface JoinGameParams {
   gameId: string
@@ -39,6 +49,50 @@ export const useGameStore = defineStore('game', () => {
    * l'historique par design (voir CLAUDE.md).
    */
   const chatMessages = ref<ChatMessage[]>([])
+
+  /**
+   * Historique detaille rond par rond (etape 11), charge une fois via REST puis
+   * rafraichi a chaque nouveau round resolu (watch sur roundCount ci-dessous) -
+   * jamais via une souscription STOMP dediee, pour ne pas dupliquer cote frontend la
+   * logique deja portee par GET /api/games/{id}/history. historyIndex pilote la
+   * navigation cote client, independamment de state : null = position live, -1 =
+   * position de depart, 0..n-1 = position apres le round i.
+   */
+  const historyRounds = ref<GameHistoryEntry[]>([])
+  const historyInitialBoard = ref<Board | null>(null)
+  const historyIndex = ref<number | null>(null)
+
+  async function fetchHistory() {
+    if (!gameId.value) return
+    try {
+      const history = await getGameHistory(gameId.value)
+      historyInitialBoard.value = history.initialBoard
+      historyRounds.value = history.rounds
+    } catch {
+      // Echec silencieux : la navigation dans l'historique est une amelioration de
+      // confort, jamais necessaire pour jouer - ne pas bloquer/perturber la partie en
+      // cours pour autant.
+    }
+  }
+
+  /** null(live) <-> n-1 <-> ... <-> -1(depart) - la fleche gauche depuis le direct va au dernier round joue, pas au-dela. */
+  function historyPrev() {
+    if (historyIndex.value === null) {
+      historyIndex.value = historyRounds.value.length - 1
+    } else if (historyIndex.value > -1) {
+      historyIndex.value -= 1
+    }
+  }
+
+  /** Symetrique de historyPrev : depasser le dernier round joue revient au direct (null). */
+  function historyNext() {
+    if (historyIndex.value === null) return
+    if (historyIndex.value < historyRounds.value.length - 1) {
+      historyIndex.value += 1
+    } else {
+      historyIndex.value = null
+    }
+  }
 
   let subscriptions: StompSubscription[] = []
   /**
@@ -126,9 +180,13 @@ export const useGameStore = defineStore('game', () => {
     pendingMove.value = null
     canAct.value = Boolean(playerToken)
     chatMessages.value = []
+    historyRounds.value = []
+    historyInitialBoard.value = null
+    historyIndex.value = null
     subscribed = false
 
     await ensureSubscribed()
+    await fetchHistory()
   }
 
   /** À appeler en quittant la vue de partie (voir GameView.vue) pour ne pas laisser les abonnements actifs en arrière-plan. */
@@ -137,7 +195,23 @@ export const useGameStore = defineStore('game', () => {
     subscriptions = []
     subscribed = false
     gameId.value = null
+    historyRounds.value = []
+    historyInitialBoard.value = null
+    historyIndex.value = null
   }
+
+  /**
+   * Un round resolu (en direct, ou decouvert au premier chargement) fait grossir
+   * roundCount - on refetch alors l'historique detaille, sans jamais faire sauter
+   * historyIndex : un round resolu pendant qu'on navigue dans le passe met a jour la
+   * liste en silence, sans forcer un retour a la position courante (CLAUDE.md, etape 11).
+   */
+  watch(
+    () => state.value?.roundCount,
+    (roundCount, previous) => {
+      if (roundCount !== undefined && roundCount !== previous) fetchHistory()
+    },
+  )
 
   /**
    * Reflète, après (re)connexion (typiquement un rechargement de page), ma propre
@@ -159,7 +233,7 @@ export const useGameStore = defineStore('game', () => {
     publish(`/app/games/${gameId.value}/move`, { token: token.value, from, to, promotion: promotion ?? null }).catch(() => {
       pendingSubmission.value = false
       pendingMove.value = null
-      error.value = { code: 'NETWORK_ERROR', message: "Connexion perdue : le coup n'a pas pu être envoyé, réessayez." }
+      error.value = { code: 'NETWORK_ERROR', message: "Connexion perdue : réessayez." }
     })
   }
 
@@ -169,7 +243,7 @@ export const useGameStore = defineStore('game', () => {
     publish(`/app/games/${gameId.value}/guess`, { token: token.value, from, to, promotion: promotion ?? null }).catch(() => {
       pendingSubmission.value = false
       pendingMove.value = null
-      error.value = { code: 'NETWORK_ERROR', message: "Connexion perdue : la devinette n'a pas pu être envoyée, réessayez." }
+      error.value = { code: 'NETWORK_ERROR', message: "Connexion perdue : réessayez." }
     })
   }
 
@@ -192,6 +266,11 @@ export const useGameStore = defineStore('game', () => {
     connectionStatus,
     canAct,
     chatMessages,
+    historyRounds,
+    historyInitialBoard,
+    historyIndex,
+    historyPrev,
+    historyNext,
     joinGame,
     leaveGame,
     submitMove,

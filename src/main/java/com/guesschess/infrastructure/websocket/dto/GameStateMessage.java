@@ -13,7 +13,10 @@ import java.util.List;
  * cote spectateur sans dependre d'un appel REST separe. mySubmission vaut toujours
  * MySubmissionMessage.NONE dans ce message quand il est diffuse publiquement sur ce
  * topic - seule la reponse privee a /app/games/{id}/view le renseigne (voir
- * MySubmissionMessage).
+ * MySubmissionMessage). roundCount est le nombre de rounds deja resolus (y compris
+ * les rounds annules) - permet au frontend de detecter qu'un nouveau round vient
+ * d'etre resolu et de refetch l'historique detaille (GET /api/games/{id}/history)
+ * sans avoir a diffuser cet historique complet sur chaque message d'etat.
  */
 public record GameStateMessage(
         String gameId,
@@ -26,6 +29,7 @@ public record GameStateMessage(
         List<LegalMoveMessage> legalMoves,
         List<MoveHistoryEntry> moveHistory,
         boolean full,
-        MySubmissionMessage mySubmission
+        MySubmissionMessage mySubmission,
+        int roundCount
 ) {
 }

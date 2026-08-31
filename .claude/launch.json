@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "guesschess-frontend",
-      "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeExecutable": "frontend\\run-dev.cmd",
+      "runtimeArgs": [],
       "port": 5173
     }
   ]

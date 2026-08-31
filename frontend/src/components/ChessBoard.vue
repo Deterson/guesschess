@@ -24,6 +24,7 @@ const props = withDefaults(
     lastRound?: RoundSummaryMessage | null
     pendingMove?: { from: string; to: string } | null
     hoverGuess?: { from: string; to: string } | null
+    ghostMove?: { from: string; to: string } | null
   }>(),
   {
     legalMoves: () => [],
@@ -32,6 +33,7 @@ const props = withDefaults(
     lastRound: null,
     pendingMove: null,
     hoverGuess: null,
+    ghostMove: null,
   },
 )
 
@@ -130,6 +132,10 @@ function isPendingSquare(square: string): boolean {
 
 function isHoverGuessSquare(square: string): boolean {
   return props.hoverGuess != null && (square === props.hoverGuess.from || square === props.hoverGuess.to)
+}
+
+function isGhostMoveSquare(square: string): boolean {
+  return props.ghostMove != null && (square === props.ghostMove.from || square === props.ghostMove.to)
 }
 
 function attemptMove(from: string, to: string): boolean {
@@ -235,7 +241,9 @@ function onSquarePointerCancel(event: PointerEvent) {
               ? 'bg-sky-500/50'
               : '',
           isPendingSquare(algebraic(file, rank)) ? 'bg-sky-500/25' : '',
-          isHoverGuessSquare(algebraic(file, rank)) ? 'ring-4 ring-violet-400 ring-inset' : '',
+          isHoverGuessSquare(algebraic(file, rank)) || isGhostMoveSquare(algebraic(file, rank))
+            ? 'ring-4 ring-violet-400 ring-inset'
+            : '',
           disabled ? 'cursor-default' : 'cursor-pointer',
         ]"
         :data-square="algebraic(file, rank)"
@@ -253,7 +261,9 @@ function onSquarePointerCancel(event: PointerEvent) {
             pendingMove?.from !== algebraic(file, rank) &&
             pendingMove?.to !== algebraic(file, rank) &&
             hoverGuess?.from !== algebraic(file, rank) &&
-            hoverGuess?.to !== algebraic(file, rank)
+            hoverGuess?.to !== algebraic(file, rank) &&
+            ghostMove?.from !== algebraic(file, rank) &&
+            ghostMove?.to !== algebraic(file, rank)
           "
           :src="iconOf(pieceAt(file, rank))!"
           class="h-[80%] w-[80%] drop-shadow"
@@ -271,6 +281,13 @@ function onSquarePointerCancel(event: PointerEvent) {
           v-if="hoverGuess?.to === algebraic(file, rank) && iconOf(pieceAtSquare(hoverGuess.from))"
           :src="iconOf(pieceAtSquare(hoverGuess.from))!"
           class="h-[80%] w-[80%] drop-shadow"
+          draggable="false"
+          alt=""
+        />
+        <img
+          v-if="ghostMove?.to === algebraic(file, rank) && iconOf(pieceAtSquare(ghostMove.from))"
+          :src="iconOf(pieceAtSquare(ghostMove.from))!"
+          class="h-[80%] w-[80%] opacity-40 grayscale"
           draggable="false"
           alt=""
         />

@@ -1,6 +1,10 @@
 package com.guesschess.infrastructure.web;
 
+import com.guesschess.infrastructure.websocket.dto.AckMessage;
+import com.guesschess.infrastructure.websocket.dto.CreateGameResponse;
 import com.guesschess.infrastructure.websocket.dto.GameStateMessage;
+import com.guesschess.infrastructure.websocket.dto.SubmitGuessRequest;
+import com.guesschess.infrastructure.websocket.dto.SubmitMoveRequest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -182,10 +186,106 @@ class GameCreationControllerIntegrationTest {
         assertEquals(404, response.statusCode());
     }
 
+    /**
+     * Etape 11 de la roadmap : historique detaille rond par rond, lecture seule et
+     * accessible sans jeton comme pggn/my-access.
+     */
+    @Test
+    void historyForAnUnknownGameReturnsNotFound() throws Exception {
+        HttpResponse<String> response = getRaw("/api/games/" + java.util.UUID.randomUUID() + "/history");
+
+        assertEquals(404, response.statusCode());
+    }
+
+    @Test
+    void historyReturnsOnlyTheInitialBoardWhenNoRoundHasBeenResolvedYet() throws Exception {
+        JsonNode created = post("/api/games", "{\"variant\":\"GUESSCHESS\",\"color\":\"WHITE\"}");
+        String gameId = created.get("gameId").asString();
+
+        HttpResponse<String> response = getRaw("/api/games/" + gameId + "/history");
+
+        assertEquals(200, response.statusCode());
+        JsonNode body = objectMapper.readTree(response.body());
+        assertTrue(body.get("rounds").isEmpty());
+        assertEquals("wP", body.get("initialBoard").get(1).get(4).asString());
+        assertEquals("bP", body.get("initialBoard").get(6).get(4).asString());
+    }
+
+    /**
+     * Cree la partie via STOMP /app/games.create (comme StompFlowIntegrationTest),
+     * pas via POST /api/games : la creation REST lie immediatement chaque couleur a
+     * l'identite (anonyme ou compte) resolue depuis CETTE requete HTTP precise (etape 7),
+     * alors qu'une session STOMP de test independante (sans cookie partage) resout sa
+     * propre identite anonyme fraiche - agir sur une partie creee en REST depuis une
+     * session STOMP separee echoue donc avec NotYourColorException. La creation via
+     * /app/games.create ne lie personne a la creation ; le lien ne se pose qu'au premier
+     * coup/devinette soumis par couleur (etape 6), ce qui correspond exactement a cette
+     * meme session STOMP - aucun conflit d'identite.
+     */
+    @Test
+    void historyIncludesAResolvedRoundWithItsGuessAndTheResultingBoard() throws Exception {
+        WebSocketStompClient stompClient = new WebSocketStompClient(new StandardWebSocketClient());
+        stompClient.setMessageConverter(new JacksonJsonMessageConverter());
+        StompSession session = stompClient
+                .connectAsync("ws://localhost:" + port + "/ws", new StompSessionHandlerAdapter() {})
+                .get(5, TimeUnit.SECONDS);
+
+        BlockingQueue<CreateGameResponse> created = new LinkedBlockingQueue<>();
+        session.subscribe("/user/queue/games.created", handlerFor(CreateGameResponse.class, created));
+        session.send("/app/games.create", "");
+        CreateGameResponse game = created.poll(5, TimeUnit.SECONDS);
+        assertNotNull(game);
+        String gameId = game.gameId();
+
+        BlockingQueue<GameStateMessage> broadcasts = new LinkedBlockingQueue<>();
+        session.subscribe("/topic/games/" + gameId, handlerFor(GameStateMessage.class, broadcasts));
+        BlockingQueue<AckMessage> guessAcks = new LinkedBlockingQueue<>();
+        session.subscribe("/user/queue/guess.ack", handlerFor(AckMessage.class, guessAcks));
+
+        session.send("/app/games/" + gameId + "/guess", new SubmitGuessRequest(game.blackToken(), "d2", "d4", null));
+        assertNotNull(guessAcks.poll(5, TimeUnit.SECONDS));
+        session.send("/app/games/" + gameId + "/move", new SubmitMoveRequest(game.whiteToken(), "e2", "e4", null));
+        assertNotNull(broadcasts.poll(5, TimeUnit.SECONDS));
+
+        HttpResponse<String> response = getRaw("/api/games/" + gameId + "/history");
+
+        assertEquals(200, response.statusCode());
+        JsonNode body = objectMapper.readTree(response.body());
+        JsonNode round = body.get("rounds").get(0);
+        assertEquals(1, round.get("moveNumber").asInt());
+        assertEquals("WHITE", round.get("mover").asString());
+        assertEquals("e2", round.get("actualFrom").asString());
+        assertEquals("e4", round.get("actualTo").asString());
+        assertEquals("e4", round.get("realSan").asString());
+        assertEquals("d4", round.get("guessedSan").asString());
+        assertEquals(false, round.get("guessedCorrectly").asBoolean());
+        assertEquals("wP", round.get("boardAfter").get(3).get(4).asString());
+        assertTrue(round.get("boardAfter").get(1).get(4).isNull());
+    }
+
     private JsonNode post(String path, String jsonBody) throws Exception {
         HttpResponse<String> response = postRaw(path, jsonBody);
         assertEquals(201, response.statusCode());
         return objectMapper.readTree(response.body());
+    }
+
+    private <T> StompFrameHandler handlerFor(Class<T> type, BlockingQueue<T> queue) {
+        return new StompFrameHandler() {
+            @Override
+            public Type getPayloadType(StompHeaders headers) {
+                return type;
+            }
+
+            @Override
+            public void handleFrame(StompHeaders headers, Object payload) {
+                queue.add(type.cast(payload));
+            }
+        };
+    }
+
+    private HttpResponse<String> getRaw(String path) throws Exception {
+        HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + path)).GET().build();
+        return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
     }
 
     private HttpResponse<String> postRaw(String path, String jsonBody) throws Exception {

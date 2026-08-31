@@ -13,7 +13,7 @@
 
 set -uo pipefail
 
-REMOTE_HOST="ubuntu@15.188.63.232"
+REMOTE_HOST="ubuntu@35.180.147.199"
 REMOTE_KEY="$HOME/.ssh/guesschess-dev-docker.pem"
 REMOTE_DIR="guesschess-verify-$$"
 IMAGE_TAG="guesschess-mvn-runner:25"

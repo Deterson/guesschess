@@ -1,5 +1,13 @@
 import { useAuthStore } from '../stores/auth'
-import type { Color, CreateGameHttpResponse, ErrorResponse, GameVariant, JoinGameHttpResponse, MyAccessHttpResponse } from '../types/api'
+import type {
+  Color,
+  CreateGameHttpResponse,
+  ErrorResponse,
+  GameHistoryHttpResponse,
+  GameVariant,
+  JoinGameHttpResponse,
+  MyAccessHttpResponse,
+} from '../types/api'
 
 /**
  * En dev (`npm run dev`), le frontend (5173) et le backend (8080) sont deux origines
@@ -91,3 +99,6 @@ export const joinGame = (gameId: string, authToken: string | null) =>
 
 export const myAccess = (gameId: string, authToken: string | null) =>
   request<MyAccessHttpResponse>(`/api/games/${gameId}/my-access`, { token: authToken })
+
+export const getGameHistory = (gameId: string) =>
+  request<GameHistoryHttpResponse>(`/api/games/${gameId}/history`)

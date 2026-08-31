@@ -22,6 +22,10 @@ import java.util.List;
  * jamais la devinette ou le coup en attente. playedMoveHistory porte les plateaux
  * avant/apres chaque coup reellement joue, necessaires a GameMessageMapper pour
  * generer la notation SAN de la liste de coups (voir Game.playedMoveHistory).
+ * roundCount (nombre de rounds deja resolus, y compris les rounds annules) permet
+ * au frontend de detecter qu'un nouveau round vient d'etre resolu (donc de refetch
+ * l'historique detaille via GET /api/games/{id}/history) sans avoir a diffuser tout
+ * cet historique sur chaque message d'etat.
  */
 public record GameSnapshot(
         GameId id,
@@ -32,7 +36,8 @@ public record GameSnapshot(
         GameResult result,
         RoundResult lastRoundResult,
         List<Move> legalMoves,
-        List<Game.PlayedMove> playedMoveHistory
+        List<Game.PlayedMove> playedMoveHistory,
+        int roundCount
 ) {
 
     public static GameSnapshot of(Game game) {
@@ -45,7 +50,8 @@ public record GameSnapshot(
                 game.result(),
                 game.lastRoundResult(),
                 game.legalMoves(),
-                game.playedMoveHistory()
+                game.playedMoveHistory(),
+                game.roundHistory().size()
         );
     }
 }

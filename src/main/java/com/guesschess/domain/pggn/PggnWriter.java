@@ -87,7 +87,7 @@ public final class PggnWriter {
         return ply.realSan() + "(" + ply.guessedSan() + ")";
     }
 
-    private static PggnPly toPly(int moveNumber, Game.RoundContext context) {
+    public static PggnPly toPly(int moveNumber, Game.RoundContext context) {
         RoundResult round = context.round();
         Move guessedMove = round.guessedMove();
 

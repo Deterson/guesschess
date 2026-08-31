@@ -7,14 +7,20 @@ import com.guesschess.application.JoinResult;
 import com.guesschess.application.MyAccess;
 import com.guesschess.application.NoOpenColorException;
 import com.guesschess.application.PlayerRef;
+import com.guesschess.domain.game.Game;
 import com.guesschess.domain.game.GameId;
 import com.guesschess.domain.game.GameNotFoundException;
 import com.guesschess.domain.game.GameVariant;
+import com.guesschess.domain.game.RoundResult;
+import com.guesschess.domain.pggn.PggnPly;
+import com.guesschess.domain.pggn.PggnWriter;
 import com.guesschess.domain.piece.Color;
 import com.guesschess.infrastructure.security.HttpPlayerIdentityResolver;
 import com.guesschess.infrastructure.web.dto.CreateGameHttpRequest;
 import com.guesschess.infrastructure.web.dto.CreateGameHttpResponse;
 import com.guesschess.infrastructure.web.dto.ErrorResponse;
+import com.guesschess.infrastructure.web.dto.GameHistoryEntryHttpResponse;
+import com.guesschess.infrastructure.web.dto.GameHistoryHttpResponse;
 import com.guesschess.infrastructure.web.dto.JoinGameHttpResponse;
 import com.guesschess.infrastructure.web.dto.MyAccessHttpResponse;
 import com.guesschess.infrastructure.websocket.GameMessageMapper;
@@ -32,6 +38,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -150,6 +158,36 @@ class GameCreationController {
         try {
             String pggn = gameLifecycleService.exportPggn(GameId.fromString(gameId));
             return ResponseEntity.ok().contentType(MediaType.TEXT_PLAIN).body(pggn);
+        } catch (GameNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new ErrorResponse("GAME_NOT_FOUND", "Partie introuvable"));
+        }
+    }
+
+    /**
+     * Historique detaille round par round (etape 11 de la roadmap) - lecture seule et
+     * accessible sans jeton comme pggn/my-access. Alimente le panneau de navigation
+     * cote frontend (liste de coups cliquable façon PGGN + fantome de la devinette).
+     */
+    @GetMapping("/{gameId}/history")
+    ResponseEntity<?> history(@PathVariable String gameId) {
+        try {
+            GameLifecycleService.GameHistorySnapshot snapshot = gameLifecycleService.gameHistory(GameId.fromString(gameId));
+            List<GameHistoryEntryHttpResponse> rounds = new ArrayList<>();
+            for (int i = 0; i < snapshot.rounds().size(); i++) {
+                Game.RoundContext context = snapshot.rounds().get(i);
+                RoundResult round = context.round();
+                PggnPly ply = PggnWriter.toPly((i / 2) + 1, context);
+                rounds.add(new GameHistoryEntryHttpResponse(
+                        ply.moveNumber(), round.mover().name(), round.guesser().name(),
+                        round.actualMove().from().toAlgebraic(), round.actualMove().to().toAlgebraic(), ply.realSan(),
+                        round.guessedMove() == null ? null : round.guessedMove().from().toAlgebraic(),
+                        round.guessedMove() == null ? null : round.guessedMove().to().toAlgebraic(),
+                        ply.guessedSan(), round.guessedCorrectly(),
+                        context.boardAfter() == null ? null : mapper.toBoardCells(context.boardAfter())
+                ));
+            }
+            return ResponseEntity.ok(new GameHistoryHttpResponse(mapper.toBoardCells(snapshot.initialBoard()), rounds));
         } catch (GameNotFoundException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(new ErrorResponse("GAME_NOT_FOUND", "Partie introuvable"));

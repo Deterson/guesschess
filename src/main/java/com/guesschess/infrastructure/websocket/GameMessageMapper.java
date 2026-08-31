@@ -51,7 +51,8 @@ public class GameMessageMapper {
                 toLegalMoveMessages(snapshot.legalMoves()),
                 toMoveHistoryEntries(snapshot.playedMoveHistory()),
                 full,
-                toMySubmissionMessage(mySubmission)
+                toMySubmissionMessage(mySubmission),
+                snapshot.roundCount()
         );
     }
 
@@ -118,7 +119,7 @@ public class GameMessageMapper {
                 .toList();
     }
 
-    private String[][] toBoardCells(Board board) {
+    public String[][] toBoardCells(Board board) {
         String[][] cells = new String[8][8];
         for (int rank = 0; rank < 8; rank++) {
             for (int file = 0; file < 8; file++) {

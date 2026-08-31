@@ -19,9 +19,9 @@ Jeu d'échecs classique avec une règle additionnelle :
 - **Frontend** : VueJS 3
 - **Déploiement** : Docker + docker-compose, sur Raspberry Pi 4 (4 Go RAM) — si le Pi devient un jour insuffisant, la conteneurisation permet de redéployer les mêmes images sur du cloud sans réécrire l'application
 - **Modes de jeu** : temps réel (WebSocket) **et** asynchrone (façon correspondance), au choix des joueurs
-- attention : le docker tourne sur une VM remote 15.188.63.232:5432, le SSH est ouvert et le .pem est situé là: C:\Users\drde6\.ssh\guesschess-dev-docker.pem
+- attention : le docker tourne sur une VM remote 35.180.147.199:5432 (AWS EC2, Elastic IP donc fixe d'un redemarrage a l'autre — avant l'allocation de cette Elastic IP, l'IP publique changeait a chaque stop/start de l'instance, ce qui a deja necessite une mise a jour de cette meme ligne), le SSH est ouvert et le .pem est situé là: C:\Users\drde6\.ssh\guesschess-dev-docker.pem
   - Pas de Docker local sur la machine de dev Windows (CLI `docker` absente du PATH, testé aussi bien en Git Bash qu'en PowerShell) : tout Docker (Postgres de dev inclus) vit uniquement sur cette VM distante, accessible via le `.pem` ci-dessus.
-  - Consequence directe : `spring.datasource.url` (application.properties) pointe par defaut sur `15.188.63.232:5432` — lancer le backend en local se connecte donc a cette base Postgres **partagee**, pas a une instance locale isolee. A garder en tete avant de la modifier ou d'y jouer une partie de test (les autres sessions/devs y accedent potentiellement aussi).
+  - Consequence directe : `spring.datasource.url` (application.properties) pointe par defaut sur `35.180.147.199:5432` — lancer le backend en local se connecte donc a cette base Postgres **partagee**, pas a une instance locale isolee. A garder en tete avant de la modifier ou d'y jouer une partie de test (les autres sessions/devs y accedent potentiellement aussi).
   - Utilisateur SSH de la VM : `ubuntu` (dans le groupe `docker`, `docker ps`/`docker run` fonctionnent sans `sudo`). Alias configure dans `~/.ssh/config` (poste de dev de l'utilisateur) : `ssh guesschess-vm` suffit, pas besoin de repeter `-i .pem` ni l'utilisateur/IP a chaque fois.
   - **Tests Maven qui necessitent Java 25** : le `JAVA_HOME` par defaut de cette machine de dev pointe vers un JDK 8 (`mvnw -v` le confirme), ce qui fait echouer la compilation de tout le code utilisant `record`/pattern matching avec des erreurs trompeuses ("class, interface, or enum expected") qui n'ont rien a voir avec une vraie erreur de syntaxe. Un JDK 25 est neanmoins deja installe localement (gere par IntelliJ) : `C:\Users\drde6\.jdks\ms-25.0.4.1`. Prefixer les commandes Maven avec, par exemple en Git Bash :
     ```
@@ -29,6 +29,7 @@ Jeu d'échecs classique avec une règle additionnelle :
     ```
     (chemin a verifier si l'utilisateur change de JDK gere par IntelliJ - lister `~/.jdks/` en cas de doute). Alternative durable : l'utilisateur peut positionner `JAVA_HOME` sur ce JDK 25 une bonne fois pour toutes dans son profil Windows, mais ce n'est pas fait automatiquement ici pour ne pas casser d'autres usages de JDK 8 sur la meme machine.
   - **Tests d'integration bases sur Testcontainers** (`JpaGameRepositoryIntegrationTest`, `StompFlowIntegrationTest`, ... via `PostgresTestContainerConfig`) : ont besoin d'un **daemon Docker local** pour lancer un Postgres jetable, absent sur cette machine de dev (`Could not find a valid Docker environment`) — mais peuvent tourner sur la VM distante ci-dessus, qui en a un. Script pret a l'emploi : [`scripts/test-integration-remote.sh`](scripts/test-integration-remote.sh) `[filtre -Dtest optionnel]` — copie `pom.xml`/`mvnw`/`.mvn`/`src` vers la VM via SSH, lance les tests dans un conteneur Java 25 ephemere (`docker run --network host -v /var/run/docker.sock:...`, le pattern classique Docker-in-Docker par socket monte : `--network host` est necessaire pour que ce conteneur atteigne, via `localhost`, les conteneurs Testcontainers "freres" qu'il demarre lui-meme sur cette meme VM), puis nettoie sa copie (via un conteneur, les fichiers generes appartenant a `root`). L'image du conteneur runner (Java 25 + `unzip`/`curl`, necessaires au wrapper Maven mais absents de l'image de base) est construite une fois et reutilisee (`guesschess-mvn-runner:25`, deja en cache sur la VM). Seuls les tests unitaires domaine/application (aucune dependance Postgres/Docker) sont directement verifiables en local sans ce script.
+  - **Frontend (`npm run dev` / Vite) qui necessite un Node plus recent** : le Node par defaut de cette machine de dev est en v20.11.0, mais `vite` (v8, package.json de `frontend`) depend de `rolldown`, qui a besoin de `node:util.styleText` (Node ~21.7+) et echoue au demarrage sinon (`SyntaxError: The requested module 'node:util' does not provide an export named 'styleText'`). Un Node plus recent est neanmoins deja present localement via le node embarque d'IntelliJ : `C:\Users\drde6\AppData\Roaming\JetBrains\IntelliJIdea2026.2\node\versions\24.20.0`. Plutot que de modifier le PATH systeme (le vieux Node est enregistre au niveau **Machine**, avant le PATH **User** dans l'ordre de resolution Windows — le corriger demanderait des droits admin), [`frontend/run-dev.cmd`](frontend/run-dev.cmd) fixe le PATH localement avant de lancer `npm run dev`, et [`.claude/launch.json`](.claude/launch.json) pointe dessus pour que la preview du frontend lancee depuis une session Claude Code utilise ce script plutot que `npm` directement. (Chemin du Node IntelliJ a verifier si l'utilisateur change de version geree par IntelliJ, meme remarque que pour le JDK 25 ci-dessus.)
 
 ## Décisions d'architecture
 
@@ -197,19 +198,50 @@ Jeu d'échecs classique avec une règle additionnelle :
     supprimé plutôt que maintenu en double, plutôt que gardé comme information
     dupliquée à synchroniser à la main.
 
-11. Historique de partie navigable (front), façon lichess.org : liste des coups affichée à
-    gauche de l'échiquier, chaque coup cliquable. Cliquer un coup fait afficher l'état du
-    plateau à ce moment de la partie (dérivé de `positionHistory`, déjà introduit à l'étape
-    10 pour le PGGN — même source de vérité, pas de nouvelle donnée à faire remonter du
-    backend) plutôt que l'état courant, avec le coup deviné à ce round affiché en
-    transparence sur le plateau (case/pièce fantôme, cohérent avec le rendu entre
-    parenthèses du PGGN pour ce même round). Cliquer le dernier coup de la liste revient à
-    l'état courant de la partie (le mode "navigation" doit rester distinct côté client de la
-    partie réellement en cours : parcourir l'historique ne doit ni permettre de jouer un
-    coup depuis une position passée, ni interférer avec la réception en direct des mises à
-    jour WebSocket sur la partie live — un round résolu pendant qu'un joueur navigue dans
-    l'historique doit rafraîchir la liste sans forcer un retour à la position courante tant
-    que l'utilisateur n'a pas cliqué le dernier coup lui-même).
+11. ✅ Historique de partie navigable (fait), façon lichess.org : contrairement à
+    l'hypothèse initiale de cette étape, une **nouvelle donnée structurée a bien dû
+    remonter du backend** — `GameStateMessage.moveHistory`/`RoundSummaryMessage`
+    n'exposaient que les coups réellement joués (pas les devinettes, pas les rounds
+    annulés, pas de plateau par round), insuffisant pour une liste façon PGGN et un
+    fantôme de devinette ; `positionHistory`/`Game.roundHistoryWithPositions()`
+    existaient déjà côté domaine (étape 10) mais n'étaient consommés que par
+    `PggnWriter` (texte brut), jamais exposés en JSON. Nouvel endpoint
+    `GET /api/games/{gameId}/history` (lecture seule, sans jeton, même posture que
+    `/pggn`/`/my-access`) : `GameHistoryHttpResponse`/`GameHistoryEntryHttpResponse`
+    (`infrastructure/web/dto`), construits dans `GameCreationController` à partir de
+    `GameLifecycleService.gameHistory` (nouveau, retourne un `GameHistorySnapshot`
+    nested record) et de `Game.roundHistoryWithPositions()`. Réutilise telles quelles
+    la recette SAN de `PggnWriter.toPly` (rendue `public`, seul changement sur ce
+    fichier) et la conversion plateau→JSON de `GameMessageMapper.toBoardCells`
+    (rendue `public`) — pas de nouvelle logique de sérialisation dupliquée.
+    `GameSnapshot`/`GameStateMessage` gagnent un champ `roundCount` (nombre de rounds
+    déjà résolus) pour que le frontend sache quand refetch l'historique détaillé sans
+    diffuser tout cet historique sur chaque message d'état live.
+
+    Front : `MoveHistoryList.vue` réécrit pour consommer cet historique détaillé et
+    rendre une notation façon PGGN cliquable (`1. e4(d4) e5(Nc6)`, mêmes règles
+    d'omission que `PggnWriter.renderPly`), avec une entrée "Position de départ".
+    `ChessBoard.vue` gagne une prop `ghostMove` dédiée (rendu `opacity-40 grayscale`,
+    délibérément distincte de `hoverGuess` qui reste l'affichage opaque du survol
+    manuel en direct sur `RoundResultBanner`) pour le fantôme de la devinette en
+    navigation historique. Store `game` : `historyRounds`/`historyInitialBoard`/
+    `historyIndex` (`null`=direct, `-1`=position de départ, `0..n-1`=après le round i),
+    navigation `null ↔ n-1 ↔ ... ↔ -1` symétrique aux deux bouts. Navigation clavier
+    ←/→ (`GameView.vue`, ignorée si le focus est dans le champ de chat) en plus du
+    clic. Cliquer le dernier coup de la liste renvoie explicitement à `null` (direct)
+    plutôt qu'à son propre index, conformément à l'exigence ci-dessous. Un round
+    résolu pendant la navigation met à jour `historyRounds` en silence (`watch` sur
+    `roundCount`) sans jamais changer `historyIndex` tant que l'utilisateur n'a pas
+    cliqué lui-même le dernier coup. Vérifié de bout en bout dans un vrai navigateur
+    (création de partie, deux rounds résolus dont un round annulé, navigation
+    clavier/souris, fantôme affiché, plateau non-interactif pendant la navigation).
+
+    **Point de vigilance ouvert (non corrigé, hors périmètre de cette étape)** :
+    `myAccessRecoversTheTokenFromTheAnonymousCookieAloneAfterLosingTheUrl`
+    (`GameCreationControllerIntegrationTest`) échoue de façon reproductible (404 au
+    lieu de 200), y compris complètement isolé sur une base fraîche — probable bug
+    dans `AnonymousIdentityFilter`/`HttpPlayerIdentityResolver` (étape 6/7), pas un
+    flake. Non corrigé ici (aucun rapport avec l'historique navigable).
 
 12. Timers (temps de réflexion + timer de devinette) : configuration du contrôle de temps
     au moment de la création de la partie (étape 7), façon échecs classique — un temps total
