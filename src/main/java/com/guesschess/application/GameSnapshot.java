@@ -25,7 +25,10 @@ import java.util.List;
  * roundCount (nombre de rounds deja resolus, y compris les rounds annules) permet
  * au frontend de detecter qu'un nouveau round vient d'etre resolu (donc de refetch
  * l'historique detaille via GET /api/games/{id}/history) sans avoir a diffuser tout
- * cet historique sur chaque message d'etat.
+ * cet historique sur chaque message d'etat. inCheck indique si sideToMove est
+ * actuellement en echec sur board (Game.isInCheck(), toujours false si la partie
+ * n'est plus ONGOING) - permet au frontend de surligner le roi concerne sans
+ * dupliquer la detection d'echec cote client.
  */
 public record GameSnapshot(
         GameId id,
@@ -37,7 +40,8 @@ public record GameSnapshot(
         RoundResult lastRoundResult,
         List<Move> legalMoves,
         List<Game.PlayedMove> playedMoveHistory,
-        int roundCount
+        int roundCount,
+        boolean inCheck
 ) {
 
     public static GameSnapshot of(Game game) {
@@ -51,7 +55,8 @@ public record GameSnapshot(
                 game.lastRoundResult(),
                 game.legalMoves(),
                 game.playedMoveHistory(),
-                game.roundHistory().size()
+                game.roundHistory().size(),
+                game.isInCheck()
         );
     }
 }

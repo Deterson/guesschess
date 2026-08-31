@@ -44,6 +44,7 @@ const resultBgClass = computed(() => {
       Partie terminée : nulle (<router-link to="/how-to-play" class="text-black underline hover:no-underline">6 guess repetition</router-link>)
     </p>
     <p v-else-if="resultText" class="font-semibold text-black">{{ resultText }}</p>
+    <p v-else-if="myColor && !state.full" class="text-stone-400">En attente d'un adversaire pour commencer à jouer…</p>
     <p v-else-if="pendingSubmission" class="text-stone-400">En attente de l'adversaire…</p>
     <p v-else-if="myRole === 'mover'"><strong>À vous de jouer</strong></p>
     <p v-else-if="myRole === 'guesser'"><strong>À vous de deviner</strong></p>

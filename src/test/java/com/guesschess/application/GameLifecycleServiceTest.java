@@ -48,7 +48,7 @@ class GameLifecycleServiceTest {
 
     @Test
     void moveWaitsForTheGuessBeforeResolving() {
-        CreatedGame game = service.createGame();
+        CreatedGame game = createFullGame();
         MoveIntent e4 = MoveIntent.of(Position.fromAlgebraic("e2"), Position.fromAlgebraic("e4"));
 
         Optional<GameSnapshot> immediate = service.submitMove(game.whiteToken(), e4);
@@ -63,7 +63,7 @@ class GameLifecycleServiceTest {
 
     @Test
     void submitMoveByTheBlackTokenIsRejectedWhenWhiteIsToMove() {
-        CreatedGame game = service.createGame();
+        CreatedGame game = createFullGame();
         MoveIntent e4 = MoveIntent.of(Position.fromAlgebraic("e2"), Position.fromAlgebraic("e4"));
 
         assertThrows(WrongTurnException.class, () -> service.submitMove(game.blackToken(), e4));
@@ -71,7 +71,7 @@ class GameLifecycleServiceTest {
 
     @Test
     void submitGuessByTheMoverTokenIsRejected() {
-        CreatedGame game = service.createGame();
+        CreatedGame game = createFullGame();
         MoveIntent e4 = MoveIntent.of(Position.fromAlgebraic("e2"), Position.fromAlgebraic("e4"));
 
         assertThrows(WrongTurnException.class, () -> service.submitGuess(game.whiteToken(), e4));
@@ -88,7 +88,7 @@ class GameLifecycleServiceTest {
 
     @Test
     void submitMoveWithAGeometricallyImpossibleIntentIsRejected() {
-        CreatedGame game = service.createGame();
+        CreatedGame game = createFullGame();
         MoveIntent impossible = MoveIntent.of(Position.fromAlgebraic("e2"), Position.fromAlgebraic("e5"));
 
         assertThrows(NoSuchLegalMoveException.class, () -> service.submitMove(game.whiteToken(), impossible));
@@ -96,7 +96,7 @@ class GameLifecycleServiceTest {
 
     @Test
     void correctGuessCancelsTheMoveAndPassesTurnWithoutPlayingIt() {
-        CreatedGame game = service.createGame();
+        CreatedGame game = createFullGame();
         MoveIntent e4 = MoveIntent.of(Position.fromAlgebraic("e2"), Position.fromAlgebraic("e4"));
 
         service.submitGuess(game.blackToken(), e4);
@@ -119,7 +119,7 @@ class GameLifecycleServiceTest {
 
     @Test
     void viewGameWithTokenExposesMySubmissionOnlyToTheSubmittingColor() {
-        CreatedGame game = service.createGame();
+        CreatedGame game = createFullGame();
         MoveIntent e4 = MoveIntent.of(Position.fromAlgebraic("e2"), Position.fromAlgebraic("e4"));
 
         assertFalse(service.viewGame(game.gameId(), game.whiteToken()).mySubmission().submitted());
@@ -136,7 +136,7 @@ class GameLifecycleServiceTest {
 
     @Test
     void viewGameWithoutOrUnrelatedTokenNeverExposesASubmission() {
-        CreatedGame game = service.createGame();
+        CreatedGame game = createFullGame();
         MoveIntent e4 = MoveIntent.of(Position.fromAlgebraic("e2"), Position.fromAlgebraic("e4"));
         service.submitMove(game.whiteToken(), e4);
 
@@ -146,7 +146,7 @@ class GameLifecycleServiceTest {
 
     @Test
     void viewGameWithTokenExposesAnExplicitNoGuessAsSubmitted() {
-        CreatedGame game = service.createGame();
+        CreatedGame game = createFullGame();
 
         service.submitGuess(game.blackToken(), null);
 
@@ -156,49 +156,37 @@ class GameLifecycleServiceTest {
     }
 
     @Test
-    void submittingAMoveWithARequesterLinksItToTheTokenColor() {
-        CreatedGame game = service.createGame();
+    void submittingAMoveWithARequesterMatchingTheAlreadyLinkedIdentitySucceeds() {
+        PlayerRef whiteRequester = new PlayerRef.Account(UserId.random());
+        CreatedGame game = createFullGame(whiteRequester, new PlayerRef.Anonymous(AnonymousId.random()));
         MoveIntent e4 = MoveIntent.of(Position.fromAlgebraic("e2"), Position.fromAlgebraic("e4"));
-        PlayerRef requester = new PlayerRef.Account(UserId.random());
 
-        service.submitMove(game.whiteToken(), e4, requester);
-
-        GameAccess access = gameAccessRepository.findByGameId(game.gameId()).orElseThrow();
-        assertEquals(requester, access.playerOf(Color.WHITE));
-        assertNull(access.playerOf(Color.BLACK));
-    }
-
-    @Test
-    void submittingAGuessWithARequesterLinksItToTheTokenColor() {
-        CreatedGame game = service.createGame();
-        PlayerRef requester = new PlayerRef.Anonymous(AnonymousId.random());
-
-        service.submitGuess(game.blackToken(), null, requester);
+        service.submitMove(game.whiteToken(), e4, whiteRequester);
 
         GameAccess access = gameAccessRepository.findByGameId(game.gameId()).orElseThrow();
-        assertEquals(requester, access.playerOf(Color.BLACK));
+        assertEquals(whiteRequester, access.playerOf(Color.WHITE));
     }
 
     @Test
     void aColorAlreadyLinkedRejectsActionsFromADifferentRequester() {
-        CreatedGame game = service.createGame();
-        MoveIntent e4 = MoveIntent.of(Position.fromAlgebraic("e2"), Position.fromAlgebraic("e4"));
-        PlayerRef firstWhiteRequester = new PlayerRef.Anonymous(AnonymousId.random());
+        PlayerRef whiteRequester = new PlayerRef.Anonymous(AnonymousId.random());
         PlayerRef blackRequester = new PlayerRef.Account(UserId.random());
+        CreatedGame game = createFullGame(whiteRequester, blackRequester);
+        MoveIntent e4 = MoveIntent.of(Position.fromAlgebraic("e2"), Position.fromAlgebraic("e4"));
 
-        service.submitMove(game.whiteToken(), e4, firstWhiteRequester);
+        service.submitMove(game.whiteToken(), e4, whiteRequester);
         // guess null (incorrecte) : le coup est joue, le trait passe a Black.
         service.submitGuess(game.blackToken(), null, blackRequester);
 
         // Round 2 : White est maintenant le devineur (Black au trait) - meme couleur,
         // meme jeton, mais une identite differente : doit etre rejete (etape 7,
         // durcissement) plutot que silencieusement accepte sans ecraser le lien.
-        PlayerRef secondWhiteRequester = new PlayerRef.Account(UserId.random());
+        PlayerRef impostor = new PlayerRef.Account(UserId.random());
         assertThrows(NotYourColorException.class,
-                () -> service.submitGuess(game.whiteToken(), null, secondWhiteRequester));
+                () -> service.submitGuess(game.whiteToken(), null, impostor));
 
         GameAccess access = gameAccessRepository.findByGameId(game.gameId()).orElseThrow();
-        assertEquals(firstWhiteRequester, access.playerOf(Color.WHITE));
+        assertEquals(whiteRequester, access.playerOf(Color.WHITE));
     }
 
     @Test
@@ -316,6 +304,22 @@ class GameLifecycleServiceTest {
         assertEquals(new PlayerRef.Account(blackAccount), whiteSummary.opponent());
         assertEquals(GameLifecycleService.GameSummary.Outcome.LOST, whiteSummary.outcome());
         assertEquals(GameLifecycleService.GameSummary.Outcome.WON, blackSummary.outcome());
+    }
+
+    /**
+     * Partie complete (les deux couleurs liees a un joueur reel) - submitMove/
+     * submitGuess exigent desormais isFull() (voir GameLifecycleService.requireFull),
+     * donc tout test qui soumet un coup ou une devinette doit partir d'une partie
+     * ainsi creee plutot que du bare service.createGame() (qui ne lie personne).
+     */
+    private CreatedGame createFullGame(PlayerRef whiteRequester, PlayerRef blackRequester) {
+        CreatedGame game = service.createGame(GameVariant.GUESSCHESS, Color.WHITE, whiteRequester);
+        service.joinGame(game.gameId(), blackRequester);
+        return game;
+    }
+
+    private CreatedGame createFullGame() {
+        return createFullGame(new PlayerRef.Anonymous(AnonymousId.random()), new PlayerRef.Anonymous(AnonymousId.random()));
     }
 
     private void playRoundWithoutGuessing(PlayerToken moverToken, PlayerToken guesserToken, String from, String to) {

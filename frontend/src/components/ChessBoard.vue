@@ -25,6 +25,7 @@ const props = withDefaults(
     pendingMove?: { from: string; to: string } | null
     hoverGuess?: { from: string; to: string } | null
     ghostMove?: { from: string; to: string; piece: PieceCode } | null
+    checkedColor?: ColorLower | null
   }>(),
   {
     legalMoves: () => [],
@@ -34,6 +35,7 @@ const props = withDefaults(
     pendingMove: null,
     hoverGuess: null,
     ghostMove: null,
+    checkedColor: null,
   },
 )
 
@@ -145,6 +147,21 @@ function isHoverGuessSquare(square: string): boolean {
 
 function isGhostMoveSquare(square: string): boolean {
   return props.ghostMove != null && (square === props.ghostMove.from || square === props.ghostMove.to)
+}
+
+const checkedKingSquare = computed(() => {
+  if (!props.checkedColor) return null
+  const kingCode: PieceCode = props.checkedColor === 'white' ? 'wK' : 'bK'
+  for (let rank = 0; rank < 8; rank++) {
+    for (let file = 0; file < 8; file++) {
+      if (props.board[rank]?.[file] === kingCode) return algebraic(file, rank)
+    }
+  }
+  return null
+})
+
+function isCheckedKingSquare(square: string): boolean {
+  return checkedKingSquare.value === square
 }
 
 function attemptMove(from: string, to: string): boolean {
@@ -281,6 +298,11 @@ function onSquarePointerCancel(event: PointerEvent) {
         @pointerup="onSquarePointerUp"
         @pointercancel="onSquarePointerCancel"
       >
+        <span
+          v-if="isCheckedKingSquare(algebraic(file, rank))"
+          class="pointer-events-none absolute inset-0"
+          style="background: radial-gradient(circle, rgba(239, 68, 68, 0.9) 0%, rgba(239, 68, 68, 0.55) 45%, rgba(239, 68, 68, 0) 78%)"
+        />
         <img
           v-if="
             iconOf(pieceAt(file, rank)) &&

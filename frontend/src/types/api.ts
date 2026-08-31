@@ -157,6 +157,7 @@ export interface GameStateMessage {
   full: boolean
   mySubmission: MySubmissionMessage
   roundCount: number
+  inCheck: boolean
 }
 
 export interface ErrorMessage {

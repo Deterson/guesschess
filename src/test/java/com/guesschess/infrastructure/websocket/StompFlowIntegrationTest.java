@@ -70,7 +70,9 @@ class StompFlowIntegrationTest {
         assertEquals("WHITE", state.sideToMove());
         assertEquals(20, state.legalMoves().size());
         assertTrue(state.moveHistory().isEmpty());
-        assertFalse(state.full());
+        // /app/games.create lie desormais les deux couleurs a l'identite de la session
+        // appelante (voir GameController.createGame), donc la partie est deja complete.
+        assertTrue(state.full());
     }
 
     @Test
@@ -174,22 +176,31 @@ class StompFlowIntegrationTest {
         assertEquals("wP", state.board()[3][4]);
     }
 
+    /**
+     * game.create (etape 6+) lie desormais les deux couleurs a l'identite de la session
+     * appelante (voir GameController.createGame) - une session STOMP separee resout sa
+     * propre identite anonyme fraiche, donc soumettre un coup/devinette depuis une telle
+     * session echouerait avec NotYourColorException (voir GameCreationControllerIntegrationTest.
+     * historyIncludesAResolvedRoundWithItsGuessAndTheResultingBoard). Seule la session
+     * creatrice agit ici ; la session separee ne fait que s'abonner, pour verifier que la
+     * diffusion publique atteint bien une connexion qui n'a jamais rien soumis.
+     */
     @Test
-    void broadcastReachesASeparateConnectionThatOnlySubmittedTheMove() throws Exception {
+    void broadcastReachesASeparateConnectionThatOnlySubscribed() throws Exception {
         StompSession creatorSession = connect();
         CreateGameResponse game = createGame(creatorSession);
 
-        StompSession guesserSession = connect();
+        StompSession listenerSession = connect();
+        BlockingQueue<GameStateMessage> broadcasts = new LinkedBlockingQueue<>();
+        listenerSession.subscribe("/topic/games/" + game.gameId(), handlerFor(GameStateMessage.class, broadcasts));
+
         BlockingQueue<AckMessage> guessAcks = new LinkedBlockingQueue<>();
-        guesserSession.subscribe("/user/queue/guess.ack", handlerFor(AckMessage.class, guessAcks));
-        guesserSession.send("/app/games/" + game.gameId() + "/guess",
+        creatorSession.subscribe("/user/queue/guess.ack", handlerFor(AckMessage.class, guessAcks));
+        creatorSession.send("/app/games/" + game.gameId() + "/guess",
                 new SubmitGuessRequest(game.blackToken(), "e2", "e4", null));
         assertNotNull(guessAcks.poll(5, TimeUnit.SECONDS));
 
-        StompSession moverSession = connect();
-        BlockingQueue<GameStateMessage> broadcasts = new LinkedBlockingQueue<>();
-        moverSession.subscribe("/topic/games/" + game.gameId(), handlerFor(GameStateMessage.class, broadcasts));
-        moverSession.send("/app/games/" + game.gameId() + "/move",
+        creatorSession.send("/app/games/" + game.gameId() + "/move",
                 new SubmitMoveRequest(game.whiteToken(), "e2", "e4", null));
 
         GameStateMessage state = broadcasts.poll(5, TimeUnit.SECONDS);

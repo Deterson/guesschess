@@ -16,7 +16,9 @@ import java.util.List;
  * MySubmissionMessage). roundCount est le nombre de rounds deja resolus (y compris
  * les rounds annules) - permet au frontend de detecter qu'un nouveau round vient
  * d'etre resolu et de refetch l'historique detaille (GET /api/games/{id}/history)
- * sans avoir a diffuser cet historique complet sur chaque message d'etat.
+ * sans avoir a diffuser cet historique complet sur chaque message d'etat. inCheck
+ * indique si sideToMove est actuellement en echec, pour surligner son roi cote
+ * frontend (toujours false une fois la partie terminee).
  */
 public record GameStateMessage(
         String gameId,
@@ -30,6 +32,7 @@ public record GameStateMessage(
         List<MoveHistoryEntry> moveHistory,
         boolean full,
         MySubmissionMessage mySubmission,
-        int roundCount
+        int roundCount,
+        boolean inCheck
 ) {
 }

@@ -52,7 +52,8 @@ public class GameMessageMapper {
                 toMoveHistoryEntries(snapshot.playedMoveHistory()),
                 full,
                 toMySubmissionMessage(mySubmission),
-                snapshot.roundCount()
+                snapshot.roundCount(),
+                snapshot.inCheck()
         );
     }
 

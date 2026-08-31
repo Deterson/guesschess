@@ -2,6 +2,7 @@ package com.guesschess.infrastructure.websocket;
 
 import com.guesschess.application.CreatedGame;
 import com.guesschess.application.GameLifecycleService;
+import com.guesschess.application.GameNotFullException;
 import com.guesschess.application.GameSnapshot;
 import com.guesschess.application.GameView;
 import com.guesschess.application.MoveIntent;
@@ -63,13 +64,29 @@ public class GameController {
         this.messagingTemplate = messagingTemplate;
     }
 
+    /**
+     * request (et son eventuel identifiant de variante) reste le seul parametre metier ;
+     * simpSessionAttributes sert uniquement a lier les deux couleurs a l'identite de
+     * CETTE connexion (compte ou anonyme) des la creation. Necessaire depuis que
+     * submitMove/submitGuess exigent une partie complete (GameLifecycleService.
+     * requireFull) : ce endpoint reste un raccourci de "partie contre soi-meme" reserve
+     * aux tests d'integration (le frontend reel cree via POST /api/games, qui ne lie
+     * que le createur, puis attend un /join distinct - voir GameCreationController).
+     */
     @MessageMapping("/games.create")
     @SendToUser("/queue/games.created")
-    public CreateGameResponse createGame(@Payload(required = false) CreateGameRequest request) {
+    public CreateGameResponse createGame(@Payload(required = false) CreateGameRequest request,
+                                          @Header(value = "simpSessionAttributes", required = false) Map<String, Object> sessionAttributes) {
         GameVariant variant = request == null || request.variant() == null
                 ? GameVariant.GUESSCHESS
                 : GameVariant.valueOf(request.variant());
-        CreatedGame created = gameLifecycleService.createGame(variant);
+        PlayerRef requester = WebSocketPlayerIdentity.resolve(sessionAttributes);
+        CreatedGame created = requester == null
+                ? gameLifecycleService.createGame(variant)
+                : gameLifecycleService.createGame(variant, Color.WHITE, requester);
+        if (requester != null) {
+            gameLifecycleService.joinGame(created.gameId(), requester);
+        }
         return new CreateGameResponse(
                 created.gameId().toString(),
                 created.whiteToken().toString(),
@@ -152,6 +169,7 @@ public class GameController {
             WrongTurnException.class,
             NotYourColorException.class,
             NoOpenColorException.class,
+            GameNotFullException.class,
             NoSuchLegalMoveException.class,
             GameNotFoundException.class,
             IllegalArgumentException.class,

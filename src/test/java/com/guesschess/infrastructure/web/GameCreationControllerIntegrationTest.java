@@ -213,14 +213,16 @@ class GameCreationControllerIntegrationTest {
 
     /**
      * Cree la partie via STOMP /app/games.create (comme StompFlowIntegrationTest),
-     * pas via POST /api/games : la creation REST lie immediatement chaque couleur a
+     * pas via POST /api/games : la creation REST lie immediatement le createur a
      * l'identite (anonyme ou compte) resolue depuis CETTE requete HTTP precise (etape 7),
      * alors qu'une session STOMP de test independante (sans cookie partage) resout sa
      * propre identite anonyme fraiche - agir sur une partie creee en REST depuis une
-     * session STOMP separee echoue donc avec NotYourColorException. La creation via
-     * /app/games.create ne lie personne a la creation ; le lien ne se pose qu'au premier
-     * coup/devinette soumis par couleur (etape 6), ce qui correspond exactement a cette
-     * meme session STOMP - aucun conflit d'identite.
+     * session STOMP separee echouerait donc avec NotYourColorException. /app/games.create
+     * lie au contraire les DEUX couleurs a l'identite de la session appelante des la
+     * creation (voir GameController.createGame) - necessaire depuis que submitMove/
+     * submitGuess exigent une partie complete (GameLifecycleService.requireFull) - ce qui
+     * correspond exactement a cette meme session STOMP tout du long : aucun conflit
+     * d'identite.
      */
     @Test
     void historyIncludesAResolvedRoundWithItsGuessAndTheResultingBoard() throws Exception {

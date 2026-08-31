@@ -81,6 +81,7 @@ public class GameLifecycleService {
      */
     public Optional<GameSnapshot> submitMove(PlayerToken token, MoveIntent intent, PlayerRef requester) {
         GameAccess access = requireAccess(token);
+        requireFull(access);
         Color color = access.colorOf(token);
         return gameRepository.withGame(access.gameId(), game -> {
             requireColor(access, token, game.sideToMove());
@@ -107,6 +108,7 @@ public class GameLifecycleService {
      */
     public Optional<GameSnapshot> submitGuess(PlayerToken token, MoveIntent intent, PlayerRef requester) {
         GameAccess access = requireAccess(token);
+        requireFull(access);
         Color color = access.colorOf(token);
         return gameRepository.withGame(access.gameId(), game -> {
             requireColor(access, token, game.sideToMove().opposite());
@@ -289,6 +291,17 @@ public class GameLifecycleService {
     private GameAccess requireAccess(PlayerToken token) {
         return gameAccessRepository.findByToken(token)
                 .orElseThrow(() -> new UnknownPlayerTokenException(token));
+    }
+
+    /**
+     * Rejette toute soumission (coup ou devinette) tant que les deux couleurs ne sont
+     * pas liees a un joueur reel - empeche le createur de jouer contre lui-meme (ou de
+     * deviner son propre coup) avant qu'un adversaire n'ait rejoint la partie.
+     */
+    private void requireFull(GameAccess access) {
+        if (!access.isFull()) {
+            throw new GameNotFullException(access.gameId());
+        }
     }
 
     private void requireColor(GameAccess access, PlayerToken token, Color expected) {

@@ -12,7 +12,7 @@ import MoveHistoryList from '../components/MoveHistoryList.vue'
 import ChatPanel from '../components/ChatPanel.vue'
 import InviteBanner from '../components/InviteBanner.vue'
 import AuthModal from '../components/AuthModal.vue'
-import type { Board, PromotionPieceType, RoundSummaryMessage } from '../types/api'
+import type { Board, ColorLower, PromotionPieceType, RoundSummaryMessage } from '../types/api'
 
 const props = defineProps<{
   gameId: string
@@ -167,6 +167,12 @@ const hoverGuessBoard = computed<Board | null>(() => {
   return applyMoveToBoard(base, round.guessedFrom, round.guessedTo)
 })
 
+/** Roi en echec : uniquement en direct sur le plateau reel (jamais en navigation historique ni pendant l'apercu au survol d'une devinette). */
+const checkedColor = computed<ColorLower | null>(() => {
+  if (historyIndex.value !== null || hoveredGuess.value || !state.value?.inCheck) return null
+  return state.value.sideToMove.toLowerCase() as ColorLower
+})
+
 const myRole = computed(() => {
   if (!state.value || !myColor.value) return null
   return state.value.sideToMove === myColor.value.toUpperCase() ? 'mover' : 'guesser'
@@ -176,6 +182,7 @@ const boardDisabled = computed(
   () =>
     !state.value ||
     state.value.status === 'FINISHED' ||
+    !state.value.full ||
     pendingSubmission.value ||
     !canAct.value ||
     historyIndex.value !== null,
@@ -375,6 +382,7 @@ function submitNoGuess() {
             :pending-move="pendingMove"
             :hover-guess="hoverGuessSquares"
             :ghost-move="displayGhost"
+            :checked-color="checkedColor"
             @choose-move="onChooseMove"
           />
 
