@@ -2,20 +2,15 @@ ne rien implémenter dans ce TODO à moins que cela ait été explicitement dema
 
 
 --- règles générales
-- garder la possibilité d'en passant si c'est le dernier coup effectif (mon pion avance de 2 et peut être pris en passant,
-    je guess le coup de mon adversaire, il guess mon coup, le plateau est dans le même état qu'avant et mon pion devrait toujours être pris en passant, mais ce n'est pas le cas)
+- garder la possibilité d'en passant si c'est le dernier coup effectif (mon pion avance de 2 et peut être pris en passant, je guess le coup de mon adversaire, il guess mon coup, le plateau est dans le même état qu'avant et mon pion devrait toujours être pris en passant, mais ce n'est pas le cas)
 
 --- FRONT
-- le tout premier clic sur une pièce ne marche pas
-- pour désélectionner la pièce, j'aimerais que ce soit possible de cliquer hors du board. Cliquer hors du board ne désélectionne pas la pièce pour l'instant
-- lorsqu'on surligne le "coup deviné" dans le front, on voit les cases entourées mais aucune pièce n'apparaît, il faudrait avoir exactement l'état du plateau si ce coup avait été joué
+- enlever toute la verbosité typique d'IA ("vous regardez cette partie en mode spectateur : elle est déjà complète" ou "quelqu'un d'autre s'est connecté avec le lien" on s'en fout, "Mode spectateur" c'est très bien)
+- traduction intégrale en anglais (avec un switch pour le français)
 - lorsqu'un joueur crée une partie et joue un coup, si quelqu'un rejoint la partie, le coup est réinitialisé. il faudrait faire en sorte qu'il n'ait pas à le rejouer
 - une page de règles (6 guess repetition, guessmate)
-- afficher dans l'historique les coups devinés. Changer l'historique parce qu'il est moche
 - enlever le bouton "ne pas deviner" (sera sûrement fait pendant l'étape du timer)
-- traduction intégrale en anglais (plus tard un switch pour le français)
 - rajouter du son
-- avoir un vrai historique cliquable à côté du jeu, qui ramène à la position cliquée.
 - un favicon et un logo stylé
 
 étapes optionnelles:

@@ -24,7 +24,7 @@ const props = withDefaults(
     lastRound?: RoundSummaryMessage | null
     pendingMove?: { from: string; to: string } | null
     hoverGuess?: { from: string; to: string } | null
-    ghostMove?: { from: string; to: string } | null
+    ghostMove?: { from: string; to: string; piece: PieceCode } | null
   }>(),
   {
     legalMoves: () => [],
@@ -69,6 +69,13 @@ interface DragState {
 const dragState = ref<DragState | null>(null)
 let suppressNextClick = false
 
+/** Clic en dehors du plateau (n'importe où ailleurs sur la page) : désélectionne la pièce en cours. */
+function onDocumentClick(event: MouseEvent) {
+  if (selectedFrom.value && boardRef.value && !boardRef.value.contains(event.target as Node)) {
+    selectedFrom.value = null
+  }
+}
+
 onMounted(() => {
   if (boardRef.value) {
     resizeObserver = new ResizeObserver(() => {
@@ -77,10 +84,12 @@ onMounted(() => {
     resizeObserver.observe(boardRef.value)
     squareSize.value = boardRef.value.clientWidth / 8
   }
+  document.addEventListener('click', onDocumentClick)
 })
 
 onBeforeUnmount(() => {
   resizeObserver?.disconnect()
+  document.removeEventListener('click', onDocumentClick)
 })
 
 const displayRanks = computed(() => (props.orientation === 'white' ? [7, 6, 5, 4, 3, 2, 1, 0] : [0, 1, 2, 3, 4, 5, 6, 7]))
@@ -206,11 +215,29 @@ function onSquarePointerUp(event: PointerEvent) {
   if (!drag || event.pointerId !== drag.pointerId) return
 
   if (drag.dragging) {
+    // Le navigateur ne fait pas toujours suivre un pointerup "glissé" d'un évènement
+    // click (comportement standard dès qu'il y a eu un déplacement notable) - si aucun
+    // click ne survient jamais, ce flag resterait bloqué à true et supprimerait
+    // silencieusement le prochain clic sans rapport. Il s'auto-réinitialise donc peu
+    // après (au tour de boucle suivant) plutôt que de dépendre d'un click qui peut ne
+    // jamais arriver pour le remettre à false.
     suppressNextClick = true
+    setTimeout(() => {
+      suppressNextClick = false
+    }, 0)
     const targetEl = document.elementFromPoint(event.clientX, event.clientY)
     const targetSquare = targetEl?.closest<HTMLElement>('[data-square]')?.dataset.square ?? null
-    if (targetSquare) attemptMove(drag.from, targetSquare)
-    selectedFrom.value = null
+    // Un léger tremblement de la main entre pointerdown et pointerup (courant sur un
+    // premier clic, la souris arrivant tout juste sur la case) suffit à dépasser
+    // DRAG_THRESHOLD_PX et bascule dragging à true - mais si le relâchement a lieu sur
+    // la case de départ elle-même, ce n'est pas un vrai glisser-déposer : la pièce doit
+    // rester sélectionnée (déjà fait par onSquarePointerMove) plutôt que d'être
+    // désélectionnée puis le clic suivant supprimé, ce qui rendait ce premier clic
+    // muet en pratique.
+    if (targetSquare && targetSquare !== drag.from) {
+      attemptMove(drag.from, targetSquare)
+      selectedFrom.value = null
+    }
   }
 
   dragState.value = null
@@ -260,8 +287,6 @@ function onSquarePointerCancel(event: PointerEvent) {
             !(dragState?.dragging && dragState.from === algebraic(file, rank)) &&
             pendingMove?.from !== algebraic(file, rank) &&
             pendingMove?.to !== algebraic(file, rank) &&
-            hoverGuess?.from !== algebraic(file, rank) &&
-            hoverGuess?.to !== algebraic(file, rank) &&
             ghostMove?.from !== algebraic(file, rank) &&
             ghostMove?.to !== algebraic(file, rank)
           "
@@ -278,15 +303,8 @@ function onSquarePointerCancel(event: PointerEvent) {
           alt=""
         />
         <img
-          v-if="hoverGuess?.to === algebraic(file, rank) && iconOf(pieceAtSquare(hoverGuess.from))"
-          :src="iconOf(pieceAtSquare(hoverGuess.from))!"
-          class="h-[80%] w-[80%] drop-shadow"
-          draggable="false"
-          alt=""
-        />
-        <img
-          v-if="ghostMove?.to === algebraic(file, rank) && iconOf(pieceAtSquare(ghostMove.from))"
-          :src="iconOf(pieceAtSquare(ghostMove.from))!"
+          v-if="ghostMove?.to === algebraic(file, rank)"
+          :src="iconOf(ghostMove.piece)!"
           class="h-[80%] w-[80%] opacity-40 grayscale"
           draggable="false"
           alt=""

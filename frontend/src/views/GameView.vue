@@ -126,6 +126,47 @@ const hoverGuessSquares = computed(() => {
   return { from: round.guessedFrom, to: round.guessedTo }
 })
 
+const FILES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
+
+function squareToIndices(square: string): [number, number] {
+  return [FILES.indexOf(square[0]), Number(square.slice(1)) - 1]
+}
+
+function applyMoveToBoard(board: Board, from: string, to: string): Board {
+  const [fFile, fRank] = squareToIndices(from)
+  const [tFile, tRank] = squareToIndices(to)
+  const piece = board[fRank]?.[fFile] ?? null
+  const next = board.map((row) => row.slice())
+  next[fRank][fFile] = null
+  next[tRank][tFile] = piece
+  return next
+}
+
+/** Dernier round de l'historique detaille (etape 11) - seul a porter un snapshot de plateau (RoundSummaryMessage n'en a pas). */
+const lastHistoryRound = computed(() => historyRounds.value[historyRounds.value.length - 1] ?? null)
+
+/** Plateau juste avant le dernier coup reel joue (round precedent resolu, ou position de depart s'il n'y en a qu'un). */
+const boardBeforeLastRound = computed<Board | null>(() => {
+  const n = historyRounds.value.length
+  if (n === 0) return null
+  if (n === 1) return historyInitialBoard.value
+  return historyRounds.value[n - 2]?.boardAfter ?? null
+})
+
+/**
+ * Au survol de RoundResultBanner : montre le plateau comme si le dernier coup reel
+ * n'avait pas ete joue et que la devinette avait ete jouee a sa place, plutot que de
+ * superposer un ghost sur le coup reel toujours affiche (source de confusion : les
+ * deux coups semblaient joues en meme temps).
+ */
+const hoverGuessBoard = computed<Board | null>(() => {
+  if (!hoveredGuess.value) return null
+  const round = lastHistoryRound.value
+  const base = boardBeforeLastRound.value
+  if (!round?.guessedFrom || !round.guessedTo || !base) return null
+  return applyMoveToBoard(base, round.guessedFrom, round.guessedTo)
+})
+
 const myRole = computed(() => {
   if (!state.value || !myColor.value) return null
   return state.value.sideToMove === myColor.value.toUpperCase() ? 'mover' : 'guesser'
@@ -159,11 +200,31 @@ const displayBoard = computed<Board | null>(() => {
   return viewedRound.value?.boardAfter ?? state.value?.board ?? null
 })
 
-/** Coup deviné du round consulté en navigation historique - null en direct (voir hoverGuessSquares pour le survol souris). */
+/** Plateau juste avant le round consulté (pour retrouver la piece devinee - voir displayGhost). */
+const boardBeforeViewedRound = computed<Board | null>(() => {
+  const index = historyIndex.value
+  if (index === null || index < 0) return null
+  return index === 0 ? historyInitialBoard.value : (historyRounds.value[index - 1]?.boardAfter ?? null)
+})
+
+function pieceAtSquareOf(board: Board, square: string) {
+  const [file, rank] = squareToIndices(square)
+  return board[rank]?.[file] ?? null
+}
+
+/**
+ * Coup deviné du round consulté en navigation historique - null en direct (voir
+ * hoverGuessSquares pour le survol souris). La piece est resolue sur le plateau
+ * D'AVANT le round (pas boardAfter, qui reflete le coup REEL deja joue et peut donc
+ * avoir deplace cette meme piece ailleurs si guessedFrom === actualFrom).
+ */
 const displayGhost = computed(() => {
   const round = viewedRound.value
   if (!round?.guessedFrom || !round.guessedTo) return null
-  return { from: round.guessedFrom, to: round.guessedTo }
+  const base = boardBeforeViewedRound.value
+  const piece = base ? pieceAtSquareOf(base, round.guessedFrom) : null
+  if (!piece) return null
+  return { from: round.guessedFrom, to: round.guessedTo, piece }
 })
 
 /** Réutilise le surlignage sky/rouge déjà géré par ChessBoard pour le round consulté en navigation. */
@@ -242,7 +303,7 @@ function submitNoGuess() {
       <router-link to="/" class="text-emerald-500 hover:text-emerald-400">Retour à l'accueil</router-link>
     </div>
 
-    <div v-else-if="!state" class="text-stone-400">Connexion à la partie…</div>
+    <div v-else-if="!state" class="text-stone-400">Connexion…</div>
 
     <template v-else>
       <div class="grid w-full grid-cols-1 items-start gap-6 @min-[67rem]:grid-cols-[minmax(0,1fr)_36rem_minmax(0,1fr)]">
@@ -306,7 +367,7 @@ function submitNoGuess() {
 
         <div class="order-2 mx-auto flex w-full max-w-xl flex-col items-center gap-4 @min-[67rem]:order-none @min-[67rem]:col-start-2 @min-[67rem]:mx-0 @min-[67rem]:max-w-none">
           <ChessBoard
-            :board="displayBoard ?? state.board"
+            :board="hoverGuessBoard ?? displayBoard ?? state.board"
             :legal-moves="state.legalMoves"
             :orientation="myColor ?? 'white'"
             :disabled="boardDisabled"
