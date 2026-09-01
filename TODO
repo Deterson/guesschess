@@ -10,6 +10,7 @@ ne rien implémenter dans ce TODO à moins que cela ait été explicitement dema
 - il reste du français hardcodé dans le back "Joueur anonyme" par exemple) trouver un moyen pour "joueur anonyme" de l'écrire d'une certaine manière pour que le front puisse le détecter et le traduire
 
 --- FRONT
+- proposer de changer de style (change la couleur des cases, et adapte les couleurs du code couleur des coups joués / devinés sur les parties ET dans le tutoriel)
 - proposer la nulle
 - enlever toute la verbosité typique d'IA ("vous regardez cette partie en mode spectateur : elle est déjà complète" ou "quelqu'un d'autre s'est connecté avec le lien" on s'en fout, enlever cette infobulle parce que c'est écrit en dessous "Vous observez cette partie")
 - une page de règles (6 guess repetition, guessmate) (sera sûrement fais dans le tutoriel)

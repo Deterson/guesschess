@@ -23,10 +23,17 @@ const TRAIT_LABELS = computed<Record<Color, string>>(() => ({ WHITE: t('gameStat
 const WIN_LABELS = computed<Record<Color, string>>(() => ({ WHITE: t('gameStatusBar.winnerWhite'), BLACK: t('gameStatusBar.winnerBlack') }))
 
 const isGuessRepetitionDraw = computed(() => props.state.result != null && props.state.result.cause === 'DRAW_THREE_GUESS_REPETITION')
+const isGuessmate = computed(() => props.state.result != null && props.state.result.cause === 'CHECK_PARRY_GUESSED')
+
+const guessmateWinnerLabel = computed(() => {
+  const result = props.state.result
+  if (!result || !result.winner) return null
+  return WIN_LABELS.value[result.winner]
+})
 
 const resultText = computed(() => {
   const result = props.state.result
-  if (!result || isGuessRepetitionDraw.value) return null
+  if (!result || isGuessRepetitionDraw.value || isGuessmate.value) return null
   if (!result.winner) return t('gameStatusBar.resultDraw')
   return t('gameStatusBar.resultWin', { winner: WIN_LABELS.value[result.winner] })
 })
@@ -41,12 +48,18 @@ const resultBgClass = computed(() => {
 </script>
 
 <template>
-  <div class="mb-4 flex flex-col gap-1 rounded-lg px-4 py-3 text-sm" :class="resultBgClass ?? 'bg-stone-800'">
+  <div class="mb-4 flex flex-col items-center gap-1 rounded-lg px-4 py-3 text-center text-sm" :class="resultBgClass ?? 'bg-stone-800'">
     <p v-if="!myColor" class="text-stone-400">{{ t('gameStatusBar.spectating') }}</p>
     <i18n-t v-if="isGuessRepetitionDraw" keypath="gameStatusBar.resultDrawGuessRepetition" tag="p" class="font-semibold text-black">
       <template #link>
-        <router-link to="/how-to-play" class="text-black underline hover:no-underline">{{ t('gameStatusBar.guessRepetitionLinkText') }}</router-link>
+        <router-link to="/how-to-play#six-guess-repetition" class="text-black underline hover:no-underline">{{ t('gameStatusBar.guessRepetitionLinkText') }}</router-link>
       </template>
+    </i18n-t>
+    <i18n-t v-else-if="isGuessmate" keypath="gameStatusBar.resultWinGuessmate" tag="p" class="font-semibold text-black">
+      <template #link>
+        <router-link to="/how-to-play#guessmate" class="text-black underline hover:no-underline">{{ t('gameStatusBar.guessmateLinkText') }}</router-link>
+      </template>
+      <template #winner>{{ guessmateWinnerLabel }}</template>
     </i18n-t>
     <p v-else-if="resultText" class="font-semibold text-black">{{ resultText }}</p>
     <p v-else-if="myColor && !state.full" class="text-stone-400">{{ t('gameStatusBar.waitingOpponentToStart') }}</p>

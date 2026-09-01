@@ -36,6 +36,8 @@
     "resultWin": "Game over: {winner} win",
     "resultDrawGuessRepetition": "Game over: draw ({link})",
     "guessRepetitionLinkText": "6 guess repetition",
+    "resultWinGuessmate": "{link}: {winner} win",
+    "guessmateLinkText": "Guessmate",
     "waitingOpponentToStart": "Waiting for an opponent to start playing…",
     "waitingOpponentSubmission": "Waiting for your opponent…",
     "yourTurnToPlay": "Your turn to play",
@@ -101,7 +103,23 @@
     "guessmateSuffix": " (Guessmate)"
   },
   "howToPlay": {
-    "placeholder": "Tutorial coming soon"
+    "pggnTitle": "PGGN notation",
+    "pggnText": "The game record uses PGGN (Portable Game Guess Notation), which extends classic PGN by adding the guess in parentheses right after the real move, e.g. e4(e3). If the guess was correct, only the guessed move appears, e.g. (Nf3). With no guess, the parentheses are simply omitted.",
+    "title": "How to play",
+    "intro": "On every move, both players think at the same time, without seeing each other's choice: whoever is to move picks their move, while their opponent tries to guess the move they'll play. Once both choices are made, they're revealed and compared.",
+    "legendTitle": "Board legend",
+    "legendGuess": "violet-circle squares: the guessed move",
+    "legendPlayed": "Blue squares: the played move",
+    "legendCancelled": "Red squares: correct guess, the move is cancelled",
+    "example1Title": "Incorrect guess",
+    "example1Text": "White played Nf3, while Black guessed e4. The guess is wrong: White's move is played normally, the game continues. It's now Black's turn to move.",
+    "example2Title": "Correct guess",
+    "example2Text": "White played e4, and Black guessed e4. The guess is right: the move is cancelled and it's Black's turn to move.",
+    "example3Title": "Guessmate",
+    "example3Text": "If the player to move is in check and their opponent correctly guesses their move, the move is cancelled and the king is mated. This case is called \"Guessmate\".",
+    "example3Caption": "Here, White is in check and tries to flee with Kf2; Black guesses Kf2: the king is guessmated, the game is over.",
+    "guessRepetitionTitle": "6 guess repetition",
+    "guessRepetitionText": "If the same attempted move is correctly guessed by the opponent three times in a row for each side, with no move actually being played in between, the game is declared a draw. This rule prevents a possible deadlock."
   },
   "oauthCallback": {
     "connecting": "Signing in…"

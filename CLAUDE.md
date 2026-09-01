@@ -227,19 +227,15 @@ Jeu d'échecs classique avec une règle additionnelle :
     propre contrôle de temps (ex. temps par coup en jours, façon correspondance) ; hors
     périmètre de cette étape.
 
-13. Tutoriel des règles : lien depuis le header global (posé à l'étape 8, qui crée déjà la
-    route `/how-to-play` avec un contenu vide "tutoriel en création") vers une page dédiée,
-    route publique côté front, aucune auth requise — au même titre que la lecture d'une
-    partie en spectateur — qui explique le concept du jeu en texte, illustré
-    par des échiquiers représentant des positions d'exemple (coup réel vs devinette révélés
-    côte à côte, cas devinette correcte → coup annulé et tour qui passe au devineur, cas
-    devinette incorrecte → coup joué normalement, cas particulier Guessmate → roi capturé).
-    Plutôt que des images statiques à maintenir séparément, réutiliser le composant
-    d'échiquier déjà existant (étape 5) en mode non-interactif/lecture seule, alimenté par
-    des positions figées codées en dur pour chaque exemple — reste cohérent visuellement
-    avec le vrai plateau (mêmes assets de pièces, même thème) et évite un jeu d'images à
-    régénérer si le thème du plateau change. Contenu purement statique, pas de backend
-    impliqué.
+13. ✅ Tutoriel des règles (fait) : `HowToPlayView.vue` (route publique existante
+    `/how-to-play`), contenu FR/EN statique, aucun backend impliqué. Réutilise `ChessBoard.vue`
+    en `disabled` avec des positions codées en dur (helper `withChanges` sur un plateau de
+    départ) plutôt que des images séparées. Trois exemples, surbrillance réutilisant les props
+    existantes de `ChessBoard` (`hoverGuess` violet = coup deviné, `lastRound` bleu/rouge =
+    coup joué / devinette correcte annulée) : devinette incorrecte, devinette correcte,
+    Guessmate (roi capturé, plateau minimal sans pièces superflues). Rédigé en présentant
+    Guessmate comme la seule variante (pas de mention du choix GUESSCHESS/GUESSMATE de la
+    page d'accueil).
 
 14. Identifiant unique de compte (login) : à choisir une seule fois, à la toute première
     connexion Google ou GitHub (écran dédié avant d'entrer dans l'app, une seule fois par

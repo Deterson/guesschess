@@ -354,8 +354,6 @@ function submitNoGuess() {
               {{ t('game.connectionLostReconnecting') }}
             </div>
 
-            <GameStatusBar :state="state" :my-color="myColor" :my-role="myRole" :pending-submission="pendingSubmission" />
-
             <RoundResultBanner
               v-if="state.lastRound"
               :round="state.lastRound"
@@ -387,6 +385,8 @@ function submitNoGuess() {
             :checked-color="checkedColor"
             @choose-move="onChooseMove"
           />
+
+          <GameStatusBar class="w-full" :state="state" :my-color="myColor" :my-role="myRole" :pending-submission="pendingSubmission" />
 
           <button
             v-if="myRole === 'guesser' && !boardDisabled"

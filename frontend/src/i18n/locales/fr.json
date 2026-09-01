@@ -36,6 +36,8 @@
     "resultWin": "Partie terminée : victoire {winner}",
     "resultDrawGuessRepetition": "Partie terminée : nulle ({link})",
     "guessRepetitionLinkText": "6 guess repetition",
+    "resultWinGuessmate": "{link} : victoire {winner}",
+    "guessmateLinkText": "Guessmate",
     "waitingOpponentToStart": "En attente d'un adversaire pour commencer à jouer…",
     "waitingOpponentSubmission": "En attente de l'adversaire…",
     "yourTurnToPlay": "À vous de jouer",
@@ -101,7 +103,23 @@
     "guessmateSuffix": " (Guessmate)"
   },
   "howToPlay": {
-    "placeholder": "Tutoriel en création"
+    "pggnTitle": "Notation PGGN",
+    "pggnText": "Le déroulé de la partie se note en PGGN (Portable Game Guess Notation), qui reprend le PGN classique en ajoutant la devinette entre parenthèses juste après le coup réel, ex. e4(e3). Si la devinette était correcte, seul le coup deviné apparaît, entre parenthèses, ex. (Nf3). Sans devinette, les parenthèses sont simplement omises.",
+    "title": "Comment jouer",
+    "intro": "À chaque coup, les deux joueurs réfléchissent en même temps, sans voir le choix de l'autre : celui dont c'est le tour choisit son coup, pendant que son adversaire essaie de deviner lequel il va jouer. Une fois les deux choix faits, ils sont révélés et comparés.",
+    "legendTitle": "Légende des plateaux",
+    "legendGuess": "Ronds violets : coup deviné",
+    "legendPlayed": "Cases bleues : coup réellement joué",
+    "legendCancelled": "Cases rouges : devinette correcte, le coup est annulé",
+    "example1Title": "Devinette incorrecte",
+    "example1Text": "Les blancs jouent  Cf3,  les noirs devinent e4. La devinette est fausse : le coup des blancs est joué normalement, c'est aux noirs de jouer.",
+    "example2Title": "Devinette correcte",
+    "example2Text": "Les blancs jouent e4, et les noirs devinent e4. La devinette est juste : le coup est annulé, c'est aux noirs de jouer.",
+    "example3Title": "Guessmate : fin de partie immédiate",
+    "example3Text": "Si le joueur au trait est en échec et que son adversaire devine correctement son coup, le roi passe en Guessmate, et la partie se termine immédiatement.",
+    "example3Caption": "Ici, les blancs en échec tentent de fuir en Rf2 ; les noirs devinent Rf2 : le roi reste en échec et meurt au prochain tour.",
+    "guessRepetitionTitle": "6 guess repetition",
+    "guessRepetitionText": "Si un même coup tenté par chaque camp est deviné correctement trois fois de suite par l'adversaire — sans qu'aucun coup ne soit réellement joué entre-temps — la partie est déclarée nulle. Cette règle évite qu'une paire de coups s'annule indéfiniment sans faire avancer la partie."
   },
   "oauthCallback": {
     "connecting": "Connexion en cours…"

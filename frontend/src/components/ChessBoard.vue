@@ -271,7 +271,7 @@ function onSquarePointerCancel(event: PointerEvent) {
 <template>
   <div
     ref="boardRef"
-    class="relative grid aspect-square w-full max-w-xl touch-none grid-cols-8 grid-rows-8 overflow-hidden rounded-lg border-2 border-stone-700 select-none"
+    class="chess-board relative grid aspect-square w-full max-w-xl touch-none grid-cols-8 grid-rows-8 overflow-hidden rounded-lg border-2 border-stone-700 select-none"
   >
     <template v-for="rank in displayRanks" :key="`rank-${rank}`">
       <button
@@ -280,7 +280,7 @@ function onSquarePointerCancel(event: PointerEvent) {
         type="button"
         class="relative flex aspect-square items-center justify-center"
         :class="[
-          (file + rank) % 2 === 0 ? 'bg-amber-800' : 'bg-amber-100',
+          (file + rank) % 2 === 0 ? 'bg-[var(--square-dark)]' : 'bg-[var(--square-light)]',
           selectedFrom === algebraic(file, rank) ? 'ring-4 ring-emerald-400 ring-inset' : '',
           isGuessedLastRoundSquare(algebraic(file, rank))
             ? 'bg-red-500/50'
@@ -289,7 +289,7 @@ function onSquarePointerCancel(event: PointerEvent) {
               : '',
           isPendingSquare(algebraic(file, rank)) ? 'bg-sky-500/25' : '',
           isHoverGuessSquare(algebraic(file, rank)) || isGhostMoveSquare(algebraic(file, rank))
-            ? 'ring-4 ring-violet-400 ring-inset'
+            ? 'ring-4 ring-violet-800 ring-inset'
             : '',
           disabled ? 'cursor-default' : 'cursor-pointer',
         ]"
@@ -361,3 +361,10 @@ function onSquarePointerCancel(event: PointerEvent) {
     />
   </div>
 </template>
+
+<style scoped>
+.chess-board {
+  --square-dark: #6daec3;
+  --square-light: #fef3c7;
+}
+</style>
