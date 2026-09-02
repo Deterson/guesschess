@@ -26,10 +26,16 @@ function logout() {
 
 <template>
   <header class="flex items-center justify-between gap-4 border-b border-stone-800 px-4 py-3">
-    <nav class="flex items-center gap-4 text-sm font-semibold text-stone-300">
-      <router-link to="/" class="hover:text-white">{{ t('header.play') }}</router-link>
-      <router-link to="/how-to-play" class="hover:text-white">{{ t('header.tutorial') }}</router-link>
-    </nav>
+    <div class="flex items-center gap-6">
+      <router-link to="/" class="flex items-center">
+        <img src="/guesschess-minimal.png" alt="Guesschess" class="h-8 w-8" />
+      </router-link>
+
+      <nav class="flex items-center gap-4 text-sm font-semibold text-stone-300">
+        <router-link to="/" class="hover:text-white">{{ t('header.play') }}</router-link>
+        <router-link to="/how-to-play" class="hover:text-white">{{ t('header.tutorial') }}</router-link>
+      </nav>
+    </div>
 
     <div class="flex items-center gap-4">
       <template v-if="authStore.isLoggedIn">
