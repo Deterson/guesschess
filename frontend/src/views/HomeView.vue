@@ -6,6 +6,8 @@ import { createGame } from '../services/api'
 import { useGameStore } from '../stores/game'
 import { useAuthStore } from '../stores/auth'
 import AuthModal from '../components/AuthModal.vue'
+import CreateGameModal from '../components/CreateGameModal.vue'
+import LoginModal from '../components/LoginModal.vue'
 import type { Color } from '../types/api'
 
 const router = useRouter()
@@ -13,22 +15,31 @@ const gameStore = useGameStore()
 const authStore = useAuthStore()
 const { t } = useI18n()
 const creating = ref(false)
-const showModal = ref(false)
+const showCreateModal = ref(false)
+const showAuthModal = ref(false)
+const showLoginModal = ref(false)
 const error = ref<string | null>(null)
 const noGuessmate = ref(false)
 const color = ref<Color | 'RANDOM'>('RANDOM')
 
-function openModal() {
+function openCreateModal() {
   error.value = null
+  showCreateModal.value = true
+}
+
+function onCreateModalConfirm(choice: { color: Color | 'RANDOM'; noGuessmate: boolean }) {
+  showCreateModal.value = false
+  color.value = choice.color
+  noGuessmate.value = choice.noGuessmate
   if (authStore.isLoggedIn) {
     create(authStore.token)
   } else {
-    showModal.value = true
+    showAuthModal.value = true
   }
 }
 
 async function create(authToken: string | null) {
-  showModal.value = false
+  showAuthModal.value = false
   creating.value = true
   error.value = null
   try {
@@ -54,6 +65,14 @@ async function create(authToken: string | null) {
 function continueAnonymously() {
   create(null)
 }
+
+function openMyGames() {
+  if (authStore.isLoggedIn) {
+    router.push('/profile')
+  } else {
+    showLoginModal.value = true
+  }
+}
 </script>
 
 <template>
@@ -63,51 +82,36 @@ function continueAnonymously() {
       {{ t('home.tagline') }}
     </p>
 
-    <fieldset class="w-full rounded-lg bg-stone-800 px-4 py-3 text-left">
-      <legend class="px-1 text-sm font-semibold">{{ t('home.colorLegend') }}</legend>
-      <div class="flex gap-4 text-sm text-stone-300">
-        <label class="flex items-center gap-2">
-          <input type="radio" v-model="color" value="WHITE" class="accent-emerald-600" />
-          {{ t('common.white') }}
-        </label>
-        <label class="flex items-center gap-2">
-          <input type="radio" v-model="color" value="BLACK" class="accent-emerald-600" />
-          {{ t('common.black') }}
-        </label>
-        <label class="flex items-center gap-2">
-          <input type="radio" v-model="color" value="RANDOM" class="accent-emerald-600" />
-          {{ t('home.random') }}
-        </label>
-      </div>
-    </fieldset>
-
-    <label class="flex items-center gap-3 rounded-lg bg-stone-800 px-4 py-3 text-sm">
-      <input type="checkbox" v-model="noGuessmate" class="h-4 w-4 accent-emerald-600" />
-      <span class="text-left">
-        <span class="font-semibold">{{ t('home.noGuessmateTitle') }}</span>
-        <br />
-        <span class="text-stone-400">
-          {{ t('home.noGuessmateDescription') }}
-        </span>
-      </span>
-    </label>
-
     <p v-if="error" class="text-sm text-red-400">{{ error }}</p>
 
-    <button
-      type="button"
-      class="rounded-lg bg-emerald-600 px-6 py-3 font-semibold hover:bg-emerald-500 disabled:opacity-50"
-      :disabled="creating"
-      @click="openModal"
-    >
-      {{ creating ? t('home.creating') : `${t('home.createButton')}${noGuessmate ? t('home.noGuessmateSuffix') : ''}` }}
-    </button>
+    <div class="flex flex-col items-center gap-3">
+      <router-link to="/how-to-play" class="rounded-lg bg-stone-700 px-6 py-2 font-semibold hover:bg-stone-600">
+        {{ t('header.tutorial') }}
+      </router-link>
+
+      <button
+        type="button"
+        class="rounded-lg bg-emerald-600 px-6 py-3 font-semibold hover:bg-emerald-500 disabled:opacity-50"
+        :disabled="creating"
+        @click="openCreateModal"
+      >
+        {{ creating ? t('home.creating') : t('home.createButton') }}
+      </button>
+
+      <button type="button" class="rounded-lg bg-stone-700 px-6 py-2 font-semibold hover:bg-stone-600" @click="openMyGames">
+        {{ t('profile.myGames') }}
+      </button>
+    </div>
+
+    <CreateGameModal :open="showCreateModal" @confirm="onCreateModalConfirm" @close="showCreateModal = false" />
 
     <AuthModal
-      :open="showModal"
+      :open="showAuthModal"
       :pending-action="{ type: 'create', variant: noGuessmate ? 'NOGUESSMATE' : 'GUESSCHESS', color }"
       @anonymous="continueAnonymously"
-      @close="showModal = false"
+      @close="showAuthModal = false"
     />
+
+    <LoginModal :open="showLoginModal" return-to="/profile" @close="showLoginModal = false" />
   </div>
 </template>

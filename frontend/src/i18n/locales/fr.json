@@ -14,7 +14,7 @@
   },
   "header": {
     "play": "Jouer",
-    "tutorial": "Tutoriel",
+    "tutorial": "Règles",
     "profile": "Profil",
     "login": "Connexion",
     "logout": "Déconnexion",
@@ -96,16 +96,16 @@
     "tagline": "Les échecs, mais si vous devinez le coup de votre adversaire, il ne joue pas.",
     "colorLegend": "Votre couleur",
     "random": "Aléatoire",
-    "noGuessmateTitle": "Variante sans Guessmate",
-    "noGuessmateDescription": "Deviner correctement le coup qui pare un échec annule simplement ce coup, au lieu de mettre fin à la partie immédiatement.",
+    "createModalTitle": "Nouvelle partie",
+    "noGuessmateTitle": "Variante sans {link}",
+    "noGuessmateDescription": "Deviner correctement le coup qui pare un échec ne met pas fin à la partie. Le roi doit être mangé (ou maté). Cette variante peut ralonger les parties.",
     "createButton": "Créer une partie",
-    "creating": "Création…",
-    "noGuessmateSuffix": " (sans Guessmate)"
+    "creating": "Création…"
   },
   "howToPlay": {
     "pggnTitle": "Notation PGGN",
-    "pggnText": "Le déroulé de la partie se note en PGGN (Portable Game Guess Notation), qui reprend le PGN classique en ajoutant la devinette entre parenthèses juste après le coup réel, ex. e4(e3). Si la devinette était correcte, seul le coup deviné apparaît, entre parenthèses, ex. (Nf3). Sans devinette, les parenthèses sont simplement omises.",
-    "title": "Comment jouer",
+    "pggnText": "Le déroulé de la partie se note en PGGN (Portable Game Guess Notation), qui reprend le PGN classique en ajoutant la devinette entre parenthèses juste après le coup réel, par exemple \"e4 (e3)\". Si la devinette était correcte, seul le coup deviné apparaît, entre parenthèses, par exemple \"(Nf3)\". Si la devinette est absente, les parenthèses sont simplement omises.",
+    "title": "Règles",
     "intro": "À chaque coup, les deux joueurs réfléchissent en même temps, sans voir le choix de l'autre : celui dont c'est le tour choisit son coup, pendant que son adversaire essaie de deviner lequel il va jouer. Une fois les deux choix faits, ils sont révélés et comparés.",
     "legendTitle": "Légende des plateaux",
     "legendGuess": "Ronds violets : coup deviné",
@@ -118,6 +118,7 @@
     "example3Title": "Guessmate : fin de partie immédiate",
     "example3Text": "Si le joueur au trait est en échec et que son adversaire devine correctement son coup, le roi passe en Guessmate, et la partie se termine immédiatement.",
     "example3Caption": "Ici, les blancs en échec tentent de fuir en Rf2 ; les noirs devinent Rf2 : le roi reste en échec et meurt au prochain tour.",
+    "noGuessmateVariantTitle": "Variante sans Guessmate",
     "guessRepetitionTitle": "6 guess repetition",
     "guessRepetitionText": "Si un même coup tenté par chaque camp est deviné correctement trois fois de suite par l'adversaire — sans qu'aucun coup ne soit réellement joué entre-temps — la partie est déclarée nulle. Cette règle évite qu'une paire de coups s'annule indéfiniment sans faire avancer la partie."
   },

@@ -154,6 +154,10 @@ const example3Guess = { from: 'e1', to: 'f2' }
           <p class="mt-2 text-center font-mono text-sm text-stone-400">(Kf2)#</p>
           <p class="mt-2 text-center text-sm text-gray-500">{{ t('howToPlay.example3Caption') }}</p>
         </div>
+        <div class="mx-auto w-full max-w-sm rounded-lg border-2 border-violet-400 px-4 py-3 text-sm text-stone-300">
+          <p class="mb-1 font-semibold text-violet-300">{{ t('howToPlay.noGuessmateVariantTitle') }}</p>
+          <p class="text-stone-400">{{ t('home.noGuessmateDescription') }}</p>
+        </div>
       </section>
 
       <section id="six-guess-repetition" class="flex flex-col gap-4 scroll-mt-8">
