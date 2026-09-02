@@ -94,6 +94,15 @@ public class AccountService {
     }
 
     /**
+     * Profil public consultable par login (etape 15), sans authentification - voir
+     * PlayerProfileController. Optional plutot qu'une exception : le controleur decide
+     * lui-meme de la reponse HTTP (404) en cas d'absence.
+     */
+    public Optional<AccountSnapshot> findByLogin(String login) {
+        return userRepository.findByLoginIgnoreCase(login).map(this::toSnapshot);
+    }
+
+    /**
      * Nom d'affichage modifiable par l'utilisateur (etape 8), initialise au login a
      * la creation du compte (etape 14) - 2 a 32 caracteres Unicode.
      */

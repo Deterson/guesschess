@@ -60,11 +60,12 @@
     "loading": "Loading…",
     "loadMore": "Load more games",
     "settings": "Settings",
-    "login": "Login",
-    "loginImmutableHint": "Your login is permanent and cannot be changed.",
-    "displayName": "Display name",
-    "bio": "Bio",
-    "bioEmpty": "No bio yet."
+    "bioEmpty": "No bio yet.",
+    "editDisplayNameTitle": "Edit display name"
+  },
+  "publicProfile": {
+    "games": "Games",
+    "notFound": "This player doesn't exist."
   },
   "profileSettings": {
     "turnBlinkReminder": "Blinking reminder when it's your turn",
@@ -105,7 +106,10 @@
     "offerDraw": "Offer draw",
     "acceptDraw": "Accept draw",
     "opponentOffersDraw": "Your opponent offers a draw",
-    "anonymousPlayer": "Anonymous"
+    "anonymousPlayer": "Anonymous",
+    "loginModalReminder": "You will always have access to this ongoing game",
+    "anonymousAccessReminderLink": "Log in",
+    "anonymousAccessReminderSuffix": "to access this game from anywhere"
   },
   "home": {
     "tagline": "Chess, but if you guess your opponent's move, it isn't played.",

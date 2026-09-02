@@ -13,21 +13,21 @@ const { t } = useI18n()
 
       <nav class="flex flex-col gap-1 text-sm">
         <router-link
-          to="/profile/about"
+          to="/my-profile/about"
           class="rounded px-2 py-1 hover:bg-stone-800"
           active-class="bg-stone-800 text-white"
         >
           {{ t('profile.myProfile') }}
         </router-link>
         <router-link
-          to="/profile/games"
+          to="/my-profile/games"
           class="rounded px-2 py-1 hover:bg-stone-800"
           active-class="bg-stone-800 text-white"
         >
           {{ t('profile.myGames') }}
         </router-link>
         <router-link
-          to="/profile/settings"
+          to="/my-profile/settings"
           class="rounded px-2 py-1 hover:bg-stone-800"
           active-class="bg-stone-800 text-white"
         >

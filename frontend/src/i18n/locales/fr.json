@@ -60,11 +60,12 @@
     "loading": "Chargement…",
     "loadMore": "Charger plus de parties",
     "settings": "Paramètres",
-    "login": "Pseudo",
-    "loginImmutableHint": "Votre pseudo est définitif, il ne peut pas être modifié.",
-    "displayName": "Nom d'affichage",
-    "bio": "Bio",
-    "bioEmpty": "Pas encore de bio."
+    "bioEmpty": "Pas encore de bio.",
+    "editDisplayNameTitle": "Modifier le nom d'affichage"
+  },
+  "publicProfile": {
+    "games": "Parties",
+    "notFound": "Ce joueur n'existe pas."
   },
   "profileSettings": {
     "turnBlinkReminder": "Rappel clignotant quand c'est votre tour",
@@ -105,7 +106,10 @@
     "offerDraw": "Proposer la nulle",
     "acceptDraw": "Accepter la nulle",
     "opponentOffersDraw": "Votre adversaire propose la nulle",
-    "anonymousPlayer": "Anonyme"
+    "anonymousPlayer": "Anonyme",
+    "loginModalReminder": "Vous aurez toujours accès à la partie en cours",
+    "anonymousAccessReminderLink": "Connectez-vous",
+    "anonymousAccessReminderSuffix": "pour accéder à cette partie n'importe où"
   },
   "home": {
     "tagline": "Les échecs, mais si vous devinez le coup de votre adversaire, il ne joue pas.",

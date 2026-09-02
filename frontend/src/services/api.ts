@@ -13,6 +13,7 @@ import type {
   GameVariant,
   JoinGameHttpResponse,
   MyAccessHttpResponse,
+  PublicProfileHttpResponse,
 } from '../types/api'
 
 /**
@@ -135,6 +136,13 @@ export const completeRegistration = (pendingToken: string, login: string) =>
 
 export const listMyGames = (page: number, size: number, authToken: string) =>
   request<GameSummaryHttpResponse[]>(`/api/account/games?page=${page}&size=${size}`, { token: authToken })
+
+/** Profil public d'un joueur (etape 15) - jamais de jeton, endpoint accessible a tous. */
+export const getPublicProfile = (login: string) =>
+  request<PublicProfileHttpResponse>(`/api/players/${encodeURIComponent(login)}`)
+
+export const listGamesByLogin = (login: string, page: number, size: number) =>
+  request<GameSummaryHttpResponse[]>(`/api/players/${encodeURIComponent(login)}/games?page=${page}&size=${size}`)
 
 export const getAccountSettings = (authToken: string) =>
   request<AccountSettingsHttpResponse>('/api/account/settings', { token: authToken })

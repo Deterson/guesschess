@@ -151,48 +151,23 @@ Jeu d'échecs classique avec une règle additionnelle :
    Compose par défaut (donc le même volume Postgres) si lancés depuis le même dossier sans `-p` —
    utiliser un nom de projet distinct pour tester la stack prod en local sans toucher aux données
    de dev.
-10. Format PGGN (Portable Game Guess Notation) — notation inspirée du PGN, avec le
-    coup deviné entre parenthèses juste après le coup réel (ex. `1. e4(e3) e5(Nc6)`).
-    Si la devinette est correcte (round annulé, coup réel == deviné par définition),
-    seule la devinette entre parenthèses apparaît (`2. (Nf3) Nc6(a5)`) — pas de
-    redondance puisque coup réel et deviné sont alors identiques. Si aucune devinette
-    n'a été soumise, les parenthèses sont omises (juste `e4`). `+`/`#` uniquement sur
-    un coup réellement joué qui met en échec/mat ; jamais sur une devinette dans un
-    round annulé non-terminal (le plateau revient à l'état d'avant, rien à tester) —
-    sauf le cas terminal Guessmate (roi capturé via devinette correcte en échec,
-    ex. `16. (Ke2)#`), seul cas où l'annulation elle-même termine la partie. En-têtes
-    façon PGN (`[Event]`, `[Date]`, `[White]`/`[Black]` à `"?"` tant que la page profil
-    de l'étape 8 n'existe pas, `[Variant]`, `[Result]`, `[Termination]` — ce dernier
-    portant directement la valeur de `GameResultCause`, plus précis qu'un `[Result]`
-    seul qui ne distingue pas la cause). Parseur en extraction simple (pas de
-    revalidation contre le moteur de règles) : un .pggn réimporté n'est donc pas une
-    source de vérité fiable. Exposition probable via `GET /api/games/{id}/pggn`.
+10. ✅ Format PGGN (Portable Game Guess Notation) (fait) — notation façon PGN avec le coup
+    deviné entre parenthèses après le coup réel (`e4(e3)`) ; devinette correcte → seule elle
+    apparaît entre parenthèses (`(Nf3)`, pas de redondance) ; pas de devinette → pas de
+    parenthèses. `+`/`#` uniquement sur un coup réellement joué, jamais sur une devinette
+    annulée (sauf le cas terminal Guessmate, ex. `16. (Ke2)#`). En-têtes façon PGN,
+    `[Termination]` porte directement `GameResultCause`. `GET /api/games/{id}/pggn`
+    (`PggnWriter`/`PggnParser`, ce dernier en extraction simple, non revalidé contre le
+    moteur). Stockage : `roundHistory` (liste de `RoundResult`, y compris rounds annulés) a
+    remplacé `lastRoundResult`/`moveHistory`, devenu redondant.
 
-    **Implique de changer le stockage de l'état de partie** : `Game`/`GameStateJson`
-    ne gardent aujourd'hui que `lastRoundResult` (le dernier round), pas l'historique
-    complet — à remplacer par un `roundHistory` (liste de `RoundResult`, un par round,
-    y compris les rounds annulés), qui devient la source de vérité pour reconstruire
-    le PGGN (avec l'aide de `positionHistory`, qui a déjà un instantané par round,
-    pour la désambiguïsation SAN). Une fois `roundHistory` en place, `moveHistory`
-    devient redondant (dérivable des rounds où `movePlayed = true`) et doit être
-    supprimé plutôt que maintenu en double, plutôt que gardé comme information
-    dupliquée à synchroniser à la main.
-
-11. ✅ Historique de partie navigable (fait), façon lichess.org : nouvel endpoint
-    `GET /api/games/{gameId}/history` (lecture seule, sans jeton, même posture que
-    `/pggn`/`/my-access`), exposant le détail par round (coup joué, devinette, plateau) —
-    nécessaire car `GameStateMessage.moveHistory` n'exposait que les coups réellement joués, pas
-    assez pour une liste façon PGGN avec fantôme de devinette. `GameSnapshot`/`GameStateMessage`
-    gagnent `roundCount` pour que le frontend sache quand refetch l'historique détaillé sans le
-    diffuser à chaque message d'état live.
-
-    Front : `MoveHistoryList.vue` rend une notation PGGN cliquable (mêmes règles d'omission que
-    `PggnWriter`), `ChessBoard.vue` gagne une prop `ghostMove` dédiée (distincte de `hoverGuess`,
-    l'affichage du survol manuel en direct) pour le fantôme de la devinette en navigation
-    historique. Navigation clavier ←/→ et souris, `historyIndex` (`null`=direct,
-    `-1`=position de départ, `0..n-1`=après le round i) ; un round résolu pendant la navigation
-    met à jour la liste sans changer l'index tant que l'utilisateur n'a pas cliqué lui-même le
-    dernier coup.
+11. ✅ Historique de partie navigable (fait), façon lichess.org : `GET /api/games/{gameId}/history`
+    (lecture seule, sans jeton) expose le détail par round (coup joué, devinette, plateau) ;
+    `roundCount` sur `GameSnapshot`/`GameStateMessage` évite de le refetch à chaque message
+    live. Front : `MoveHistoryList.vue` (notation PGGN cliquable), `ChessBoard.vue` avec une
+    prop `ghostMove` dédiée pour la devinette en navigation (distincte de `hoverGuess`, le
+    survol manuel en direct), navigation clavier ←/→, `historyIndex` (`null`=direct,
+    `-1`=départ, `0..n-1`=après le round i).
 
 12. Timers (temps de réflexion + timer de devinette) : configuration du contrôle de temps
     au moment de la création de la partie (étape 7), façon échecs classique — un temps total
@@ -227,69 +202,54 @@ Jeu d'échecs classique avec une règle additionnelle :
     propre contrôle de temps (ex. temps par coup en jours, façon correspondance) ; hors
     périmètre de cette étape.
 
-13. ✅ Tutoriel des règles (fait) : `HowToPlayView.vue` (route publique existante
-    `/how-to-play`), contenu FR/EN statique, aucun backend impliqué. Réutilise `ChessBoard.vue`
-    en `disabled` avec des positions codées en dur (helper `withChanges` sur un plateau de
-    départ) plutôt que des images séparées. Trois exemples, surbrillance réutilisant les props
-    existantes de `ChessBoard` (`hoverGuess` violet = coup deviné, `lastRound` bleu/rouge =
-    coup joué / devinette correcte annulée) : devinette incorrecte, devinette correcte,
-    Guessmate (roi capturé, plateau minimal sans pièces superflues). Rédigé en présentant
-    Guessmate comme la seule variante (pas de mention du choix GUESSCHESS/GUESSMATE de la
-    page d'accueil).
+13. ✅ Tutoriel des règles (fait) : `HowToPlayView.vue` (`/how-to-play`), contenu FR/EN
+    statique, aucun backend. Réutilise `ChessBoard.vue` en `disabled` avec des positions codées
+    en dur. Trois exemples via les props de surbrillance existantes de `ChessBoard`
+    (devinette incorrecte, devinette correcte, Guessmate) ; Guessmate présenté comme seule
+    variante (pas de mention du choix GUESSCHESS/GUESSMATE de l'accueil).
 
-14. ✅ Identifiant unique de compte (login) (fait, partiellement) : pseudonyme immuable,
-    3-20 caractères (`[A-Za-z0-9_]` puis `[A-Za-z0-9_-]*`, pas de tiret initial), unique
-    insensible à la casse (index `lower(login)`, migration V9), interdit sur "Anonymous"/
-    "Anonyme". **Pas de wipe de base** : `login` reste nullable en SQL (comptes créés avant
-    cette étape) mais un nouveau compte n'est jamais inséré sans login — inscription en deux
-    temps via un JWT "pending_registration" de courte durée (`JwtService`,
-    `RegistrationController`, `POST /api/registration/complete`) émis par
-    `OAuthLoginSuccessHandler` quand aucun compte n'existe encore pour l'identité OAuth ; un
-    compte historique sans login est bloqué côté frontend (garde `router/index.ts` +
-    `stores/account.ts`, `needsLogin`) sur `/choose-login` jusqu'à `PATCH /api/account/login`.
-    `display_name` (2-32 caractères, initialisé au login) et `bio` (5000 caractères) restent
-    modifiables séparément, page "Mon profil" (`ProfileAboutView.vue`). Login affiché
-    au-dessus/en-dessous du plateau (`PlayerLabel.vue`, chargé une fois via
-    `GET /api/games/{id}/players` puis tenu à jour en direct par `PlayersBroadcastService`
-    sur `/topic/games/{id}/players` — adversaire qui rejoint, ou joueur anonyme qui se
-    connecte à un compte en pleine partie), teinté clair/sombre selon la couleur,
-    "Anonyme"/"Anonymous" en italique pour les identités anonymes. Recherche de
-    profil/invitation directe/amis : toujours hors périmètre.
+14. ✅ Identifiant unique de compte (login) (fait) : pseudonyme immuable, 3-20 caractères,
+    unique insensible à la casse (index `lower(login)`, migration V9), interdit sur
+    "Anonymous"/"Anonyme". `login` nullable en SQL pour les comptes créés avant cette étape
+    (bloqués côté front sur `/choose-login` jusqu'à `PATCH /api/account/login`) ; un nouveau
+    compte n'est jamais inséré sans login (inscription en deux temps via un JWT
+    "pending_registration", `RegistrationController`/`POST /api/registration/complete`).
+    `display_name`/`bio` modifiables séparément (`ProfileAboutView.vue`). Login affiché
+    au-dessus/en-dessous du plateau (`PlayerLabel.vue`, tenu à jour en direct par
+    `PlayersBroadcastService` sur `/topic/games/{id}/players`), "Anonyme"/"Anonymous" en
+    italique pour les identités anonymes. Recherche de profil/invitation directe/amis :
+    toujours hors périmètre.
+
+    **Convention d'affichage** : partout où le login d'un compte est affiché côté front
+    (`PlayerLabel.vue`, `ProfileAboutView.vue`, `PublicProfileView.vue`), il est précédé d'un
+    `@` (ex. `@Deterson`) — jamais pour un nom d'affichage ou une identité anonyme.
+
+    **Profil public** (ajouté après coup) : `/profile/{login}` (`PublicProfileView.vue`), en
+    lecture seule et public (sans authentification), distinct de `/my-profile/*` (l'ancien
+    `/profile/*`, renommé pour libérer ce chemin) qui reste réservé au compte connecté pour
+    éditer ses propres infos. Backend : `GET /api/players/{login}` et
+    `/api/players/{login}/games`, en dehors de `/api/account/**` donc jamais authentifiés
+    (`PlayerProfileController`, `UserRepository.findByLoginIgnoreCase`). Le login affiché en
+    partie (`PlayerLabel.vue`) pointe vers ce profil.
 
 ## Liaison compte/session ↔ partie (étapes 6-7)
 
-- **Lien immuable** : chaque partie référence, par couleur, soit un compte (`userId`), soit une
-  identité de session anonyme — jamais les deux, et jamais modifié une fois posé. Pas de
-  "changement de joueur" en cours de partie.
-- **Identité anonyme** : cookie **HttpOnly signé côté serveur** (pas de JWT en localStorage, pour
-  éviter l'exposition XSS), longue durée (~1 an), régénéré uniquement si absent. Réutilisée pour
-  toutes les parties jouées depuis le même navigateur, ce qui permet un mini-historique pour les
-  joueurs non connectés sans nécessiter de compte — mais la page de profil (étape 8) est elle-même
-  réservée aux comptes connectés, donc ce mini-historique anonyme n'est exposé nulle part pour
-  l'instant. Fusion anonyme → compte : tranchée à l'étape 8 (voir cette section) — au login, tous
-  les `game_access` liés à l'identité anonyme du cookie en cours sont réécrits vers le compte, seule
-  exception documentée à l'immuabilité du lien décrite juste au-dessus.
-- **Page d'accueil (étape 7)** : choix de couleur à la création (blancs / noirs / aléatoire). Que
-  le créateur soit déjà connecté ou non, il passe par la **même modale** "se connecter / jouer en
-  anonyme" que l'adversaire avant que la partie soit effectivement créée et son lien posé —
-  comportement symétrique entre les deux joueurs.
-- Une fois la partie créée : redirection du créateur vers l'URL de sa partie, et bannière affichant
-  ce **même lien** (`/game/{gameId}`, sans jeton) à envoyer à l'adversaire — un seul lien par
-  partie, pas de lien séparé par couleur (voir étape 7 pour le pourquoi : le jeton a cessé d'être
-  le mécanisme d'autorisation, il n'a donc plus de raison d'être dans une URL).
-- **Le lien reste valide pour tout le monde, la liaison est à usage unique** : n'importe qui peut
-  toujours ouvrir `/game/{gameId}` (lecture seule, mode spectateur, pas de jeton nécessaire), mais
-  une fois qu'un adversaire (compte ou anonyme) a revendiqué le siège encore libre, toute nouvelle
-  tentative de revendication échoue clairement (`409 GAME_FULL`) — pas de second joueur possible
-  sur la même couleur.
-- **Flux de l'adversaire visitant le lien** : d'abord résolu comme spectateur via
-  `GET /api/games/{id}/my-access` (identité pas encore liée). S'il clique "Rejoindre cette
-  partie" : déjà connecté → son compte est immédiatement et immuablement lié (pas de modale).
-  Sinon, modale "se connecter" ou "jouer en anonyme" ; le choix qui en résulte (compte après
-  OAuth, ou identité de session anonyme) est immédiatement et immuablement lié à la partie.
-- **Bounded context** : le lien lui-même (partie ↔ compte/anonyme) vit côté "Partie" (le `Game`
-  référence un identifiant de joueur), la résolution de cet identifiant (qui est ce compte, ou
-  gestion du cookie anonyme) reste du ressort du contexte "Compte joueur".
+- **Lien immuable, à usage unique** : chaque partie référence, par couleur, un compte (`userId`)
+  ou une identité de session anonyme (jamais les deux), posé une fois et jamais changé. `Game`
+  porte l'identifiant de joueur (bounded context "Partie") ; la résolution de cet identifiant
+  (quel compte, ou gestion du cookie anonyme) reste côté "Compte joueur".
+- **Identité anonyme** : cookie HttpOnly signé côté serveur (pas de JWT en localStorage), longue
+  durée, réutilisé pour toutes les parties du même navigateur. Fusion anonyme → compte au login
+  (étape 8) : tous les `game_access` de l'identité anonyme du cookie sont réécrits vers le
+  compte — seule exception à l'immuabilité ci-dessus.
+- **Page d'accueil (étape 7)** : choix de couleur à la création ; créateur et adversaire passent
+  par la même modale "se connecter / jouer en anonyme". Un seul lien de partie (`/game/{gameId}`,
+  sans jeton) envoyé à l'adversaire, pas de lien par couleur.
+- **Le lien reste ouvrable par tout le monde en spectateur**, mais une fois une couleur revendiquée
+  par un adversaire, toute nouvelle tentative échoue (`409 GAME_FULL`).
+- **Flux de l'adversaire** : résolu d'abord en spectateur via `GET /api/games/{id}/my-access`, puis
+  lié immédiatement et immuablement au clic sur "Rejoindre" — compte si déjà connecté, sinon après
+  la modale connexion/anonyme.
 
 ## Variables d'environnement (depuis l'étape 4)
 

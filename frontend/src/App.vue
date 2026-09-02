@@ -12,7 +12,7 @@ const settingsStore = useSettingsStore()
 /**
  * Precharge une seule fois les parametres du compte (etape "Paramètres" du profil) des
  * l'arrivee sur l'app si l'utilisateur est deja connecte - sinon GameStatusBar
- * afficherait la valeur par defaut jusqu'a une visite de /profile/settings. Echec
+ * afficherait la valeur par defaut jusqu'a une visite de /my-profile/settings. Echec
  * silencieux : un parametre non charge retombe sur son defaut (comportement actuel).
  */
 onMounted(() => {

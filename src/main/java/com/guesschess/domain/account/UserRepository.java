@@ -16,6 +16,12 @@ public interface UserRepository {
     Optional<User> findById(UserId id);
 
     /**
+     * Resolution d'un profil public par login (etape 15) - insensible a la casse,
+     * comme existsByLoginIgnoreCase ci-dessous.
+     */
+    Optional<User> findByLoginIgnoreCase(String login);
+
+    /**
      * Verification d'unicite du login (etape 14), insensible a la casse - voir
      * AccountService.validateLogin. Le veritable garde-fou reste l'index unique sur
      * lower(login) en base (V9) ; cette methode n'evite qu'une erreur peu conviviale

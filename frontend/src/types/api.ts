@@ -138,6 +138,14 @@ export interface GameSummaryHttpResponse {
   board: Board
 }
 
+/** GET /api/players/{login} - profil public consultable par n'importe qui, jamais l'email. */
+export interface PublicProfileHttpResponse {
+  id: string
+  displayName: string
+  login: string
+  bio: string
+}
+
 // ---- WebSocket STOMP (infrastructure/websocket/dto) ----
 
 export interface LegalMoveMessage {

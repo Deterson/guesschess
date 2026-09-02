@@ -6,6 +6,7 @@ import { oauthAuthorizationUrl } from '../services/api'
 const props = defineProps<{
   open: boolean
   returnTo: string
+  inGame?: boolean
 }>()
 const emit = defineEmits<{
   close: []
@@ -22,7 +23,10 @@ function continueWithOAuth(provider: string) {
 <template>
   <div v-if="open" class="fixed inset-0 z-10 flex items-center justify-center bg-black/60">
     <div class="w-full max-w-sm space-y-4 rounded-lg bg-stone-800 p-6 shadow-xl">
-      <p class="text-center text-stone-200">{{ t('header.loginModalTitle') }}</p>
+      <div class="space-y-1">
+        <p class="text-center text-stone-200">{{ t('header.loginModalTitle') }}</p>
+        <p v-if="inGame" class="text-center text-xs text-stone-500">{{ t('game.loginModalReminder') }}</p>
+      </div>
 
       <div class="space-y-2">
         <button

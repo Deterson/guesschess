@@ -8,6 +8,7 @@ import ProfileLayout from '../views/ProfileLayout.vue'
 import ProfileGamesView from '../views/ProfileGamesView.vue'
 import ProfileSettingsView from '../views/ProfileSettingsView.vue'
 import ProfileAboutView from '../views/ProfileAboutView.vue'
+import PublicProfileView from '../views/PublicProfileView.vue'
 import { useAuthStore } from '../stores/auth'
 import { useAccountStore } from '../stores/account'
 import { peek as peekPendingRegistration } from '../services/pendingRegistration'
@@ -32,7 +33,7 @@ const router = createRouter({
     { path: '/choose-login', name: 'choose-login', component: ChooseLoginView },
     { path: '/how-to-play', name: 'how-to-play', component: HowToPlayView },
     {
-      path: '/profile',
+      path: '/my-profile',
       component: ProfileLayout,
       meta: { requiresAuth: true },
       children: [
@@ -41,6 +42,12 @@ const router = createRouter({
         { path: 'games', name: 'profile-games', component: ProfileGamesView },
         { path: 'settings', name: 'profile-settings', component: ProfileSettingsView },
       ],
+    },
+    {
+      path: '/profile/:login',
+      name: 'public-profile',
+      component: PublicProfileView,
+      props: (route) => ({ login: route.params.login }),
     },
   ],
 })

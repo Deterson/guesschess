@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '../stores/auth'
-import { save as savePendingAction } from '../services/pendingAction'
-import { oauthAuthorizationUrl } from '../services/api'
+import LoginModal from './LoginModal.vue'
 import LanguageSwitch from './LanguageSwitch.vue'
 
 const authStore = useAuthStore()
@@ -12,11 +11,7 @@ const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
 const showLoginModal = ref(false)
-
-function continueWithOAuth(provider: string) {
-  savePendingAction({ type: 'login', returnTo: route.fullPath })
-  window.location.href = oauthAuthorizationUrl(provider)
-}
+const inGame = computed(() => route.name === 'game')
 
 function logout() {
   authStore.logout()
@@ -39,7 +34,7 @@ function logout() {
 
     <div class="flex items-center gap-4">
       <template v-if="authStore.isLoggedIn">
-        <router-link to="/profile" class="text-sm font-semibold text-stone-300 hover:text-white">
+        <router-link to="/my-profile" class="text-sm font-semibold text-stone-300 hover:text-white">
           {{ t('header.profile') }}
         </router-link>
         <button type="button" class="cursor-pointer text-sm font-semibold text-stone-300 hover:text-white" @click="logout">
@@ -54,30 +49,5 @@ function logout() {
     </div>
   </header>
 
-  <div v-if="showLoginModal" class="fixed inset-0 z-10 flex items-center justify-center bg-black/60">
-    <div class="w-full max-w-sm space-y-4 rounded-lg bg-stone-800 p-6 shadow-xl">
-      <p class="text-center text-stone-200">{{ t('header.loginModalTitle') }}</p>
-
-      <div class="space-y-2">
-        <button
-          type="button"
-          class="w-full rounded-lg bg-stone-700 px-4 py-2 font-semibold hover:bg-stone-600"
-          @click="continueWithOAuth('google')"
-        >
-          {{ t('common.continueWithGoogle') }}
-        </button>
-        <button
-          type="button"
-          class="w-full rounded-lg bg-stone-700 px-4 py-2 font-semibold hover:bg-stone-600"
-          @click="continueWithOAuth('github')"
-        >
-          {{ t('common.continueWithGithub') }}
-        </button>
-      </div>
-
-      <button type="button" class="w-full text-center text-sm text-stone-400 hover:text-stone-300" @click="showLoginModal = false">
-        {{ t('common.cancel') }}
-      </button>
-    </div>
-  </div>
+  <LoginModal :open="showLoginModal" :return-to="route.fullPath" :in-game="inGame" @close="showLoginModal = false" />
 </template>

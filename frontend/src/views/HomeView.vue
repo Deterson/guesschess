@@ -68,7 +68,7 @@ function continueAnonymously() {
 
 function openMyGames() {
   if (authStore.isLoggedIn) {
-    router.push('/profile')
+    router.push('/my-profile/games')
   } else {
     showLoginModal.value = true
   }
@@ -112,6 +112,6 @@ function openMyGames() {
       @close="showAuthModal = false"
     />
 
-    <LoginModal :open="showLoginModal" return-to="/profile" @close="showLoginModal = false" />
+    <LoginModal :open="showLoginModal" return-to="/my-profile/games" @close="showLoginModal = false" />
   </div>
 </template>

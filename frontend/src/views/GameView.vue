@@ -13,6 +13,7 @@ import MoveHistoryList from '../components/MoveHistoryList.vue'
 import ChatPanel from '../components/ChatPanel.vue'
 import InviteBanner from '../components/InviteBanner.vue'
 import AuthModal from '../components/AuthModal.vue'
+import LoginModal from '../components/LoginModal.vue'
 import PlayerLabel from '../components/PlayerLabel.vue'
 import type { Board, ColorLower, PromotionPieceType, RoundSummaryMessage } from '../types/api'
 
@@ -58,6 +59,7 @@ const accessDenied = ref(false)
 const joining = ref(false)
 const joinError = ref<string | null>(null)
 const showJoinModal = ref(false)
+const showLoginModal = ref(false)
 
 /**
  * Aucun token/couleur dans l'URL (un seul lien par partie, /game/{gameId}) : l'accès
@@ -415,6 +417,13 @@ function submitNoGuess() {
 
           <div class="order-3 mx-auto w-full max-w-xl @min-[67rem]:order-none @min-[67rem]:mx-0 @min-[67rem]:max-w-none">
             <ChatPanel :messages="chatMessages" :can-send="Boolean(myColor) && canAct" @send="gameStore.sendChat" />
+
+            <p v-if="myColor && !authStore.isLoggedIn" class="mt-2 text-center text-xs text-stone-500">
+              <button type="button" class="underline hover:text-stone-400" @click="showLoginModal = true">
+                {{ t('game.anonymousAccessReminderLink') }}
+              </button>
+              {{ t('game.anonymousAccessReminderSuffix') }}
+            </p>
           </div>
         </div>
 
@@ -449,7 +458,9 @@ function submitNoGuess() {
         </div>
 
         <div class="order-4 mx-auto w-full max-w-xl @min-[67rem]:order-none @min-[67rem]:col-start-3 @min-[67rem]:mx-0 @min-[67rem]:max-w-none">
-          <div v-if="myColor && canAct" class="mb-2 flex flex-col items-center">
+          <MoveHistoryList :rounds="historyRounds" :history-index="historyIndex" @select="onHistorySelect" />
+
+          <div v-if="myColor && canAct" class="mt-2 flex flex-col items-center">
             <p v-if="drawOfferedByOpponent" class="mb-1 text-xs text-stone-400">{{ t('game.opponentOffersDraw') }}</p>
             <button
               type="button"
@@ -461,7 +472,6 @@ function submitNoGuess() {
               {{ drawOfferedByOpponent ? t('game.acceptDraw') : t('game.offerDraw') }}
             </button>
           </div>
-          <MoveHistoryList :rounds="historyRounds" :history-index="historyIndex" @select="onHistorySelect" />
         </div>
       </div>
 
@@ -478,6 +488,8 @@ function submitNoGuess() {
         @anonymous="joinAnonymously"
         @close="showJoinModal = false"
       />
+
+      <LoginModal :open="showLoginModal" :return-to="`/game/${gameId}`" :in-game="true" @close="showLoginModal = false" />
     </template>
   </div>
 </template>

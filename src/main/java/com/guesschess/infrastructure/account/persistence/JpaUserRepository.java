@@ -69,6 +69,12 @@ class JpaUserRepository implements UserRepository {
         return users.findById(id.value()).map(this::toDomain);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<User> findByLoginIgnoreCase(String login) {
+        return users.findByLoginIgnoreCase(login).map(this::toDomain);
+    }
+
     private User toDomain(UserEntity entity) {
         List<OAuthIdentity> userIdentities = identities.findByUserId(entity.getId()).stream()
                 .map(e -> new OAuthIdentity(OAuthProvider.valueOf(e.getProvider()), e.getExternalId()))
