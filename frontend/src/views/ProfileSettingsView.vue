@@ -1,16 +1,23 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useSettingsStore } from '../stores/settings'
+import { ApiError } from '../services/api'
 
 const authStore = useAuthStore()
 const settingsStore = useSettingsStore()
+const router = useRouter()
 const { t } = useI18n()
 const error = ref<string | null>(null)
 
 onMounted(() => {
-  if (!settingsStore.loaded) settingsStore.load(authStore.token!)
+  if (!settingsStore.loaded) {
+    settingsStore.load(authStore.token!).catch((e) => {
+      if (e instanceof ApiError && e.code === 'SESSION_EXPIRED') router.replace('/')
+    })
+  }
 })
 
 async function onToggleTurnBlinkReminder(event: Event) {

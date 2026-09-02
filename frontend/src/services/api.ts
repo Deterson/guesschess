@@ -42,6 +42,14 @@ interface RequestOptions {
   method?: string
   body?: unknown
   token?: string | null
+  /**
+   * Réservé aux routes qui restent utilisables sans compte (permitAll côté backend :
+   * createGame, joinGame, myAccess). Pour celles-là seulement, un jeton périmé/corrompu
+   * en localStorage ne doit jamais bloquer un flux qui reste possible en anonyme : on
+   * l'oublie et on retente une seule fois sans lui. Pour toute autre route (qui exige
+   * toujours un compte), voir le code SESSION_EXPIRED plus bas.
+   */
+  allowAnonymousFallback?: boolean
 }
 
 /**
@@ -50,7 +58,10 @@ interface RequestOptions {
  * nécessaire pour que la création/le join en anonyme résolvent la même identité que
  * les futures requêtes du même navigateur.
  */
-async function request<T>(path: string, { method = 'GET', body, token }: RequestOptions = {}): Promise<T> {
+async function request<T>(
+  path: string,
+  { method = 'GET', body, token, allowAnonymousFallback = false }: RequestOptions = {},
+): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   if (token) headers.Authorization = `Bearer ${token}`
 
@@ -81,11 +92,17 @@ async function request<T>(path: string, { method = 'GET', body, token }: Request
     // Spring Security rejette une requête portant un Bearer invalide/expiré avec 401
     // AVANT même d'atteindre l'endpoint, même quand celui-ci n'exige aucune
     // authentification (permitAll) - un jeton présenté mais invalide n'est pas
-    // équivalent à une requête anonyme. Un compte périmé/corrompu en localStorage ne
-    // doit jamais bloquer un flux qui reste possible en anonyme : on l'oublie et on
-    // retente une seule fois sans lui.
+    // équivalent à une requête anonyme.
     useAuthStore().logout()
-    return request<T>(path, { method, body })
+    if (allowAnonymousFallback) {
+      return request<T>(path, { method, body })
+    }
+    // Route qui exige toujours un compte (getMe, listMyGames, setLogin, ...) : pas de
+    // repli anonyme possible, donc pas la peine de retenter. On distingue ce cas via
+    // le code SESSION_EXPIRED pour que l'appelant puisse réagir (ex. renvoyer vers
+    // l'accueil) plutôt que d'afficher un 401 brut à un utilisateur qui se croit
+    // toujours connecté.
+    throw new ApiError(i18n.global.t('errors.sessionExpired'), 401, 'SESSION_EXPIRED')
   }
 
   if (!response.ok) {
@@ -99,13 +116,13 @@ async function request<T>(path: string, { method = 'GET', body, token }: Request
 export const oauthAuthorizationUrl = (provider: string): string => `${API_URL}/oauth2/authorization/${provider}`
 
 export const createGame = (variant: GameVariant, color: Color | 'RANDOM', token: string | null) =>
-  request<CreateGameHttpResponse>('/api/games', { method: 'POST', body: { variant, color }, token })
+  request<CreateGameHttpResponse>('/api/games', { method: 'POST', body: { variant, color }, token, allowAnonymousFallback: true })
 
 export const joinGame = (gameId: string, authToken: string | null) =>
-  request<JoinGameHttpResponse>(`/api/games/${gameId}/join`, { method: 'POST', token: authToken })
+  request<JoinGameHttpResponse>(`/api/games/${gameId}/join`, { method: 'POST', token: authToken, allowAnonymousFallback: true })
 
 export const myAccess = (gameId: string, authToken: string | null) =>
-  request<MyAccessHttpResponse>(`/api/games/${gameId}/my-access`, { token: authToken })
+  request<MyAccessHttpResponse>(`/api/games/${gameId}/my-access`, { token: authToken, allowAnonymousFallback: true })
 
 export const getGameHistory = (gameId: string) =>
   request<GameHistoryHttpResponse>(`/api/games/${gameId}/history`)

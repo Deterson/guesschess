@@ -157,6 +157,7 @@
     "network": "Could not reach the server.",
     "generic": "Error {status}",
     "connectionLost": "Connection to the server lost. Retrying automatically...",
-    "connectionLostRetry": "Connection lost: please try again."
+    "connectionLostRetry": "Connection lost: please try again.",
+    "sessionExpired": "Your session has expired, please log in again."
   }
 }

@@ -55,6 +55,7 @@ Jeu d'échecs classique avec une règle additionnelle :
 - **Asynchrone** : REST classique (ex. `POST /games/{id}/moves`), sans connexion persistante — logique vu que les deux joueurs ne sont pas connectés en même temps et que la fréquence est naturellement faible.
 - **Dimensionnement** : même à 1000 joueurs simultanés (~500 parties), le volume de messages reste faible (quelques dizaines à centaines par seconde, sur des connexions déjà ouvertes) — le vrai axe de dimensionnement, ce sont les connexions WebSocket maintenues ouvertes, pas le débit de requêtes. C'est ce que les threads virtuels de Java 25 encaissent bien.
 - Seule la soumission finale (coup ou devinette validé) part vers le serveur — les interaction UI (déplacer une pièce, hésiter) restent côté client. Le serveur revalide systématiquement chaque soumission (jamais confiance dans le client).
+- **`frontend/src/services/api.ts`** : toute nouvelle route qui exige toujours un compte (contrairement à `createGame`/`joinGame`/`myAccess`, permitAll et donc passées en `allowAnonymousFallback: true`) doit laisser `request()` remonter le code `SESSION_EXPIRED` sur un 401 plutôt que d'implémenter son propre retry/log — l'appelant peut alors renvoyer proprement vers l'accueil au lieu d'afficher un 401 brut (bug corrigé une fois, voir historique).
 
 ## Performance et scalabilité
 

@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
-import { listMyGames } from '../services/api'
+import { ApiError, listMyGames } from '../services/api'
 import GameSummaryList from '../components/GameSummaryList.vue'
 import type { GameSummaryHttpResponse } from '../types/api'
 
 const PAGE_SIZE = 20
 
 const authStore = useAuthStore()
+const router = useRouter()
 const { t } = useI18n()
 const games = ref<GameSummaryHttpResponse[]>([])
 const page = ref(0)
@@ -25,6 +27,10 @@ async function loadMore() {
     hasMore.value = next.length === PAGE_SIZE
     page.value += 1
   } catch (e) {
+    if (e instanceof ApiError && e.code === 'SESSION_EXPIRED') {
+      router.replace('/')
+      return
+    }
     error.value = (e as Error).message
   } finally {
     loading.value = false

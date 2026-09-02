@@ -157,6 +157,7 @@
     "network": "Impossible de contacter le serveur.",
     "generic": "Erreur {status}",
     "connectionLost": "Connexion au serveur perdue. Nouvelle tentative automatique...",
-    "connectionLostRetry": "Connexion perdue : réessayez."
+    "connectionLostRetry": "Connexion perdue : réessayez.",
+    "sessionExpired": "Votre session a expiré, veuillez vous reconnecter."
   }
 }

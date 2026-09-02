@@ -89,6 +89,20 @@ router.beforeEach(async (to) => {
   if (!accountStore.loaded) {
     await accountStore.load(authStore.token!).catch(() => {})
   }
+
+  // Le chargement ci-dessus peut avoir echoue avec un 401 (jeton expire pendant la
+  // navigation) : api.ts deconnecte alors authStore silencieusement (voir
+  // SESSION_EXPIRED). isLoggedIn n'etait donc plus fiable des le debut de ce garde -
+  // sans cette verification, une route requiresAuth resterait accessible avec un
+  // compte deja deconnecte.
+  if (!authStore.isLoggedIn) {
+    if (accountStore.loaded) accountStore.reset()
+    if (to.meta.requiresAuth) {
+      return { name: 'home' }
+    }
+    return
+  }
+
   if (accountStore.needsLogin) {
     return { name: 'choose-login', query: { redirect: to.fullPath } }
   }

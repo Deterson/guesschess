@@ -59,6 +59,10 @@ async function submit() {
       router.replace(redirect)
     }
   } catch (e) {
+    if (e instanceof ApiError && e.code === 'SESSION_EXPIRED') {
+      router.replace('/')
+      return
+    }
     error.value = e instanceof ApiError ? e.message : t('chooseLogin.genericError')
   } finally {
     submitting.value = false
