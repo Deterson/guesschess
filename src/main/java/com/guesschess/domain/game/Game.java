@@ -20,11 +20,16 @@ import java.util.Optional;
  * Un round attend obligatoirement les deux soumissions - le coup reel du joueur au
  * trait (submitMove) et la devinette de son adversaire (submitGuess, qui peut valoir
  * "pas de devinette") - avant de se resoudre, quel que soit l'ordre d'arrivee.
- * submitMove reste definitif une fois appele pour un round (pas de correction) ;
- * submitGuess reste modifiable tant qu'elle n'a pas ete soumise pour ce round. Le
- * round se resout des que la seconde des deux soumissions arrive : devinette
- * correcte -> coup annule, le trait passe au devineur sans qu'aucune piece ne bouge ;
- * devinette fausse ou absente -> coup joue normalement.
+ * submitMove et submitGuess restent tous deux librement modifiables (rappelables,
+ * chaque nouvel appel ecrasant le precedent) tant que le round n'est pas resolu, donc
+ * tant que l'autre moitie de la paire n'est pas arrivee - aucune limite de nombre de
+ * changements. Cette possibilite de changement n'a de sens que hors contexte
+ * chronometre (aucun controle du temps n'existe encore - etape 12 de la roadmap - donc
+ * elle s'applique aujourd'hui a toutes les parties ; a restreindre aux seules parties
+ * par correspondance sans timer une fois le controle du temps modelise). Le round se
+ * resout des que la seconde des deux soumissions arrive : devinette correcte -> coup
+ * annule, le trait passe au devineur sans qu'aucune piece ne bouge ; devinette fausse
+ * ou absente -> coup joue normalement.
  *
  * Cas particulier (variante NOGUESSMATE, la regle de base - voir GameVariant) : si le
  * coup annule etait la parade a un echec, le roi reste en echec et le trait passe
@@ -356,19 +361,17 @@ public final class Game {
     }
 
     /**
-     * Soumission du coup reel par le joueur au trait, definitive pour ce round (pas
-     * de nouvel appel avant resolution). Le round ne se resout que si la devinette
-     * de l'adversaire est deja arrivee ; sinon ce coup reste en attente jusqu'a ce
-     * qu'elle arrive.
+     * Soumission (ou modification) du coup reel par le joueur au trait. Rappelable
+     * librement tant que la devinette de l'adversaire n'est pas deja arrivee (chaque
+     * appel remplace le precedent) - voir le commentaire de classe. Le round ne se
+     * resout que si cette devinette est deja arrivee ; sinon ce coup reste en attente
+     * jusqu'a ce qu'elle arrive.
      *
      * @return le resultat du round si la devinette etait deja arrivee, vide si le
      * round doit encore attendre la devinette
      */
     public Optional<RoundResult> submitMove(Move actualMove) {
         requireOngoing();
-        if (pendingMove != null) {
-            throw new IllegalStateException("a move has already been submitted for this round");
-        }
         if (!MoveGenerator.isLegalMove(board, sideToMove(), actualMove)) {
             throw new IllegalArgumentException("illegal move: " + actualMove);
         }

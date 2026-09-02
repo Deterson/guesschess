@@ -23,7 +23,7 @@ const text = computed(() => {
   if (!props.round.guessedFrom || !props.round.guessedTo) return t('roundResult.noGuess')
   return t('roundResult.guessResult', {
     square: props.round.guessedFrom,
-    outcome: props.round.guessedCorrectly ? t('roundResult.bingo') : t('roundResult.missed'),
+    outcome: props.round.guessedCorrectly ? t('roundResult.correct') : t('roundResult.missed'),
   })
 })
 

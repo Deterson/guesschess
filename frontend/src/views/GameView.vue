@@ -195,12 +195,19 @@ function onDrawButtonClick() {
   }
 }
 
+/**
+ * pendingSubmission ne desactive plus le plateau : tant que l'adversaire n'a pas
+ * soumis (donc tant que le round n'est pas resolu), le joueur peut reselectionner un
+ * autre coup/devinette a tout moment - chaque nouvelle soumission remplace la
+ * precedente cote serveur (voir Game.submitMove/submitGuess). Cette possibilite n'a
+ * de sens que hors contexte chronometre - a restreindre une fois le controle du temps
+ * modelise (etape 12 de la roadmap).
+ */
 const boardDisabled = computed(
   () =>
     !state.value ||
     state.value.status === 'FINISHED' ||
     !state.value.full ||
-    pendingSubmission.value ||
     !canAct.value ||
     historyIndex.value !== null,
 )

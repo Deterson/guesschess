@@ -78,7 +78,7 @@
   "roundResult": {
     "noGuess": "pas de devinette",
     "guessResult": "coup deviné : {square} ({outcome})",
-    "bingo": "bingo",
+    "correct": "correct",
     "missed": "raté"
   },
   "game": {

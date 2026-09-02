@@ -45,10 +45,22 @@ const resultBgClass = computed(() => {
   if (!props.myColor) return null
   return result.winner === props.myColor.toUpperCase() ? 'bg-emerald-500' : 'bg-red-500'
 })
+
+const isMyTurn = computed(
+  () =>
+    !props.state.result &&
+    props.myColor != null &&
+    props.state.full &&
+    !props.pendingSubmission &&
+    (props.myRole === 'mover' || props.myRole === 'guesser'),
+)
 </script>
 
 <template>
-  <div class="mb-4 flex flex-col items-center gap-1 rounded-lg px-4 py-3 text-center text-sm" :class="resultBgClass ?? 'bg-stone-800'">
+  <div
+    class="mb-4 flex flex-col items-center gap-1 rounded-lg px-4 py-3 text-center text-sm"
+    :class="resultBgClass ?? (isMyTurn ? 'animate-breathe' : 'bg-stone-800')"
+  >
     <p v-if="!myColor" class="text-stone-400">{{ t('gameStatusBar.spectating') }}</p>
     <i18n-t v-if="isGuessRepetitionDraw" keypath="gameStatusBar.resultDrawGuessRepetition" tag="p" class="font-semibold text-black">
       <template #link>
@@ -69,3 +81,22 @@ const resultBgClass = computed(() => {
     <p v-else>{{ t('gameStatusBar.sideToMove', { side: TRAIT_LABELS[state.sideToMove] }) }}</p>
   </div>
 </template>
+
+<style scoped>
+.animate-breathe {
+  animation: breathe 3000ms ease-in-out infinite;
+}
+
+@keyframes breathe {
+  0%,
+  50% {
+    background-color: #292524;
+  }
+  80% {
+    background-color: #381e3b;
+  }
+  100% {
+    background-color: #292524;
+  }
+}
+</style>

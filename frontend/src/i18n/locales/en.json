@@ -78,7 +78,7 @@
   "roundResult": {
     "noGuess": "no guess",
     "guessResult": "guessed move: {square} ({outcome})",
-    "bingo": "correct",
+    "correct": "correct",
     "missed": "missed"
   },
   "game": {

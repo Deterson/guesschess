@@ -164,13 +164,17 @@ class GameGuessingTest {
     }
 
     @Test
-    void moveCannotBeResubmittedForTheSameRound() {
+    void moveCanBeOverriddenUntilTheGuessArrives() {
         Game game = Game.newGame();
         Move e4 = findMove(game.legalMoves(), "e2", "e4");
         Move d4 = findMove(game.legalMoves(), "d2", "d4");
         game.submitMove(e4);
+        game.submitMove(d4);
 
-        assertThrows(IllegalStateException.class, () -> game.submitMove(d4));
+        RoundResult result = game.submitGuess(d4).orElseThrow();
+
+        assertTrue(result.guessedCorrectly());
+        assertEquals(d4, result.actualMove());
     }
 
     @Test

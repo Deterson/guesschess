@@ -84,11 +84,11 @@ function openMyGames() {
 
     <p v-if="error" class="text-sm text-red-400">{{ error }}</p>
 
-    <div class="flex flex-col items-center gap-3">
-      <router-link to="/how-to-play" class="rounded-lg bg-stone-700 px-6 py-2 font-semibold hover:bg-stone-600">
-        {{ t('header.tutorial') }}
-      </router-link>
+    <router-link to="/how-to-play" class="font-semibold text-emerald-400 underline hover:text-emerald-300">
+      {{ t('header.tutorial') }}
+    </router-link>
 
+    <div class="flex flex-col items-center gap-3">
       <button
         type="button"
         class="rounded-lg bg-emerald-600 px-6 py-3 font-semibold hover:bg-emerald-500 disabled:opacity-50"
