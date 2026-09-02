@@ -2,10 +2,13 @@ import { useAuthStore } from '../stores/auth'
 import { i18n } from '../i18n'
 import type {
   AccountResponse,
+  AccountSettingsHttpResponse,
   Color,
+  CompleteRegistrationHttpResponse,
   CreateGameHttpResponse,
   ErrorResponse,
   GameHistoryHttpResponse,
+  GamePlayersHttpResponse,
   GameSummaryHttpResponse,
   GameVariant,
   JoinGameHttpResponse,
@@ -106,11 +109,35 @@ export const myAccess = (gameId: string, authToken: string | null) =>
 export const getGameHistory = (gameId: string) =>
   request<GameHistoryHttpResponse>(`/api/games/${gameId}/history`)
 
+export const getGamePlayers = (gameId: string) =>
+  request<GamePlayersHttpResponse>(`/api/games/${gameId}/players`)
+
 export const getMe = (authToken: string) =>
   request<AccountResponse>('/api/account/me', { token: authToken })
 
 export const updateDisplayName = (displayName: string, authToken: string) =>
   request<AccountResponse>('/api/account/me', { method: 'PATCH', body: { displayName }, token: authToken })
 
+export const updateBio = (bio: string, authToken: string) =>
+  request<AccountResponse>('/api/account/bio', { method: 'PATCH', body: { bio }, token: authToken })
+
+/** Pose le login d'un compte historique (etape 14) - deja authentifie, voir stores/account.ts. */
+export const setLogin = (login: string, authToken: string) =>
+  request<AccountResponse>('/api/account/login', { method: 'PATCH', body: { login }, token: authToken })
+
+/**
+ * Cree le compte pour un pendingToken d'inscription frais (etape 14) - jamais de
+ * jeton d'authentification ici, l'identite est portee par pendingToken lui-meme
+ * (voir RegistrationController).
+ */
+export const completeRegistration = (pendingToken: string, login: string) =>
+  request<CompleteRegistrationHttpResponse>('/api/registration/complete', { method: 'POST', body: { pendingToken, login } })
+
 export const listMyGames = (page: number, size: number, authToken: string) =>
   request<GameSummaryHttpResponse[]>(`/api/account/games?page=${page}&size=${size}`, { token: authToken })
+
+export const getAccountSettings = (authToken: string) =>
+  request<AccountSettingsHttpResponse>('/api/account/settings', { token: authToken })
+
+export const updateAccountSettings = (settings: AccountSettingsHttpResponse, authToken: string) =>
+  request<AccountSettingsHttpResponse>('/api/account/settings', { method: 'PATCH', body: settings, token: authToken })

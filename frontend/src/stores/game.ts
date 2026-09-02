@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
 import { connect, onStatusChange, publish, subscribe, type ConnectionStatus } from '../services/stompClient'
-import { getGameHistory } from '../services/api'
+import { getGameHistory, getGamePlayers } from '../services/api'
 import { i18n } from '../i18n'
 import type { StompSubscription } from '@stomp/stompjs'
 import type {
@@ -10,6 +10,7 @@ import type {
   ColorLower,
   ErrorMessage,
   GameHistoryEntry,
+  GamePlayersHttpResponse,
   GameStateMessage,
   MySubmissionMessage,
   PromotionPieceType,
@@ -62,6 +63,24 @@ export const useGameStore = defineStore('game', () => {
   const historyRounds = ref<GameHistoryEntry[]>([])
   const historyInitialBoard = ref<Board | null>(null)
   const historyIndex = ref<number | null>(null)
+
+  /**
+   * Identite des deux joueurs (etape 14) - chargee une fois via REST au join, puis
+   * tenue a jour par une souscription STOMP dediee (/topic/games/{id}/players,
+   * PlayersBroadcastService cote backend) plutot que refetchee : elle change sur un
+   * evenement precis (adversaire qui rejoint, joueur anonyme qui se connecte a un
+   * compte en pleine partie), jamais en continu comme l'etat de la partie.
+   */
+  const players = ref<GamePlayersHttpResponse | null>(null)
+
+  async function fetchPlayers() {
+    if (!gameId.value) return
+    try {
+      players.value = await getGamePlayers(gameId.value)
+    } catch {
+      players.value = null
+    }
+  }
 
   async function fetchHistory() {
     if (!gameId.value) return
@@ -130,6 +149,11 @@ export const useGameStore = defineStore('game', () => {
         }),
       )
       subscriptions.push(
+        await subscribe<GamePlayersHttpResponse>(`/topic/games/${id}/players`, (payload) => {
+          players.value = payload
+        }),
+      )
+      subscriptions.push(
         await subscribe<GameStateMessage>('/user/queue/game.state', (payload) => {
           state.value = payload
           applyMySubmission(payload.mySubmission)
@@ -184,10 +208,21 @@ export const useGameStore = defineStore('game', () => {
     historyRounds.value = []
     historyInitialBoard.value = null
     historyIndex.value = null
+    players.value = null
     subscribed = false
 
+    // fetchPlayers (comme fetchHistory) volontairement APRES ensureSubscribed, jamais
+    // en parallele : pour un tout premier visiteur anonyme (aucun cookie
+    // guesschess_anon encore pose), plusieurs requetes reellement concurrentes
+    // declenchent chacune AnonymousIdentityFilter cote serveur sans coordination entre
+    // elles - chacune constate l'absence de cookie et en mint un different, le
+    // navigateur ne retenant que le dernier Set-Cookie recu. Si celui-ci differe de
+    // l'identite deja capturee dans la session WebSocket ouverte par ensureSubscribed
+    // juste au-dessus, le premier coup/devinette soumis est rejete ("color X is
+    // already controlled by another player") - voir CLAUDE.md.
     await ensureSubscribed()
     await fetchHistory()
+    await fetchPlayers()
   }
 
   /** À appeler en quittant la vue de partie (voir GameView.vue) pour ne pas laisser les abonnements actifs en arrière-plan. */
@@ -199,6 +234,7 @@ export const useGameStore = defineStore('game', () => {
     historyRounds.value = []
     historyInitialBoard.value = null
     historyIndex.value = null
+    players.value = null
   }
 
   /**
@@ -278,6 +314,7 @@ export const useGameStore = defineStore('game', () => {
     historyRounds,
     historyInitialBoard,
     historyIndex,
+    players,
     historyPrev,
     historyNext,
     joinGame,

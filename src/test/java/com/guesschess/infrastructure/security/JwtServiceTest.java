@@ -1,5 +1,7 @@
 package com.guesschess.infrastructure.security;
 
+import com.guesschess.domain.account.AnonymousId;
+import com.guesschess.domain.account.OAuthProvider;
 import com.guesschess.domain.account.UserId;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,6 +19,8 @@ import java.time.Duration;
 import java.time.Instant;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class JwtServiceTest {
@@ -31,7 +35,7 @@ class JwtServiceTest {
         SecretKeySpec key = new SecretKeySpec(SECRET.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
         JwtEncoder jwtEncoder = new NimbusJwtEncoder(new ImmutableSecret<>(key));
         jwtDecoder = NimbusJwtDecoder.withSecretKey(key).macAlgorithm(MacAlgorithm.HS256).build();
-        jwtService = new JwtService(jwtEncoder, Duration.ofHours(1));
+        jwtService = new JwtService(jwtEncoder, jwtDecoder, Duration.ofHours(1));
     }
 
     @Test
@@ -44,5 +48,39 @@ class JwtServiceTest {
         assertEquals(userId.toString(), decoded.getSubject());
         assertEquals("Alice", decoded.getClaimAsString("displayName"));
         assertTrue(decoded.getExpiresAt().isAfter(Instant.now()));
+    }
+
+    @Test
+    void pendingRegistrationTokenRoundTripsProviderExternalIdEmailAndAnonymousId() {
+        AnonymousId anonymousId = AnonymousId.random();
+
+        String token = jwtService.generatePendingRegistrationToken(OAuthProvider.GITHUB, "gh-42", "dana@example.com", anonymousId);
+        JwtService.PendingRegistration decoded = jwtService.decodePendingRegistrationToken(token);
+
+        assertEquals(OAuthProvider.GITHUB, decoded.provider());
+        assertEquals("gh-42", decoded.externalId());
+        assertEquals("dana@example.com", decoded.email());
+        assertEquals(anonymousId, decoded.anonymousId());
+    }
+
+    @Test
+    void pendingRegistrationTokenAllowsANullEmailAndAnonymousId() {
+        String token = jwtService.generatePendingRegistrationToken(OAuthProvider.GOOGLE, "google-1", null, null);
+        JwtService.PendingRegistration decoded = jwtService.decodePendingRegistrationToken(token);
+
+        assertNull(decoded.email());
+        assertNull(decoded.anonymousId());
+    }
+
+    @Test
+    void decodePendingRegistrationTokenRejectsAnOrdinarySessionToken() {
+        String sessionToken = jwtService.generateToken(UserId.random(), "Alice");
+
+        assertThrows(IllegalArgumentException.class, () -> jwtService.decodePendingRegistrationToken(sessionToken));
+    }
+
+    @Test
+    void decodePendingRegistrationTokenRejectsAGarbageToken() {
+        assertThrows(IllegalArgumentException.class, () -> jwtService.decodePendingRegistrationToken("not-a-jwt"));
     }
 }

@@ -8,6 +8,7 @@ import com.guesschess.domain.account.UserId;
 import com.guesschess.domain.game.GameId;
 import com.guesschess.domain.piece.Color;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -70,7 +71,8 @@ public class InMemoryGameAccessRepository implements GameAccessRepository {
     }
 
     @Override
-    public void relinkAnonymousToAccount(PlayerRef.Anonymous from, PlayerRef.Account to) {
+    public List<GameId> relinkAnonymousToAccount(PlayerRef.Anonymous from, PlayerRef.Account to) {
+        List<GameId> affected = new ArrayList<>();
         for (GameAccess access : byGameId.values()) {
             GameAccess relinked = access;
             if (from.equals(access.whitePlayer())) {
@@ -83,7 +85,9 @@ public class InMemoryGameAccessRepository implements GameAccessRepository {
                 byGameId.put(relinked.gameId(), relinked);
                 byToken.put(relinked.whiteToken(), relinked);
                 byToken.put(relinked.blackToken(), relinked);
+                affected.add(relinked.gameId());
             }
         }
+        return affected;
     }
 }

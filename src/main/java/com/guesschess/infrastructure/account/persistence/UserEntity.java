@@ -18,6 +18,12 @@ class UserEntity {
     @Column(name = "display_name", nullable = false)
     private String displayName;
 
+    @Column(name = "login")
+    private String login;
+
+    @Column(name = "bio", nullable = false)
+    private String bio;
+
     @Column(name = "email")
     private String email;
 
@@ -31,9 +37,11 @@ class UserEntity {
         // JPA
     }
 
-    UserEntity(UUID id, String displayName, String email, Instant createdAt, Instant updatedAt) {
+    UserEntity(UUID id, String displayName, String login, String bio, String email, Instant createdAt, Instant updatedAt) {
         this.id = id;
         this.displayName = displayName;
+        this.login = login;
+        this.bio = bio;
         this.email = email;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
@@ -45,6 +53,14 @@ class UserEntity {
 
     String getDisplayName() {
         return displayName;
+    }
+
+    String getLogin() {
+        return login;
+    }
+
+    String getBio() {
+        return bio;
     }
 
     String getEmail() {
@@ -63,8 +79,10 @@ class UserEntity {
      * Entite managee : le dirty-checking JPA repercute ce changement au flush/commit,
      * pas besoin d'un save() explicite (voir JpaUserRepository.update).
      */
-    void updateDisplayName(String displayName, Instant updatedAt) {
+    void applyChanges(String displayName, String login, String bio, Instant updatedAt) {
         this.displayName = displayName;
+        this.login = login;
+        this.bio = bio;
         this.updatedAt = updatedAt;
     }
 }

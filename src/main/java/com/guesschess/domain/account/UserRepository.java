@@ -14,4 +14,13 @@ public interface UserRepository {
     Optional<User> findByOAuthIdentity(OAuthProvider provider, String externalId);
 
     Optional<User> findById(UserId id);
+
+    /**
+     * Verification d'unicite du login (etape 14), insensible a la casse - voir
+     * AccountService.validateLogin. Le veritable garde-fou reste l'index unique sur
+     * lower(login) en base (V9) ; cette methode n'evite qu'une erreur peu conviviale
+     * dans le cas courant, une course entre deux inscriptions simultanees reste
+     * possible et acceptable a cette echelle.
+     */
+    boolean existsByLoginIgnoreCase(String login);
 }

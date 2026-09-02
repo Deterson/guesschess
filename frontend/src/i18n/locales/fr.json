@@ -49,6 +49,7 @@
     "winnerBlack": "des noirs"
   },
   "profile": {
+    "myProfile": "Mon profil",
     "myGames": "Mes parties",
     "modify": "Modifier",
     "save": "Enregistrer",
@@ -57,10 +58,20 @@
     "waitingOpponent": "En attente d’un adversaire",
     "anonymousOpponent": "Joueur anonyme",
     "loading": "Chargement…",
-    "loadMore": "Charger plus de parties"
+    "loadMore": "Charger plus de parties",
+    "settings": "Paramètres",
+    "login": "Pseudo",
+    "loginImmutableHint": "Votre pseudo est définitif, il ne peut pas être modifié.",
+    "displayName": "Nom d'affichage",
+    "bio": "Bio",
+    "bioEmpty": "Pas encore de bio."
+  },
+  "profileSettings": {
+    "turnBlinkReminder": "Rappel clignotant quand c'est votre tour",
+    "saveError": "Impossible d'enregistrer ce paramètre."
   },
   "inviteBanner": {
-    "created": "Partie créée — invitez votre adversaire :",
+    "created": "Partie créée: invitez votre adversaire :",
     "copy": "Copier",
     "copied": "Copié"
   },
@@ -77,7 +88,7 @@
   },
   "roundResult": {
     "noGuess": "pas de devinette",
-    "guessResult": "coup deviné : {square} ({outcome})",
+    "guessResult": "Deviné : {square} ({outcome})",
     "correct": "correct",
     "missed": "raté"
   },
@@ -93,7 +104,8 @@
     "dontGuess": "Ne pas deviner",
     "offerDraw": "Proposer la nulle",
     "acceptDraw": "Accepter la nulle",
-    "opponentOffersDraw": "Votre adversaire propose la nulle"
+    "opponentOffersDraw": "Votre adversaire propose la nulle",
+    "anonymousPlayer": "Anonyme"
   },
   "home": {
     "tagline": "Les échecs, mais si vous devinez le coup de votre adversaire, il ne joue pas.",
@@ -123,10 +135,18 @@
     "example3Caption": "Ici, les blancs en échec tentent de fuir en Rf2 ; les noirs devinent Rf2 : le roi reste en échec et meurt au prochain tour.",
     "noGuessmateVariantTitle": "Variante sans Guessmate",
     "guessRepetitionTitle": "6 guess repetition",
-    "guessRepetitionText": "Si un même coup tenté par chaque camp est deviné correctement trois fois de suite par l'adversaire — sans qu'aucun coup ne soit réellement joué entre-temps — la partie est déclarée nulle. Cette règle évite qu'une paire de coups s'annule indéfiniment sans faire avancer la partie."
+    "guessRepetitionText": "Si un même coup tenté par chaque camp est deviné correctement trois fois de suite par l'adversaire, sans qu'aucun coup ne soit réellement joué entre-temps, la partie est déclarée nulle. Cette règle évite qu'une paire de coups s'annule indéfiniment sans faire avancer la partie."
   },
   "oauthCallback": {
     "connecting": "Connexion en cours…"
+  },
+  "chooseLogin": {
+    "title": "Choisissez votre pseudo",
+    "explanation": "C'est votre identifiant unique et définitif. Il sera affiché à vos adversaires et permettra à vos amis de vous trouver. Vous pourrez définir un nom d'affichage plus tard.",
+    "placeholder": "Votre pseudo",
+    "confirm": "Confirmer",
+    "formatHint": "3 à 20 caractères : lettres, chiffres, - ou _, sans commencer par un tiret.",
+    "genericError": "Impossible d'enregistrer ce pseudo."
   },
   "errors": {
     "timeout": "Le serveur ne répond pas, réessayez.",

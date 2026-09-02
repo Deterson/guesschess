@@ -237,16 +237,24 @@ Jeu d'échecs classique avec une règle additionnelle :
     Guessmate comme la seule variante (pas de mention du choix GUESSCHESS/GUESSMATE de la
     page d'accueil).
 
-14. Identifiant unique de compte (login) : à choisir une seule fois, à la toute première
-    connexion Google ou GitHub (écran dédié avant d'entrer dans l'app, une seule fois par
-    compte), **immuable** une fois posé — distinct du `display_name` libre et modifiable
-    posé à l'étape 8, qui reste par ailleurs inchangé (il sera peut-être supprimé plus tard
-    au profit de ce login unique, décision à prendre à ce moment-là, pas avant). Objectif :
-    permettre à deux joueurs de se retrouver l'un l'autre de façon fiable (recherche de
-    profil, invitation directe, futur système d'amis...), ce qu'un simple nom d'affichage
-    modifiable et potentiellement dupliqué entre comptes ne permet pas. Détails de
-    validation (charset, longueur, unicité en base) et d'écran de sélection à préciser au
-    moment d'attaquer cette étape — non développée ici au-delà de cette intention.
+14. ✅ Identifiant unique de compte (login) (fait, partiellement) : pseudonyme immuable,
+    3-20 caractères (`[A-Za-z0-9_]` puis `[A-Za-z0-9_-]*`, pas de tiret initial), unique
+    insensible à la casse (index `lower(login)`, migration V9), interdit sur "Anonymous"/
+    "Anonyme". **Pas de wipe de base** : `login` reste nullable en SQL (comptes créés avant
+    cette étape) mais un nouveau compte n'est jamais inséré sans login — inscription en deux
+    temps via un JWT "pending_registration" de courte durée (`JwtService`,
+    `RegistrationController`, `POST /api/registration/complete`) émis par
+    `OAuthLoginSuccessHandler` quand aucun compte n'existe encore pour l'identité OAuth ; un
+    compte historique sans login est bloqué côté frontend (garde `router/index.ts` +
+    `stores/account.ts`, `needsLogin`) sur `/choose-login` jusqu'à `PATCH /api/account/login`.
+    `display_name` (2-32 caractères, initialisé au login) et `bio` (5000 caractères) restent
+    modifiables séparément, page "Mon profil" (`ProfileAboutView.vue`). Login affiché
+    au-dessus/en-dessous du plateau (`PlayerLabel.vue`, chargé une fois via
+    `GET /api/games/{id}/players` puis tenu à jour en direct par `PlayersBroadcastService`
+    sur `/topic/games/{id}/players` — adversaire qui rejoint, ou joueur anonyme qui se
+    connecte à un compte en pleine partie), teinté clair/sombre selon la couleur,
+    "Anonyme"/"Anonymous" en italique pour les identités anonymes. Recherche de
+    profil/invitation directe/amis : toujours hors périmètre.
 
 ## Liaison compte/session ↔ partie (étapes 6-7)
 
@@ -295,6 +303,7 @@ tout court (échec rapide voulu au boot Spring, pas seulement au moment du login
 - `OAUTH_POST_LOGIN_REDIRECT_URI` — URL du frontend vers laquelle rediriger après login, JWT en fragment d'URL (`#token=...`). Défaut : `http://localhost:5173/oauth-callback`.
 - `ANONYMOUS_COOKIE_SECURE` — (étape 6) `true`/`false`, flag `Secure` du cookie d'identité anonyme `guesschess_anon`. Défaut `false` (dev local en HTTP) ; mettre `true` derrière HTTPS (étape 10).
   Piège déjà rencontré : un cookie `Secure` posé sur une connexion HTTP simple est silencieusement ignoré au rappel par tout client conforme RFC 6265 — si un test/flux d'identité anonyme échoue étrangement en dev local, vérifier d'abord ce flag avant de chercher plus loin.
+  Second piège déjà rencontré (corrigé, étape 14) : ce cookie doit rester en `SameSite=Lax`, jamais `Strict` — le callback OAuth (`/login/oauth2/code/{provider}`) est atteint par une redirection *initiée par* Google/GitHub, donc cross-site du point de vue du navigateur ; un cookie `Strict` y est silencieusement omis, ce qui faisait perdre le lien anonyme → compte pour un joueur qui se connecte en pleine partie jouée anonymement.
 
 ## Accès au Raspberry Pi de déploiement (étape 10)
 

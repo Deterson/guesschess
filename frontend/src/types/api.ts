@@ -84,10 +84,44 @@ export interface GameHistoryHttpResponse {
   rounds: GameHistoryEntry[]
 }
 
+/**
+ * login est null uniquement pour un compte historique cree avant l'etape 14 qui n'a
+ * pas encore choisi le sien - le frontend doit alors bloquer sur l'ecran "choisis ton
+ * pseudo" (voir router/index.ts) avant de laisser passer quoi que ce soit d'autre.
+ */
 export interface AccountResponse {
   id: string
   displayName: string
+  login: string | null
+  bio: string
   email: string | null
+}
+
+export interface CompleteRegistrationHttpResponse {
+  token: string
+  account: AccountResponse
+}
+
+/** Code d'erreur renvoye par PATCH /api/account/login et POST /api/registration/complete. */
+export type LoginErrorCode = 'LOGIN_INVALID_FORMAT' | 'LOGIN_RESERVED' | 'LOGIN_TAKEN' | 'LOGIN_ALREADY_SET' | 'PENDING_TOKEN_INVALID'
+
+/** Identite d'un joueur pour l'affichage au-dessus/en-dessous du plateau (etape 14). */
+export type PlayerInfoType = 'ACCOUNT' | 'ANONYMOUS'
+
+export interface PlayerInfo {
+  type: PlayerInfoType
+  login: string | null
+}
+
+/** GET /api/games/{id}/players - null tant que la couleur n'est pas encore liee. */
+export interface GamePlayersHttpResponse {
+  white: PlayerInfo | null
+  black: PlayerInfo | null
+}
+
+/** "Parametres" du profil (GET/PATCH /api/account/settings) - un seul champ pour l'instant. */
+export interface AccountSettingsHttpResponse {
+  turnBlinkReminder: boolean
 }
 
 export type GameOutcome = 'WON' | 'LOST' | 'DRAW' | 'ONGOING'

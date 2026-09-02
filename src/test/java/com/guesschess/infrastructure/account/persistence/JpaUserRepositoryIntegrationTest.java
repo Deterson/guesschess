@@ -56,4 +56,26 @@ class JpaUserRepositoryIntegrationTest {
         assertThrows(DataIntegrityViolationException.class,
                 () -> userRepository.insert(User.newUser("Someone else", null, identity)));
     }
+
+    /**
+     * Login unique insensible a la casse (etape 14) - repose sur l'index unique
+     * lower(login) pose par la migration V9, pas seulement sur une verification
+     * applicative.
+     */
+    @Test
+    void existsByLoginIgnoreCaseIgnoresCase() {
+        userRepository.insert(User.newUser("UniqueLogin", null, new OAuthIdentity(OAuthProvider.GOOGLE, "google-unique")));
+
+        assertTrue(userRepository.existsByLoginIgnoreCase("uniquelogin"));
+        assertTrue(userRepository.existsByLoginIgnoreCase("UNIQUELOGIN"));
+        assertTrue(!userRepository.existsByLoginIgnoreCase("someoneelse"));
+    }
+
+    @Test
+    void loginUniqueIndexRejectsTheSameLoginIgnoringCase() {
+        userRepository.insert(User.newUser("CaseLogin", null, new OAuthIdentity(OAuthProvider.GOOGLE, "google-case-1")));
+
+        assertThrows(DataIntegrityViolationException.class,
+                () -> userRepository.insert(User.newUser("caselogin", null, new OAuthIdentity(OAuthProvider.GOOGLE, "google-case-2"))));
+    }
 }

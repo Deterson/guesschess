@@ -49,6 +49,7 @@
     "winnerBlack": "Black"
   },
   "profile": {
+    "myProfile": "My profile",
     "myGames": "My games",
     "modify": "Edit",
     "save": "Save",
@@ -57,10 +58,20 @@
     "waitingOpponent": "Waiting for an opponent",
     "anonymousOpponent": "Anonymous player",
     "loading": "Loading…",
-    "loadMore": "Load more games"
+    "loadMore": "Load more games",
+    "settings": "Settings",
+    "login": "Login",
+    "loginImmutableHint": "Your login is permanent and cannot be changed.",
+    "displayName": "Display name",
+    "bio": "Bio",
+    "bioEmpty": "No bio yet."
+  },
+  "profileSettings": {
+    "turnBlinkReminder": "Blinking reminder when it's your turn",
+    "saveError": "Could not save this setting."
   },
   "inviteBanner": {
-    "created": "Game created — invite your opponent:",
+    "created": "Game created: invite your opponent:",
     "copy": "Copy",
     "copied": "Copied"
   },
@@ -77,7 +88,7 @@
   },
   "roundResult": {
     "noGuess": "no guess",
-    "guessResult": "guessed move: {square} ({outcome})",
+    "guessResult": "Guessed: {square} ({outcome})",
     "correct": "correct",
     "missed": "missed"
   },
@@ -93,7 +104,8 @@
     "dontGuess": "Don't guess",
     "offerDraw": "Offer draw",
     "acceptDraw": "Accept draw",
-    "opponentOffersDraw": "Your opponent offers a draw"
+    "opponentOffersDraw": "Your opponent offers a draw",
+    "anonymousPlayer": "Anonymous"
   },
   "home": {
     "tagline": "Chess, but if you guess your opponent's move, it isn't played.",
@@ -127,6 +139,14 @@
   },
   "oauthCallback": {
     "connecting": "Signing in…"
+  },
+  "chooseLogin": {
+    "title": "Choose your login",
+    "explanation": "This is your permanent, unique identifier. It will be shown to your opponents and used by your friends to find you. You can still set a different, changeable display name later.",
+    "placeholder": "your login",
+    "confirm": "Confirm",
+    "formatHint": "3 to 20 characters: letters, digits, - or _, and it can't start with a hyphen.",
+    "genericError": "Could not save this login."
   },
   "errors": {
     "timeout": "The server isn't responding, please try again.",

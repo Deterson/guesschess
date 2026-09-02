@@ -1,12 +1,15 @@
 package com.guesschess.infrastructure.web;
 
 import com.guesschess.application.CreatedGame;
+import com.guesschess.application.GameAccess;
 import com.guesschess.application.GameLifecycleService;
 import com.guesschess.application.GameSnapshot;
 import com.guesschess.application.JoinResult;
 import com.guesschess.application.MyAccess;
 import com.guesschess.application.NoOpenColorException;
 import com.guesschess.application.PlayerRef;
+import com.guesschess.application.account.AccountService;
+import com.guesschess.application.account.AccountSnapshot;
 import com.guesschess.domain.game.Game;
 import com.guesschess.domain.game.GameId;
 import com.guesschess.domain.game.GameNotFoundException;
@@ -21,9 +24,12 @@ import com.guesschess.infrastructure.web.dto.CreateGameHttpResponse;
 import com.guesschess.infrastructure.web.dto.ErrorResponse;
 import com.guesschess.infrastructure.web.dto.GameHistoryEntryHttpResponse;
 import com.guesschess.infrastructure.web.dto.GameHistoryHttpResponse;
+import com.guesschess.infrastructure.web.dto.GamePlayersHttpResponse;
 import com.guesschess.infrastructure.web.dto.JoinGameHttpResponse;
 import com.guesschess.infrastructure.web.dto.MyAccessHttpResponse;
+import com.guesschess.infrastructure.web.dto.PlayerInfoHttpResponse;
 import com.guesschess.infrastructure.websocket.GameMessageMapper;
+import com.guesschess.infrastructure.websocket.PlayersBroadcastService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -64,13 +70,18 @@ class GameCreationController {
     private final HttpPlayerIdentityResolver identityResolver;
     private final SimpMessagingTemplate messagingTemplate;
     private final GameMessageMapper mapper;
+    private final AccountService accountService;
+    private final PlayersBroadcastService playersBroadcastService;
 
     GameCreationController(GameLifecycleService gameLifecycleService, HttpPlayerIdentityResolver identityResolver,
-                            SimpMessagingTemplate messagingTemplate, GameMessageMapper mapper) {
+                            SimpMessagingTemplate messagingTemplate, GameMessageMapper mapper, AccountService accountService,
+                            PlayersBroadcastService playersBroadcastService) {
         this.gameLifecycleService = gameLifecycleService;
         this.identityResolver = identityResolver;
         this.messagingTemplate = messagingTemplate;
         this.mapper = mapper;
+        this.accountService = accountService;
+        this.playersBroadcastService = playersBroadcastService;
     }
 
     @PostMapping
@@ -109,6 +120,7 @@ class GameCreationController {
                     .body(new ErrorResponse("GAME_FULL", "Cette partie est deja complete"));
         }
         broadcastGameState(id);
+        playersBroadcastService.broadcastPlayers(id);
         return ResponseEntity.ok(new JoinGameHttpResponse(result.gameId().toString(), result.color().name(), result.token().toString()));
     }
 
@@ -146,6 +158,36 @@ class GameCreationController {
         }
         MyAccess found = access.get();
         return ResponseEntity.ok(new MyAccessHttpResponse(found.color().name(), found.token().toString()));
+    }
+
+    /**
+     * Identite des deux joueurs (etape 14) - lecture seule et accessible sans jeton
+     * comme my-access/pggn/history, alimente l'affichage du pseudo au-dessus/
+     * en-dessous du plateau. login vaut le displayName pour un compte historique qui
+     * n'a pas encore choisi le sien (voir CLAUDE.md, migration V9) plutot que null,
+     * pour ne jamais afficher un nom vide sur une partie en cours.
+     */
+    @GetMapping("/{gameId}/players")
+    ResponseEntity<?> players(@PathVariable String gameId) {
+        GameAccess access = gameLifecycleService.findAccess(GameId.fromString(gameId))
+                .orElse(null);
+        if (access == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new ErrorResponse("GAME_NOT_FOUND", "Partie introuvable"));
+        }
+        return ResponseEntity.ok(new GamePlayersHttpResponse(
+                toPlayerInfo(access.playerOf(Color.WHITE)), toPlayerInfo(access.playerOf(Color.BLACK))));
+    }
+
+    private PlayerInfoHttpResponse toPlayerInfo(PlayerRef ref) {
+        return switch (ref) {
+            case null -> null;
+            case PlayerRef.Anonymous anonymous -> new PlayerInfoHttpResponse("ANONYMOUS", null);
+            case PlayerRef.Account account -> {
+                AccountSnapshot snapshot = accountService.getById(account.userId());
+                yield new PlayerInfoHttpResponse("ACCOUNT", snapshot.login() != null ? snapshot.login() : snapshot.displayName());
+            }
+        };
     }
 
     /**

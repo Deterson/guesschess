@@ -13,6 +13,7 @@ import MoveHistoryList from '../components/MoveHistoryList.vue'
 import ChatPanel from '../components/ChatPanel.vue'
 import InviteBanner from '../components/InviteBanner.vue'
 import AuthModal from '../components/AuthModal.vue'
+import PlayerLabel from '../components/PlayerLabel.vue'
 import type { Board, ColorLower, PromotionPieceType, RoundSummaryMessage } from '../types/api'
 
 const props = defineProps<{
@@ -22,8 +23,20 @@ const props = defineProps<{
 const gameStore = useGameStore()
 const authStore = useAuthStore()
 const { t } = useI18n()
-const { state, error, pendingSubmission, pendingMove, myColor, canAct, chatMessages, connectionStatus, historyRounds, historyInitialBoard, historyIndex } =
-  storeToRefs(gameStore)
+const {
+  state,
+  error,
+  pendingSubmission,
+  pendingMove,
+  myColor,
+  canAct,
+  chatMessages,
+  connectionStatus,
+  historyRounds,
+  historyInitialBoard,
+  historyIndex,
+  players,
+} = storeToRefs(gameStore)
 
 onUnmounted(() => {
   gameStore.leaveGame()
@@ -93,6 +106,17 @@ watch(
   },
   { immediate: true },
 )
+
+const topPlayer = computed(() => {
+  const orientation = myColor.value ?? 'white'
+  return orientation === 'white' ? players.value?.black ?? null : players.value?.white ?? null
+})
+const bottomPlayer = computed(() => {
+  const orientation = myColor.value ?? 'white'
+  return orientation === 'white' ? players.value?.white ?? null : players.value?.black ?? null
+})
+const topPlayerColor = computed<ColorLower>(() => ((myColor.value ?? 'white') === 'white' ? 'black' : 'white'))
+const bottomPlayerColor = computed<ColorLower>(() => myColor.value ?? 'white')
 
 function startJoin() {
   joinError.value = null
@@ -395,6 +419,8 @@ function submitNoGuess() {
         </div>
 
         <div class="order-2 mx-auto flex w-full max-w-xl flex-col items-center gap-4 @min-[67rem]:order-none @min-[67rem]:col-start-2 @min-[67rem]:mx-0 @min-[67rem]:max-w-none">
+          <PlayerLabel class="w-full" :color="topPlayerColor" :info="topPlayer" />
+
           <ChessBoard
             :board="hoverGuessBoard ?? displayBoard ?? state.board"
             :legal-moves="state.legalMoves"
@@ -407,6 +433,8 @@ function submitNoGuess() {
             :checked-color="checkedColor"
             @choose-move="onChooseMove"
           />
+
+          <PlayerLabel class="w-full" :color="bottomPlayerColor" :info="bottomPlayer" />
 
           <GameStatusBar class="w-full" :state="state" :my-color="myColor" :my-role="myRole" :pending-submission="pendingSubmission" />
 

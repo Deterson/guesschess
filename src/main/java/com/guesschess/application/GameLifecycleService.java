@@ -215,6 +215,15 @@ public class GameLifecycleService {
     }
 
     /**
+     * Identite des deux joueurs (etape 14, affichage du pseudo cote plateau) - vide si
+     * gameId n'existe pas, whitePlayer/blackPlayer valent null tant que la couleur
+     * correspondante n'est pas encore liee (voir GameAccess).
+     */
+    public Optional<GameAccess> findAccess(GameId gameId) {
+        return gameAccessRepository.findByGameId(gameId);
+    }
+
+    /**
      * Acceptation d'une invitation (etape 7, sans token) : revendique l'unique couleur
      * encore libre de gameId pour requester - il n'y a plus de choix de couleur a faire
      * cote appelant, puisqu'un lien reel n'a jamais qu'un seul siege libre (le

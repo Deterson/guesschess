@@ -4,8 +4,8 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '../stores/auth'
 import { useGameStore } from '../stores/game'
-import { consume as consumePendingAction } from '../services/pendingAction'
-import { createGame, joinGame } from '../services/api'
+import { resumeAfterLogin } from '../services/postLogin'
+import { save as savePendingRegistration } from '../services/pendingRegistration'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -15,7 +15,19 @@ const error = ref<string | null>(null)
 
 onMounted(async () => {
   const params = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+  const pendingToken = params.get('pendingToken')
   const token = params.get('token')
+
+  // Etape 14 : identite OAuth verifiee mais aucun compte ne lui correspond encore -
+  // le pendingAction (creer/rejoindre une partie) reste en sessionStorage, il sera
+  // rejoue par ChooseLoginView une fois l'inscription terminee.
+  if (pendingToken) {
+    savePendingRegistration(pendingToken)
+    history.replaceState(null, '', window.location.pathname)
+    router.replace('/choose-login')
+    return
+  }
+
   if (!token) {
     router.replace('/')
     return
@@ -23,30 +35,8 @@ onMounted(async () => {
   authStore.login(token)
   history.replaceState(null, '', window.location.pathname)
 
-  const action = consumePendingAction()
-  if (!action) {
-    router.replace('/')
-    return
-  }
-
   try {
-    if (action.type === 'create') {
-      const created = await createGame(action.variant, action.color, token)
-      await gameStore.joinGame({
-        gameId: created.gameId,
-        token: created.creatorToken,
-        color: created.creatorColor.toLowerCase() as 'white' | 'black',
-      })
-      router.replace(`/game/${created.gameId}`)
-    } else if (action.type === 'join') {
-      const joined = await joinGame(action.gameId, token)
-      await gameStore.joinGame({ gameId: joined.gameId, token: joined.token, color: joined.color.toLowerCase() as 'white' | 'black' })
-      router.replace(`/game/${action.gameId}`)
-    } else if (action.type === 'login') {
-      router.replace(action.returnTo || '/')
-    } else {
-      router.replace('/')
-    }
+    await resumeAfterLogin(token, router, gameStore)
   } catch (e) {
     error.value = (e as Error).message
   }

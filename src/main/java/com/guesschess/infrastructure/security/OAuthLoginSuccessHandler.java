@@ -5,7 +5,9 @@ import com.guesschess.application.PlayerRef;
 import com.guesschess.application.account.AccountService;
 import com.guesschess.application.account.AccountSnapshot;
 import com.guesschess.domain.account.AnonymousId;
+import com.guesschess.domain.game.GameId;
 import com.guesschess.infrastructure.security.oauth.OAuthAttributes;
+import com.guesschess.infrastructure.websocket.PlayersBroadcastService;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -18,12 +20,17 @@ import org.springframework.stereotype.Component;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Optional;
 
 /**
- * A la reussite d'un login OAuth2 (Google/GitHub) : find-or-create le compte, emet un
- * JWT et redirige vers le frontend avec le token en fragment d'URL (jamais en query
- * string, pour eviter qu'il finisse dans des logs serveur/proxy). Le frontend
- * (etape 5) lira ce fragment cote client.
+ * A la reussite d'un login OAuth2 (Google/GitHub) : redirige vers le frontend avec,
+ * en fragment d'URL (jamais en query string, pour eviter qu'il finisse dans des logs
+ * serveur/proxy), soit un jeton de session (compte deja existant), soit un jeton
+ * d'inscription en attente (etape 14 : aucun compte ne correspond encore a cette
+ * identite OAuth) - dans ce second cas, rien n'est cree en base ici ; le frontend
+ * redirige vers l'ecran "choisis ton pseudo", et seule sa soumission valide (voir
+ * RegistrationController) cree effectivement le compte.
  */
 @Component
 class OAuthLoginSuccessHandler implements AuthenticationSuccessHandler {
@@ -31,13 +38,16 @@ class OAuthLoginSuccessHandler implements AuthenticationSuccessHandler {
     private final AccountService accountService;
     private final JwtService jwtService;
     private final GameAccessRepository gameAccessRepository;
+    private final PlayersBroadcastService playersBroadcastService;
     private final String postLoginRedirectUri;
 
     OAuthLoginSuccessHandler(AccountService accountService, JwtService jwtService, GameAccessRepository gameAccessRepository,
+                              PlayersBroadcastService playersBroadcastService,
                               @Value("${app.oauth.post-login-redirect-uri}") String postLoginRedirectUri) {
         this.accountService = accountService;
         this.jwtService = jwtService;
         this.gameAccessRepository = gameAccessRepository;
+        this.playersBroadcastService = playersBroadcastService;
         this.postLoginRedirectUri = postLoginRedirectUri;
     }
 
@@ -49,18 +59,29 @@ class OAuthLoginSuccessHandler implements AuthenticationSuccessHandler {
                 oauthToken.getAuthorizedClientRegistrationId(),
                 oauthToken.getPrincipal().getAttributes());
 
-        AccountSnapshot account = accountService.findOrCreateByOAuthIdentity(
-                attributes.provider(), attributes.externalId(), attributes.displayName(), attributes.email());
-
-        // Fusion identite anonyme -> compte (etape 8) : toute partie deja liee au
-        // cookie anonyme de CE navigateur bascule vers le compte qui vient de se
-        // connecter, pour apparaitre dans "Mes parties". Seule exception documentee a
-        // l'immuabilite du lien - voir GameAccessRepository.relinkAnonymousToAccount.
         AnonymousId anonymousId = (AnonymousId) request.getAttribute(AnonymousIdentityFilter.REQUEST_ATTRIBUTE);
-        gameAccessRepository.relinkAnonymousToAccount(new PlayerRef.Anonymous(anonymousId), new PlayerRef.Account(account.id()));
+        Optional<AccountSnapshot> existing = accountService.findByOAuthIdentity(attributes.provider(), attributes.externalId());
 
-        String token = jwtService.generateToken(account.id(), account.displayName());
-        String redirectUrl = postLoginRedirectUri + "#token=" + URLEncoder.encode(token, StandardCharsets.UTF_8);
+        String redirectUrl;
+        if (existing.isPresent()) {
+            AccountSnapshot account = existing.get();
+            // Fusion identite anonyme -> compte (etape 8) : toute partie deja liee au
+            // cookie anonyme de CE navigateur bascule vers le compte qui vient de se
+            // connecter, pour apparaitre dans "Mes parties". Seule exception documentee a
+            // l'immuabilite du lien - voir GameAccessRepository.relinkAnonymousToAccount.
+            List<GameId> relinkedGames = gameAccessRepository.relinkAnonymousToAccount(
+                    new PlayerRef.Anonymous(anonymousId), new PlayerRef.Account(account.id()));
+            // Un joueur anonyme peut se connecter EN PLEINE PARTIE (etape 14) : sans
+            // cette diffusion, l'adversaire et les spectateurs deja connectes ne
+            // verraient le nouveau pseudo qu'au prochain rechargement de page.
+            relinkedGames.forEach(playersBroadcastService::broadcastPlayers);
+            String token = jwtService.generateToken(account.id(), account.displayName());
+            redirectUrl = postLoginRedirectUri + "#token=" + URLEncoder.encode(token, StandardCharsets.UTF_8);
+        } else {
+            String pendingToken = jwtService.generatePendingRegistrationToken(
+                    attributes.provider(), attributes.externalId(), attributes.email(), anonymousId);
+            redirectUrl = postLoginRedirectUri + "#pendingToken=" + URLEncoder.encode(pendingToken, StandardCharsets.UTF_8);
+        }
         response.sendRedirect(redirectUrl);
     }
 }

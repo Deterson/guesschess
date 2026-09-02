@@ -5,4 +5,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.UUID;
 
 interface SpringDataUserJpaRepository extends JpaRepository<UserEntity, UUID> {
+
+    boolean existsByLoginIgnoreCase(String login);
 }

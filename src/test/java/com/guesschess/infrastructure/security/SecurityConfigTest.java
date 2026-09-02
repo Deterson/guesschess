@@ -22,7 +22,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * /api/account/me exige un JWT Bearer valide, /ws/** reste public (etape 4 de la
  * roadmap - voir SecurityConfig). Le login OAuth2 reel (redirection vers Google/
  * GitHub) n'est pas simule ici (voir OAuthLoginSuccessHandlerTest pour la logique
- * de find-or-create + redirection).
+ * de redirection selon qu'un compte existe deja ou non).
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @AutoConfigureMockMvc
@@ -45,12 +45,12 @@ class SecurityConfigTest {
 
     @Test
     void meWithAValidJwtReturnsTheAuthenticatedAccount() throws Exception {
-        AccountSnapshot account = accountService.findOrCreateByOAuthIdentity(
-                OAuthProvider.GOOGLE, "security-test-1", "Carol", "carol@example.com");
+        AccountSnapshot account = accountService.completeRegistration(
+                OAuthProvider.GOOGLE, "security-test-1", "carol@example.com", "carol");
 
         mockMvc.perform(get("/api/account/me").with(jwt().jwt(j -> j.subject(account.id().toString()))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.displayName").value("Carol"))
+                .andExpect(jsonPath("$.displayName").value("carol"))
                 .andExpect(jsonPath("$.email").value("carol@example.com"));
     }
 }

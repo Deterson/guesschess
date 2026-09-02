@@ -3,7 +3,9 @@ package com.guesschess.infrastructure.account.web;
 import com.guesschess.application.GameLifecycleService;
 import com.guesschess.application.PlayerRef;
 import com.guesschess.application.account.AccountService;
+import com.guesschess.application.account.AccountSettingsSnapshot;
 import com.guesschess.application.account.AccountSnapshot;
+import com.guesschess.application.account.InvalidLoginException;
 import com.guesschess.domain.account.UserId;
 import com.guesschess.infrastructure.web.dto.ErrorResponse;
 import com.guesschess.infrastructure.websocket.GameMessageMapper;
@@ -44,22 +46,58 @@ class AccountController {
     @GetMapping("/me")
     AccountResponse me(@AuthenticationPrincipal Jwt jwt) {
         AccountSnapshot account = accountService.getById(UserId.fromString(jwt.getSubject()));
-        return new AccountResponse(account.id().toString(), account.displayName(), account.email());
+        return toResponse(account);
     }
 
     /**
-     * Nom d'affichage modifiable (etape 8) - 3 caracteres minimum, voir
+     * Nom d'affichage modifiable (etape 8) - 2 a 32 caracteres, voir
      * AccountService.updateDisplayName.
      */
     @PatchMapping("/me")
     ResponseEntity<?> updateMe(@AuthenticationPrincipal Jwt jwt, @RequestBody UpdateDisplayNameHttpRequest request) {
         try {
             AccountSnapshot account = accountService.updateDisplayName(UserId.fromString(jwt.getSubject()), request.displayName());
-            return ResponseEntity.ok(new AccountResponse(account.id().toString(), account.displayName(), account.email()));
+            return ResponseEntity.ok(toResponse(account));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest()
-                    .body(new ErrorResponse("INVALID_DISPLAY_NAME", "Le nom doit contenir au moins 3 caracteres"));
+                    .body(new ErrorResponse("INVALID_DISPLAY_NAME", "Le nom doit contenir entre 2 et 32 caracteres"));
         }
+    }
+
+    /**
+     * Pose le login d'un compte historique cree avant l'etape 14 (login nullable en
+     * base, voir migration V9) - le compte est deja authentifie (JWT de session
+     * normal), il lui manque juste ce champ pour sortir du blocage cote frontend.
+     * Immuable : un second appel echoue (le compte a deja un login).
+     */
+    @PatchMapping("/login")
+    ResponseEntity<?> setLogin(@AuthenticationPrincipal Jwt jwt, @RequestBody SetLoginHttpRequest request) {
+        try {
+            AccountSnapshot account = accountService.setLoginForExistingAccount(UserId.fromString(jwt.getSubject()), request.login());
+            return ResponseEntity.ok(toResponse(account));
+        } catch (InvalidLoginException e) {
+            return ResponseEntity.badRequest().body(new ErrorResponse(e.code(), e.getMessage()));
+        } catch (IllegalStateException e) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(new ErrorResponse("LOGIN_ALREADY_SET", "Ce compte a deja un pseudo"));
+        }
+    }
+
+    /**
+     * Bio libre du profil (etape 14) - 5000 caracteres maximum, voir AccountService.updateBio.
+     */
+    @PatchMapping("/bio")
+    ResponseEntity<?> updateBio(@AuthenticationPrincipal Jwt jwt, @RequestBody UpdateBioHttpRequest request) {
+        try {
+            AccountSnapshot account = accountService.updateBio(UserId.fromString(jwt.getSubject()), request.bio());
+            return ResponseEntity.ok(toResponse(account));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest()
+                    .body(new ErrorResponse("INVALID_BIO", "La bio ne doit pas depasser 5000 caracteres"));
+        }
+    }
+
+    private AccountResponse toResponse(AccountSnapshot account) {
+        return new AccountResponse(account.id().toString(), account.displayName(), account.login(), account.bio(), account.email());
     }
 
     /**
@@ -75,6 +113,22 @@ class AccountController {
         return gameLifecycleService.listGamesForAccount(userId, Math.max(page, 0), boundedSize).stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    /**
+     * "Parametres" du profil : un seul parametre pour l'instant (rappel clignotant),
+     * voir AccountSettingsSnapshot pour l'extension a de futurs parametres.
+     */
+    @GetMapping("/settings")
+    AccountSettingsResponse settings(@AuthenticationPrincipal Jwt jwt) {
+        AccountSettingsSnapshot settings = accountService.getSettings(UserId.fromString(jwt.getSubject()));
+        return new AccountSettingsResponse(settings.turnBlinkReminder());
+    }
+
+    @PatchMapping("/settings")
+    AccountSettingsResponse updateSettings(@AuthenticationPrincipal Jwt jwt, @RequestBody UpdateAccountSettingsHttpRequest request) {
+        AccountSettingsSnapshot settings = accountService.updateTurnBlinkReminder(UserId.fromString(jwt.getSubject()), request.turnBlinkReminder());
+        return new AccountSettingsResponse(settings.turnBlinkReminder());
     }
 
     private GameSummaryHttpResponse toResponse(GameLifecycleService.GameSummary summary) {

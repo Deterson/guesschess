@@ -88,11 +88,16 @@ class JpaGameAccessRepository implements GameAccessRepository {
 
     @Override
     @Transactional
-    public void relinkAnonymousToAccount(PlayerRef.Anonymous from, PlayerRef.Account to) {
+    public List<GameId> relinkAnonymousToAccount(PlayerRef.Anonymous from, PlayerRef.Account to) {
         UUID anonymousId = from.anonymousId().value();
         UUID userId = to.userId().value();
+        List<GameId> affected = springDataRepository.findGameIdsByAnonymousPlayer(anonymousId).stream()
+                .map(GameId::new)
+                .distinct()
+                .toList();
         springDataRepository.relinkWhitePlayer(anonymousId, userId);
         springDataRepository.relinkBlackPlayer(anonymousId, userId);
+        return affected;
     }
 
     private GameAccess toDomain(GameAccessEntity entity) {

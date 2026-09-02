@@ -21,6 +21,16 @@ interface SpringDataGameAccessJpaRepository extends JpaRepository<GameAccessEnti
     List<GameAccessEntity> findAllByAccount(@Param("userId") UUID userId, Pageable pageable);
 
     /**
+     * Parties affectees par une fusion anonyme -> compte (etape 14) - lue AVANT les
+     * deux UPDATE ci-dessous (qui ne renvoient rien), pour que l'appelant puisse
+     * diffuser une mise a jour de l'identite des joueurs (voir PlayersBroadcastService).
+     */
+    @Query("select a.gameId from GameAccessEntity a where "
+            + "(a.whitePlayerType = 'ANONYMOUS' and a.whitePlayerId = :anonymousId) "
+            + "or (a.blackPlayerType = 'ANONYMOUS' and a.blackPlayerId = :anonymousId)")
+    List<UUID> findGameIdsByAnonymousPlayer(@Param("anonymousId") UUID anonymousId);
+
+    /**
      * Fusion anonyme -> compte (etape 8) : deux requetes (colonnes blanc/noir separees)
      * plutot qu'une seule avec OR, une mise a jour SQL ne pouvant pas conditionner
      * quelle paire de colonnes toucher au sein d'une meme ligne selon laquelle matche.

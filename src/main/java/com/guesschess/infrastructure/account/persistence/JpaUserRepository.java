@@ -34,7 +34,7 @@ class JpaUserRepository implements UserRepository {
     @Transactional
     public void insert(User user) {
         Instant now = Instant.now();
-        users.save(new UserEntity(user.id().value(), user.displayName(), user.email(), now, now));
+        users.save(new UserEntity(user.id().value(), user.displayName(), user.login(), user.bio(), user.email(), now, now));
         for (OAuthIdentity identity : user.identities()) {
             identities.save(new OAuthIdentityEntity(
                     UUID.randomUUID(), user.id().value(), identity.provider().name(), identity.externalId(), now));
@@ -46,7 +46,13 @@ class JpaUserRepository implements UserRepository {
     public void update(User user) {
         UserEntity entity = users.findById(user.id().value())
                 .orElseThrow(() -> new IllegalArgumentException("no user found for id: " + user.id()));
-        entity.updateDisplayName(user.displayName(), Instant.now());
+        entity.applyChanges(user.displayName(), user.login(), user.bio(), Instant.now());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean existsByLoginIgnoreCase(String login) {
+        return users.existsByLoginIgnoreCase(login);
     }
 
     @Override
@@ -67,6 +73,7 @@ class JpaUserRepository implements UserRepository {
         List<OAuthIdentity> userIdentities = identities.findByUserId(entity.getId()).stream()
                 .map(e -> new OAuthIdentity(OAuthProvider.valueOf(e.getProvider()), e.getExternalId()))
                 .toList();
-        return new User(new UserId(entity.getId()), entity.getDisplayName(), entity.getEmail(), userIdentities, entity.getCreatedAt());
+        return new User(new UserId(entity.getId()), entity.getDisplayName(), entity.getLogin(), entity.getBio(),
+                entity.getEmail(), userIdentities, entity.getCreatedAt());
     }
 }

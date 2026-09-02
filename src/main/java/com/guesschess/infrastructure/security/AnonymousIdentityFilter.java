@@ -98,7 +98,19 @@ public class AnonymousIdentityFilter extends OncePerRequestFilter {
         return ResponseCookie.from(COOKIE_NAME, value)
                 .httpOnly(true)
                 .secure(secureCookie)
-                .sameSite("Strict")
+                // "Lax", pas "Strict" : le callback OAuth (/login/oauth2/code/{provider})
+                // est atteint par une navigation top-level GET redirigee DEPUIS le
+                // fournisseur (Google/GitHub), donc cross-site du point de vue du
+                // navigateur - un cookie "Strict" y est silencieusement omis. Ce
+                // cookie etait alors absent precisement sur la requete qui resout
+                // l'identite anonyme a relier au compte (OAuthLoginSuccessHandler/
+                // RegistrationController), qui en mintait donc une toute nouvelle sans
+                // rapport avec la partie jouee juste avant - perte du lien anonyme ->
+                // compte a la connexion. "Lax" autorise le cookie sur une navigation
+                // top-level GET meme cross-site (exactement ce cas), sans l'exposer
+                // aux requetes cross-site plus sensibles (POST, sub-resources) qu'
+                // "Strict" bloque aussi.
+                .sameSite("Lax")
                 .path("/")
                 .maxAge(COOKIE_MAX_AGE)
                 .build();

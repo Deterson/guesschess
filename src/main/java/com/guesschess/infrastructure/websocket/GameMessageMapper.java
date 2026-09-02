@@ -1,7 +1,11 @@
 package com.guesschess.infrastructure.websocket;
 
+import com.guesschess.application.GameAccess;
 import com.guesschess.application.GameSnapshot;
 import com.guesschess.application.MoveIntent;
+import com.guesschess.application.PlayerRef;
+import com.guesschess.application.account.AccountService;
+import com.guesschess.application.account.AccountSnapshot;
 import com.guesschess.domain.board.Board;
 import com.guesschess.domain.board.Position;
 import com.guesschess.domain.game.Game;
@@ -13,10 +17,12 @@ import com.guesschess.domain.notation.SanGenerator;
 import com.guesschess.domain.piece.Color;
 import com.guesschess.domain.piece.Piece;
 import com.guesschess.domain.piece.PieceType;
+import com.guesschess.infrastructure.websocket.dto.GamePlayersMessage;
 import com.guesschess.infrastructure.websocket.dto.GameStateMessage;
 import com.guesschess.infrastructure.websocket.dto.LegalMoveMessage;
 import com.guesschess.infrastructure.websocket.dto.MoveHistoryEntry;
 import com.guesschess.infrastructure.websocket.dto.MySubmissionMessage;
+import com.guesschess.infrastructure.websocket.dto.PlayerInfoMessage;
 import com.guesschess.infrastructure.websocket.dto.ResultMessage;
 import com.guesschess.infrastructure.websocket.dto.RoundSummaryMessage;
 import org.springframework.stereotype.Component;
@@ -29,6 +35,32 @@ import java.util.List;
  */
 @Component
 public class GameMessageMapper {
+
+    private final AccountService accountService;
+
+    public GameMessageMapper(AccountService accountService) {
+        this.accountService = accountService;
+    }
+
+    /**
+     * Identite affichable des deux joueurs (etape 14) - login vaut le displayName pour
+     * un compte historique qui n'a pas encore choisi le sien (voir CLAUDE.md, migration
+     * V9), jamais null, pour ne jamais afficher un nom vide sur une partie en cours.
+     */
+    public GamePlayersMessage toPlayersMessage(GameAccess access) {
+        return new GamePlayersMessage(toPlayerInfo(access.playerOf(Color.WHITE)), toPlayerInfo(access.playerOf(Color.BLACK)));
+    }
+
+    private PlayerInfoMessage toPlayerInfo(PlayerRef ref) {
+        return switch (ref) {
+            case null -> null;
+            case PlayerRef.Anonymous anonymous -> new PlayerInfoMessage("ANONYMOUS", null);
+            case PlayerRef.Account account -> {
+                AccountSnapshot snapshot = accountService.getById(account.userId());
+                yield new PlayerInfoMessage("ACCOUNT", snapshot.login() != null ? snapshot.login() : snapshot.displayName());
+            }
+        };
+    }
 
     /**
      * A n'utiliser que pour une diffusion publique (/topic/games/{gameId}) : ne porte

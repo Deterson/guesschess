@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useSettingsStore } from '../stores/settings'
 import type { Color, GameStateMessage } from '../types/api'
 
 const props = withDefaults(
@@ -18,6 +19,7 @@ const props = withDefaults(
 )
 
 const { t } = useI18n()
+const settingsStore = useSettingsStore()
 
 const TRAIT_LABELS = computed<Record<Color, string>>(() => ({ WHITE: t('gameStatusBar.traitWhite'), BLACK: t('gameStatusBar.traitBlack') }))
 const WIN_LABELS = computed<Record<Color, string>>(() => ({ WHITE: t('gameStatusBar.winnerWhite'), BLACK: t('gameStatusBar.winnerBlack') }))
@@ -54,12 +56,28 @@ const isMyTurn = computed(
     !props.pendingSubmission &&
     (props.myRole === 'mover' || props.myRole === 'guesser'),
 )
+
+/**
+ * Un clic sur la bannière arrête le clignotement jusqu'au prochain tour - remis à zéro
+ * dès que isMyTurn redevient vrai (nouveau round : l'ancien a été soumis/résolu).
+ */
+const acknowledged = ref(false)
+watch(isMyTurn, (myTurn) => {
+  if (myTurn) acknowledged.value = false
+})
+
+const isBreathing = computed(() => isMyTurn.value && !acknowledged.value && settingsStore.turnBlinkReminder)
+
+function acknowledge() {
+  acknowledged.value = true
+}
 </script>
 
 <template>
   <div
     class="mb-4 flex flex-col items-center gap-1 rounded-lg px-4 py-3 text-center text-sm"
-    :class="resultBgClass ?? (isMyTurn ? 'animate-breathe' : 'bg-stone-800')"
+    :class="[resultBgClass ?? (isBreathing ? 'animate-breathe' : 'bg-stone-800'), isBreathing ? 'cursor-pointer' : '']"
+    @click="acknowledge"
   >
     <p v-if="!myColor" class="text-stone-400">{{ t('gameStatusBar.spectating') }}</p>
     <i18n-t v-if="isGuessRepetitionDraw" keypath="gameStatusBar.resultDrawGuessRepetition" tag="p" class="font-semibold text-black">

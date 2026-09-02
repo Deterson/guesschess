@@ -45,6 +45,11 @@ public interface GameAccessRepository {
      * invisibles dans "Mes parties" une fois l'utilisateur connecte. Seule exception
      * volontaire a l'immuabilite du lien une fois pose (voir GameAccess.withPlayerLinked) :
      * a n'appeler qu'au moment du login reussi (voir OAuthLoginSuccessHandler).
+     *
+     * @return les parties dont un lien vient d'etre reecrit (etape 14) - permet a
+     * l'appelant de diffuser une mise a jour de l'identite des joueurs (voir
+     * PlayersBroadcastService) sur chacune, notamment celle en cours si l'utilisateur
+     * se connecte en pleine partie.
      */
-    void relinkAnonymousToAccount(PlayerRef.Anonymous from, PlayerRef.Account to);
+    List<GameId> relinkAnonymousToAccount(PlayerRef.Anonymous from, PlayerRef.Account to);
 }
