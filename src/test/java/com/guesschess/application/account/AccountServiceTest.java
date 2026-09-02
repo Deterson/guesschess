@@ -180,6 +180,13 @@ class AccountServiceTest {
         }
 
         @Override
+        public Optional<User> findByLoginIgnoreCase(String login) {
+            return byId.values().stream()
+                    .filter(u -> u.login() != null && u.login().equalsIgnoreCase(login))
+                    .findFirst();
+        }
+
+        @Override
         public boolean existsByLoginIgnoreCase(String login) {
             return byId.values().stream().anyMatch(u -> u.login() != null && u.login().equalsIgnoreCase(login));
         }
