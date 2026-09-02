@@ -127,6 +127,18 @@ class SanGeneratorTest {
     }
 
     @Test
+    void kingCaptureSuffix() {
+        Board before = Board.empty()
+                .withPiece(Position.fromAlgebraic("e1"), Piece.of(PieceType.KING, Color.WHITE))
+                .withPiece(Position.fromAlgebraic("e5"), Piece.of(PieceType.ROOK, Color.WHITE))
+                .withPiece(Position.fromAlgebraic("e8"), Piece.of(PieceType.KING, Color.BLACK));
+        Move move = findMove(before, Color.WHITE, "e5", "e8");
+        Board after = before.applyMove(move);
+
+        assertEquals("Rxe8#", SanGenerator.toSan(before, move, after));
+    }
+
+    @Test
     void disambiguationByFileWhenBothCandidatesShareTheTargetRankPath() {
         Board before = Board.empty()
                 .withPiece(Position.fromAlgebraic("e1"), Piece.of(PieceType.KING, Color.WHITE))

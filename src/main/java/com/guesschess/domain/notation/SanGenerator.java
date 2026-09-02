@@ -69,6 +69,9 @@ public final class SanGenerator {
     }
 
     private static String checkSuffix(Board after, Move move) {
+        if (move.isCapture() && move.capturedPiece().type() == PieceType.KING) {
+            return "#";
+        }
         Color opponent = move.movedPiece().color().opposite();
         if (!CheckDetector.isInCheck(after, opponent)) {
             return "";

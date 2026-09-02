@@ -96,11 +96,11 @@
     "tagline": "Chess, but if you guess your opponent's move, it isn't played.",
     "colorLegend": "Your color",
     "random": "Random",
-    "guessmateTitle": "Guessmate variant",
-    "guessmateDescription": "Correctly guessing the move that parries a check ends the game immediately, instead of simply cancelling the move.",
+    "noGuessmateTitle": "No-Guessmate variant",
+    "noGuessmateDescription": "Correctly guessing the move that parries a check simply cancels the move, instead of ending the game immediately.",
     "createButton": "Create a game",
     "creating": "Creating…",
-    "guessmateSuffix": " (Guessmate)"
+    "noGuessmateSuffix": " (no Guessmate)"
   },
   "howToPlay": {
     "pggnTitle": "PGGN notation",

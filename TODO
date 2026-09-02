@@ -1,5 +1,12 @@
 ne rien implémenter dans ce TODO à moins que cela ait été explicitement demandé
 
+- créer une modale "créer une partie" qui s'ouvre quand on clique sur "Create a game" qui demande "your color" et "no guessmate variant" avec un lien guessmate
+- rajouter "no guessmate variant" dans le tutoriel
+- rajouter un bouton "My games" en bas de Create a game qui renvoie vers la page Profil, et qui prompt le login avant si la personne n'est pas connectée
+- proposer la nulle
+- rajouter un 
+- créer un logo
+- faire le système de pseudonyme inchangeable, qu'on demande dès la première connexion. Si le pseudonyme n'est pas rempli, on ne rentre rien en base de données. Wiper ensuite la base de données car y'aura une colonne non-null unique "login" (comment faire avec le flyway?). Le login ne doit pas être "Anonymous" ou "Anonyme". Le login doit apparaître en haut et en bas pour les joueurs blancs et noirs, en fonction d'où ils sont sur le board. Il doit apparaître dans une teinte de blanc ou noir en fonction. Si la personne est anonyme, ça doit être affiché "Anonyme" (ou "Anonymous") en italique, de manière différente.
 
 --- règles générales
 - garder la possibilité d'en passant si c'est le dernier coup effectif (mon pion avance de 2 et peut être pris en passant, je guess le coup de mon adversaire, il guess mon coup, le plateau est dans le même état qu'avant et mon pion devrait toujours être pris en passant, mais ce n'est pas le cas)
@@ -10,10 +17,11 @@ ne rien implémenter dans ce TODO à moins que cela ait été explicitement dema
 - il reste du français hardcodé dans le back "Joueur anonyme" par exemple) trouver un moyen pour "joueur anonyme" de l'écrire d'une certaine manière pour que le front puisse le détecter et le traduire
 
 --- FRONT
+- empêcher de quitter la page sans un prompt "les changements effectués ne seront peut-être pas sauvegardés"
 - proposer de changer de style (change la couleur des cases, et adapte les couleurs du code couleur des coups joués / devinés sur les parties ET dans le tutoriel)
-- proposer la nulle
+- bouton "proposer la nulle"
+- bouton "rematch ?" à la fin d'un match
 - enlever toute la verbosité typique d'IA ("vous regardez cette partie en mode spectateur : elle est déjà complète" ou "quelqu'un d'autre s'est connecté avec le lien" on s'en fout, enlever cette infobulle parce que c'est écrit en dessous "Vous observez cette partie")
-- une page de règles (6 guess repetition, guessmate) (sera sûrement fais dans le tutoriel)
 - enlever le bouton "ne pas deviner" (sera sûrement fait pendant l'étape du timer)
 - rajouter du son
 - un favicon et un logo stylé

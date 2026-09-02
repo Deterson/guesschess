@@ -65,7 +65,7 @@ class PggnWriterTest {
                 .withPiece(Position.fromAlgebraic("e1"), Piece.of(PieceType.KING, Color.WHITE))
                 .withPiece(Position.fromAlgebraic("a5"), Piece.of(PieceType.BISHOP, Color.BLACK))
                 .withPiece(Position.fromAlgebraic("h8"), Piece.of(PieceType.KING, Color.BLACK));
-        Game game = Game.fromPosition(board, GameVariant.GUESSMATE);
+        Game game = Game.fromPosition(board, GameVariant.GUESSCHESS);
 
         Move ke2 = findMove(game.legalMoves(), "e1", "e2");
         game.submitMove(ke2);
@@ -80,7 +80,7 @@ class PggnWriterTest {
 
     @Test
     void headersDefaultToPlaceholdersAndReflectVariantAndOngoingResult() {
-        Game game = Game.newGame(GameVariant.GUESSMATE);
+        Game game = Game.newGame(GameVariant.GUESSCHESS);
 
         String pggn = PggnWriter.write(game);
 
@@ -88,7 +88,7 @@ class PggnWriterTest {
         assertTrue(pggn.contains("[Date \"?\"]"), pggn);
         assertTrue(pggn.contains("[White \"?\"]"), pggn);
         assertTrue(pggn.contains("[Black \"?\"]"), pggn);
-        assertTrue(pggn.contains("[Variant \"GUESSMATE\"]"), pggn);
+        assertTrue(pggn.contains("[Variant \"GUESSCHESS\"]"), pggn);
         assertTrue(pggn.contains("[Result \"*\"]"), pggn);
         assertTrue(pggn.contains("[Termination \"?\"]"), pggn);
     }

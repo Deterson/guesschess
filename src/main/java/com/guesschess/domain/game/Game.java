@@ -26,16 +26,17 @@ import java.util.Optional;
  * correcte -> coup annule, le trait passe au devineur sans qu'aucune piece ne bouge ;
  * devinette fausse ou absente -> coup joue normalement.
  *
- * Cas particulier (variante GUESSMATE, la regle de base - voir GameVariant) : si le
+ * Cas particulier (variante NOGUESSMATE, la regle de base - voir GameVariant) : si le
  * coup annule etait la parade a un echec, le roi reste en echec et le trait passe
  * quand meme au devineur, qui a alors normalement acces au coup capturant ce roi
  * parmi ses coups legaux. C'est un coup comme un autre : rien n'oblige le devineur a
  * le jouer, et lui-meme peut se faire deviner. Si personne ne capture jamais, la
  * regle de repetition finit par forcer la nulle.
  *
- * Variante GUESSMATE : dans ce meme cas particulier (devinette correcte du coup qui
- * parait un echec), la partie se termine immediatement, victoire du devineur, plutot
- * que de simplement annuler le coup et attendre une capture ulterieure du roi.
+ * Variante GUESSCHESS (par defaut) : dans ce meme cas particulier (devinette correcte
+ * du coup qui parait un echec), la partie se termine immediatement, victoire du
+ * devineur, plutot que de simplement annuler le coup et attendre une capture
+ * ulterieure du roi.
  */
 public final class Game {
 
@@ -341,7 +342,7 @@ public final class Game {
 
         RoundResult roundResult;
         if (guessedCorrectly) {
-            if (variant == GameVariant.GUESSMATE && moverWasInCheck) {
+            if (variant == GameVariant.GUESSCHESS && moverWasInCheck) {
                 finish(GameResult.win(guesser, GameResultCause.CHECK_PARRY_GUESSED));
             } else {
                 cancelRound(mover, actualMove);

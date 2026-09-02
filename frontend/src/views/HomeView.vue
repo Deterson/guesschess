@@ -15,7 +15,7 @@ const { t } = useI18n()
 const creating = ref(false)
 const showModal = ref(false)
 const error = ref<string | null>(null)
-const guessmate = ref(false)
+const noGuessmate = ref(false)
 const color = ref<Color | 'RANDOM'>('RANDOM')
 
 function openModal() {
@@ -32,7 +32,7 @@ async function create(authToken: string | null) {
   creating.value = true
   error.value = null
   try {
-    const variant = guessmate.value ? 'GUESSMATE' : 'GUESSCHESS'
+    const variant = noGuessmate.value ? 'NOGUESSMATE' : 'GUESSCHESS'
     const created = await createGame(variant, color.value, authToken)
     // Le token/couleur revenus ici sont déjà vérifiés côté serveur - on peuple
     // directement le store plutôt que de forcer GameView à les redécouvrir via
@@ -82,12 +82,12 @@ function continueAnonymously() {
     </fieldset>
 
     <label class="flex items-center gap-3 rounded-lg bg-stone-800 px-4 py-3 text-sm">
-      <input type="checkbox" v-model="guessmate" class="h-4 w-4 accent-emerald-600" />
+      <input type="checkbox" v-model="noGuessmate" class="h-4 w-4 accent-emerald-600" />
       <span class="text-left">
-        <span class="font-semibold">{{ t('home.guessmateTitle') }}</span>
+        <span class="font-semibold">{{ t('home.noGuessmateTitle') }}</span>
         <br />
         <span class="text-stone-400">
-          {{ t('home.guessmateDescription') }}
+          {{ t('home.noGuessmateDescription') }}
         </span>
       </span>
     </label>
@@ -100,12 +100,12 @@ function continueAnonymously() {
       :disabled="creating"
       @click="openModal"
     >
-      {{ creating ? t('home.creating') : `${t('home.createButton')}${guessmate ? t('home.guessmateSuffix') : ''}` }}
+      {{ creating ? t('home.creating') : `${t('home.createButton')}${noGuessmate ? t('home.noGuessmateSuffix') : ''}` }}
     </button>
 
     <AuthModal
       :open="showModal"
-      :pending-action="{ type: 'create', variant: guessmate ? 'GUESSMATE' : 'GUESSCHESS', color }"
+      :pending-action="{ type: 'create', variant: noGuessmate ? 'NOGUESSMATE' : 'GUESSCHESS', color }"
       @anonymous="continueAnonymously"
       @close="showModal = false"
     />

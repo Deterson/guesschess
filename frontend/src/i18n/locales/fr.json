@@ -96,11 +96,11 @@
     "tagline": "Les échecs, mais si vous devinez le coup de votre adversaire, il ne joue pas.",
     "colorLegend": "Votre couleur",
     "random": "Aléatoire",
-    "guessmateTitle": "Variante Guessmate",
-    "guessmateDescription": "Deviner correctement le coup qui pare un échec met fin à la partie immédiatement, au lieu de simplement annuler le coup.",
+    "noGuessmateTitle": "Variante sans Guessmate",
+    "noGuessmateDescription": "Deviner correctement le coup qui pare un échec annule simplement ce coup, au lieu de mettre fin à la partie immédiatement.",
     "createButton": "Créer une partie",
     "creating": "Création…",
-    "guessmateSuffix": " (Guessmate)"
+    "noGuessmateSuffix": " (sans Guessmate)"
   },
   "howToPlay": {
     "pggnTitle": "Notation PGGN",

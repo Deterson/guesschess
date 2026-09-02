@@ -50,15 +50,15 @@ body:ws {
 }
 
 body:ws {
-  name: 4. SEND games.create (guessmate)
+  name: 4. SEND games.create (noguessmate)
   type: text
   content: '''
     SEND
     destination:/app/games.create
     content-type:application/json
-    content-length:23
+    content-length:25
 
-    {"variant":"GUESSMATE"}
+    {"variant":"NOGUESSMATE"}
 
   '''
 }
