@@ -41,7 +41,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', onClickOutside))
       :aria-expanded="isOpen"
       @click="toggle"
     >
-      <component :is="FLAGS[locale]" class="h-4 w-6 shrink-0 rounded-[2px]" />
+      <component :is="FLAGS[locale as Locale]" class="h-4 w-6 shrink-0 rounded-[2px]" />
     </button>
 
     <ul
