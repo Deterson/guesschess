@@ -90,7 +90,10 @@
     "joinButton": "Join this game",
     "gameFullError": "This game is already full.",
     "connectionLostReconnecting": "Connection lost, reconnecting…",
-    "dontGuess": "Don't guess"
+    "dontGuess": "Don't guess",
+    "offerDraw": "Offer draw",
+    "acceptDraw": "Accept draw",
+    "opponentOffersDraw": "Your opponent offers a draw"
   },
   "home": {
     "tagline": "Chess, but if you guess your opponent's move, it isn't played.",

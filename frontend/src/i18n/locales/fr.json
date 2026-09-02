@@ -90,7 +90,10 @@
     "joinButton": "Rejoindre cette partie",
     "gameFullError": "Cette partie est déjà complète.",
     "connectionLostReconnecting": "Connexion perdue, reconnexion en cours…",
-    "dontGuess": "Ne pas deviner"
+    "dontGuess": "Ne pas deviner",
+    "offerDraw": "Proposer la nulle",
+    "acceptDraw": "Accepter la nulle",
+    "opponentOffersDraw": "Votre adversaire propose la nulle"
   },
   "home": {
     "tagline": "Les échecs, mais si vous devinez le coup de votre adversaire, il ne joue pas.",

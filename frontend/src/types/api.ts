@@ -20,6 +20,7 @@ export type GameResultCause =
   | 'DRAW_THREEFOLD_REPETITION'
   | 'DRAW_THREE_GUESS_REPETITION'
   | 'DRAW_INSUFFICIENT_MATERIAL'
+  | 'DRAW_BY_AGREEMENT'
 
 /** "wP", "bK"... ou null pour une case vide (voir GameMessageMapper.toCode). */
 export type PieceCode = `${'w' | 'b'}${'P' | 'N' | 'B' | 'R' | 'Q' | 'K'}`
@@ -161,6 +162,7 @@ export interface GameStateMessage {
   mySubmission: MySubmissionMessage
   roundCount: number
   inCheck: boolean
+  drawOfferedBy: Color | null
 }
 
 export interface ErrorMessage {

@@ -287,6 +287,68 @@ class GameTest {
         assertThrows(IllegalStateException.class, () -> game.submitMove(mate));
     }
 
+    @Test
+    void acceptingADrawOfferEndsTheGameInADrawByAgreement() {
+        Game game = Game.newGame();
+
+        game.offerDraw(Color.WHITE);
+        assertEquals(Color.WHITE, game.drawOfferedBy());
+        game.respondToDraw(Color.BLACK, true);
+
+        assertEquals(GameStatus.FINISHED, game.status());
+        assertEquals(GameResultCause.DRAW_BY_AGREEMENT, game.result().cause());
+        assertNull(game.result().winner());
+        assertNull(game.drawOfferedBy());
+    }
+
+    @Test
+    void decliningADrawOfferLeavesTheGameOngoingAndClearsTheOffer() {
+        Game game = Game.newGame();
+
+        game.offerDraw(Color.WHITE);
+        game.respondToDraw(Color.BLACK, false);
+
+        assertEquals(GameStatus.ONGOING, game.status());
+        assertNull(game.result());
+        assertNull(game.drawOfferedBy());
+    }
+
+    @Test
+    void aDrawOfferCannotBeMadeWhileAnotherIsAlreadyPending() {
+        Game game = Game.newGame();
+
+        game.offerDraw(Color.WHITE);
+
+        assertThrows(IllegalStateException.class, () -> game.offerDraw(Color.BLACK));
+    }
+
+    @Test
+    void aColorCannotRespondToItsOwnDrawOffer() {
+        Game game = Game.newGame();
+
+        game.offerDraw(Color.WHITE);
+
+        assertThrows(IllegalStateException.class, () -> game.respondToDraw(Color.WHITE, true));
+    }
+
+    @Test
+    void respondingWithNoDrawOfferPendingIsRejected() {
+        Game game = Game.newGame();
+
+        assertThrows(IllegalStateException.class, () -> game.respondToDraw(Color.BLACK, true));
+    }
+
+    @Test
+    void aPendingDrawOfferLapsesAsSoonAsTheNextRoundResolves() {
+        Game game = Game.newGame();
+
+        game.offerDraw(Color.WHITE);
+        play(game, "e2", "e4");
+
+        assertNull(game.drawOfferedBy());
+        assertThrows(IllegalStateException.class, () -> game.respondToDraw(Color.BLACK, true));
+    }
+
     private static void play(Game game, String from, String to) {
         game.submitMove(findMove(game.legalMoves(), from, to));
         game.submitGuess(null);

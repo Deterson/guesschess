@@ -1,10 +1,5 @@
 ne rien implémenter dans ce TODO à moins que cela ait été explicitement demandé
 
-- créer une modale "créer une partie" qui s'ouvre quand on clique sur "Create a game" qui demande "your color" et "no guessmate variant" avec un lien guessmate
-- rajouter "no guessmate variant" dans le tutoriel
-- rajouter un bouton "My games" en bas de Create a game qui renvoie vers la page Profil, et qui prompt le login avant si la personne n'est pas connectée
-- proposer la nulle
-- rajouter un 
 - créer un logo
 - faire le système de pseudonyme inchangeable, qu'on demande dès la première connexion. Si le pseudonyme n'est pas rempli, on ne rentre rien en base de données. Wiper ensuite la base de données car y'aura une colonne non-null unique "login" (comment faire avec le flyway?). Le login ne doit pas être "Anonymous" ou "Anonyme". Le login doit apparaître en haut et en bas pour les joueurs blancs et noirs, en fonction d'où ils sont sur le board. Il doit apparaître dans une teinte de blanc ou noir en fonction. Si la personne est anonyme, ça doit être affiché "Anonyme" (ou "Anonymous") en italique, de manière différente.
 

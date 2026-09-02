@@ -35,7 +35,8 @@ class GameJpaMapperTest {
                 freshState.whiteGuessedMove(),
                 freshState.whiteGuessedMoveStreak(),
                 freshState.blackGuessedMove(),
-                freshState.blackGuessedMoveStreak());
+                freshState.blackGuessedMoveStreak(),
+                freshState.drawOfferedBy());
         GameEntity legacyEntity = new GameEntity(
                 UUID.randomUUID(), GameVariant.GUESSCHESS, GameStatus.ONGOING,
                 null, null, Color.WHITE, legacyState, Instant.now(), Instant.now());

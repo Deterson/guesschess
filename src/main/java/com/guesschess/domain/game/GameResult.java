@@ -15,7 +15,8 @@ public record GameResult(Color winner, GameResultCause cause) {
                 || cause == GameResultCause.DRAW_FIFTY_MOVE_RULE
                 || cause == GameResultCause.DRAW_THREEFOLD_REPETITION
                 || cause == GameResultCause.DRAW_THREE_GUESS_REPETITION
-                || cause == GameResultCause.DRAW_INSUFFICIENT_MATERIAL;
+                || cause == GameResultCause.DRAW_INSUFFICIENT_MATERIAL
+                || cause == GameResultCause.DRAW_BY_AGREEMENT;
         if (isDraw && winner != null) {
             throw new IllegalArgumentException("winner must be null for cause " + cause);
         }

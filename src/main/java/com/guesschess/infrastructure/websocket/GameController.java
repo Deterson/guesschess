@@ -21,6 +21,8 @@ import com.guesschess.infrastructure.websocket.dto.AckMessage;
 import com.guesschess.infrastructure.websocket.dto.ChatMessage;
 import com.guesschess.infrastructure.websocket.dto.CreateGameRequest;
 import com.guesschess.infrastructure.websocket.dto.CreateGameResponse;
+import com.guesschess.infrastructure.websocket.dto.DrawOfferRequest;
+import com.guesschess.infrastructure.websocket.dto.DrawResponseRequest;
 import com.guesschess.infrastructure.websocket.dto.ErrorMessage;
 import com.guesschess.infrastructure.websocket.dto.GameStateMessage;
 import com.guesschess.infrastructure.websocket.dto.SubmitChatMessageRequest;
@@ -140,6 +142,31 @@ public class GameController {
         } else {
             sendToUser(sessionId, "/queue/guess.ack", new AckMessage("recorded_waiting_for_move"));
         }
+    }
+
+    /**
+     * Propose la nulle - valable a tout moment (pas seulement au trait), rejetee par
+     * le domaine (IllegalStateException, voir handleError) si une offre est deja en
+     * attente. Toujours resolue immediatement (pas de paire de soumissions a
+     * attendre comme move/guess), donc toujours diffusee.
+     */
+    @MessageMapping("/games/{gameId}/draw-offer")
+    public void offerDraw(@DestinationVariable String gameId, @Payload DrawOfferRequest request,
+                           @Header(value = "simpSessionAttributes", required = false) Map<String, Object> sessionAttributes) {
+        PlayerRef requester = WebSocketPlayerIdentity.resolve(sessionAttributes);
+        GameSnapshot resolved = gameLifecycleService.offerDraw(PlayerToken.fromString(request.token()), requester);
+        broadcast(resolved);
+    }
+
+    /**
+     * Reponse (acceptation ou refus) a l'offre de nulle en attente - voir offerDraw.
+     */
+    @MessageMapping("/games/{gameId}/draw-response")
+    public void respondToDraw(@DestinationVariable String gameId, @Payload DrawResponseRequest request,
+                               @Header(value = "simpSessionAttributes", required = false) Map<String, Object> sessionAttributes) {
+        PlayerRef requester = WebSocketPlayerIdentity.resolve(sessionAttributes);
+        GameSnapshot resolved = gameLifecycleService.respondToDraw(PlayerToken.fromString(request.token()), request.accept(), requester);
+        broadcast(resolved);
     }
 
     /**

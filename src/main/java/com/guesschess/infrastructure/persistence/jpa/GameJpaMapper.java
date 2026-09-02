@@ -87,7 +87,8 @@ class GameJpaMapper {
                 toMove(state.whiteGuessedMove()),
                 state.whiteGuessedMoveStreak(),
                 toMove(state.blackGuessedMove()),
-                state.blackGuessedMoveStreak()
+                state.blackGuessedMoveStreak(),
+                state.drawOfferedBy() == null ? null : Color.valueOf(state.drawOfferedBy())
         );
         return Game.fromMemento(memento);
     }
@@ -103,7 +104,8 @@ class GameJpaMapper {
                 toMoveJson(memento.whiteGuessedMove()),
                 memento.whiteGuessedMoveStreak(),
                 toMoveJson(memento.blackGuessedMove()),
-                memento.blackGuessedMoveStreak()
+                memento.blackGuessedMoveStreak(),
+                memento.drawOfferedBy() == null ? null : memento.drawOfferedBy().name()
         );
     }
 

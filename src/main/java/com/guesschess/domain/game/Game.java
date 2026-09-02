@@ -74,6 +74,14 @@ public final class Game {
     private Move pendingGuess;
 
     /**
+     * Couleur ayant une offre de nulle en attente, ou null. Effacee des qu'un round se
+     * resout (coup joue ou annule par une devinette - voir resolveRound) : une offre
+     * non traitee vaut implicitement refus des que la partie avance d'un coup, plutot
+     * que de rester active indefiniment.
+     */
+    private Color drawOfferedBy;
+
+    /**
      * Suivi de la regle de "three guess repetition" : pour chaque couleur, le dernier
      * coup devine correctement quand elle etait au trait, et le nombre de fois de suite
      * (sans coup reellement joue entre-temps) que ce meme coup a ete devine. La nulle
@@ -99,7 +107,7 @@ public final class Game {
     private Game(GameId id, GameVariant variant, Board board, List<PositionRecord> positionHistory, List<RoundResult> roundHistory,
                  GameStatus status, GameResult result, Move pendingMove, boolean guessSubmitted,
                  Move pendingGuess, Move whiteGuessedMove, int whiteGuessedMoveStreak,
-                 Move blackGuessedMove, int blackGuessedMoveStreak) {
+                 Move blackGuessedMove, int blackGuessedMoveStreak, Color drawOfferedBy) {
         this.id = id;
         this.variant = variant;
         this.board = board;
@@ -114,6 +122,7 @@ public final class Game {
         this.whiteGuessedMoveStreak = whiteGuessedMoveStreak;
         this.blackGuessedMove = blackGuessedMove;
         this.blackGuessedMoveStreak = blackGuessedMoveStreak;
+        this.drawOfferedBy = drawOfferedBy;
     }
 
     public static Game newGame() {
@@ -156,7 +165,8 @@ public final class Game {
         return new Game(memento.id(), memento.variant(), memento.board(), memento.positionHistory(), memento.roundHistory(),
                 memento.status(), memento.result(), memento.pendingMove(), memento.guessSubmitted(),
                 memento.pendingGuess(), memento.whiteGuessedMove(),
-                memento.whiteGuessedMoveStreak(), memento.blackGuessedMove(), memento.blackGuessedMoveStreak());
+                memento.whiteGuessedMoveStreak(), memento.blackGuessedMove(), memento.blackGuessedMoveStreak(),
+                memento.drawOfferedBy());
     }
 
     public GameId id() {
@@ -181,6 +191,44 @@ public final class Game {
 
     public GameResult result() {
         return result;
+    }
+
+    public Color drawOfferedBy() {
+        return drawOfferedBy;
+    }
+
+    /**
+     * Proposition de nulle par proposer, valable jusqu'a ce qu'elle soit acceptee,
+     * refusee, ou implicitement caduque au round suivant (voir resolveRound). Rejetee
+     * si une offre est deja en attente, quelle que soit la couleur qui l'a emise -
+     * un seul appel de nulle actif a la fois.
+     */
+    public void offerDraw(Color proposer) {
+        requireOngoing();
+        if (drawOfferedBy != null) {
+            throw new IllegalStateException("a draw offer is already pending");
+        }
+        this.drawOfferedBy = proposer;
+    }
+
+    /**
+     * Reponse de responder a l'offre de nulle en attente - forcement l'autre couleur
+     * que celle qui a propose (une couleur ne peut pas repondre a sa propre offre).
+     * Acceptee -> partie terminee en nulle (DRAW_BY_AGREEMENT) ; refusee -> l'offre
+     * est simplement levee, la partie continue normalement.
+     */
+    public void respondToDraw(Color responder, boolean accept) {
+        requireOngoing();
+        if (drawOfferedBy == null) {
+            throw new IllegalStateException("no draw offer is pending");
+        }
+        if (drawOfferedBy == responder) {
+            throw new IllegalStateException("cannot respond to your own draw offer");
+        }
+        this.drawOfferedBy = null;
+        if (accept) {
+            finish(GameResult.draw(GameResultCause.DRAW_BY_AGREEMENT));
+        }
     }
 
     /**
@@ -329,6 +377,7 @@ public final class Game {
     }
 
     private RoundResult resolveRound() {
+        this.drawOfferedBy = null;
         Move actualMove = this.pendingMove;
         Move guess = this.pendingGuess;
         Color mover = sideToMove();
@@ -461,7 +510,7 @@ public final class Game {
     public Memento toMemento() {
         return new Memento(id, variant, board, List.copyOf(positionHistory), List.copyOf(roundHistory),
                 status, result, pendingMove, guessSubmitted, pendingGuess,
-                whiteGuessedMove, whiteGuessedMoveStreak, blackGuessedMove, blackGuessedMoveStreak);
+                whiteGuessedMove, whiteGuessedMoveStreak, blackGuessedMove, blackGuessedMoveStreak, drawOfferedBy);
     }
 
     public record Memento(
@@ -478,7 +527,8 @@ public final class Game {
             Move whiteGuessedMove,
             int whiteGuessedMoveStreak,
             Move blackGuessedMove,
-            int blackGuessedMoveStreak
+            int blackGuessedMoveStreak,
+            Color drawOfferedBy
     ) {
     }
 }

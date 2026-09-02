@@ -53,7 +53,8 @@ public class GameMessageMapper {
                 full,
                 toMySubmissionMessage(mySubmission),
                 snapshot.roundCount(),
-                snapshot.inCheck()
+                snapshot.inCheck(),
+                snapshot.drawOfferedBy() == null ? null : snapshot.drawOfferedBy().name()
         );
     }
 

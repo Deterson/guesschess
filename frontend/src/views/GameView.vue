@@ -180,6 +180,21 @@ const myRole = computed(() => {
   return state.value.sideToMove === myColor.value.toUpperCase() ? 'mover' : 'guesser'
 })
 
+const drawOfferedByMe = computed(
+  () => Boolean(state.value?.drawOfferedBy) && myColor.value != null && state.value?.drawOfferedBy === myColor.value.toUpperCase(),
+)
+const drawOfferedByOpponent = computed(
+  () => Boolean(state.value?.drawOfferedBy) && myColor.value != null && state.value?.drawOfferedBy !== myColor.value.toUpperCase(),
+)
+
+function onDrawButtonClick() {
+  if (drawOfferedByOpponent.value) {
+    gameStore.respondToDraw(true)
+  } else {
+    gameStore.offerDraw()
+  }
+}
+
 const boardDisabled = computed(
   () =>
     !state.value ||
@@ -399,6 +414,18 @@ function submitNoGuess() {
         </div>
 
         <div class="order-4 mx-auto w-full max-w-xl @min-[67rem]:order-none @min-[67rem]:col-start-3 @min-[67rem]:mx-0 @min-[67rem]:max-w-none">
+          <div v-if="myColor && canAct" class="mb-2 flex flex-col items-center">
+            <p v-if="drawOfferedByOpponent" class="mb-1 text-xs text-stone-400">{{ t('game.opponentOffersDraw') }}</p>
+            <button
+              type="button"
+              class="rounded-lg px-4 py-2 text-sm disabled:opacity-50"
+              :class="drawOfferedByOpponent ? 'bg-violet-700 hover:bg-violet-600' : 'bg-stone-700 hover:bg-stone-600'"
+              :disabled="drawOfferedByMe || state.status === 'FINISHED'"
+              @click="onDrawButtonClick"
+            >
+              {{ drawOfferedByOpponent ? t('game.acceptDraw') : t('game.offerDraw') }}
+            </button>
+          </div>
           <MoveHistoryList :rounds="historyRounds" :history-index="historyIndex" @select="onHistorySelect" />
         </div>
       </div>

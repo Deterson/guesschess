@@ -118,6 +118,38 @@ public class GameLifecycleService {
         });
     }
 
+    /**
+     * Proposition de nulle (etape supplementaire, hors roadmap initiale) - a la
+     * difference de submitMove/submitGuess, ne depend pas du trait : n'importe quel
+     * joueur peut proposer a tout moment. Toujours resolue synchroniquement (pas de
+     * paire de soumissions a attendre), donc toujours diffusable immediatement.
+     */
+    public GameSnapshot offerDraw(PlayerToken token, PlayerRef requester) {
+        GameAccess access = requireAccess(token);
+        requireFull(access);
+        Color color = access.colorOf(token);
+        return gameRepository.withGame(access.gameId(), game -> {
+            requireOwnership(access.gameId(), color, requester);
+            game.offerDraw(color);
+            return GameSnapshot.of(game);
+        });
+    }
+
+    /**
+     * Reponse (acceptation ou refus) a l'offre de nulle en attente - voir
+     * GameLifecycleService.offerDraw et Game.respondToDraw.
+     */
+    public GameSnapshot respondToDraw(PlayerToken token, boolean accept, PlayerRef requester) {
+        GameAccess access = requireAccess(token);
+        requireFull(access);
+        Color color = access.colorOf(token);
+        return gameRepository.withGame(access.gameId(), game -> {
+            requireOwnership(access.gameId(), color, requester);
+            game.respondToDraw(color, accept);
+            return GameSnapshot.of(game);
+        });
+    }
+
     public GameSnapshot viewGame(GameId id) {
         return gameRepository.withGame(id, GameSnapshot::of);
     }

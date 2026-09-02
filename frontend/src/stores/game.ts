@@ -256,6 +256,14 @@ export const useGameStore = defineStore('game', () => {
     publish(`/app/games/${gameId.value}/chat`, { token: token.value, text })
   }
 
+  function offerDraw() {
+    publish(`/app/games/${gameId.value}/draw-offer`, { token: token.value })
+  }
+
+  function respondToDraw(accept: boolean) {
+    publish(`/app/games/${gameId.value}/draw-response`, { token: token.value, accept })
+  }
+
   return {
     gameId,
     token,
@@ -277,6 +285,8 @@ export const useGameStore = defineStore('game', () => {
     submitMove,
     submitGuess,
     sendChat,
+    offerDraw,
+    respondToDraw,
     dismissError,
   }
 })

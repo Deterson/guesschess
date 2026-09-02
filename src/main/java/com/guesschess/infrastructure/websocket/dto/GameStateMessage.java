@@ -18,7 +18,9 @@ import java.util.List;
  * d'etre resolu et de refetch l'historique detaille (GET /api/games/{id}/history)
  * sans avoir a diffuser cet historique complet sur chaque message d'etat. inCheck
  * indique si sideToMove est actuellement en echec, pour surligner son roi cote
- * frontend (toujours false une fois la partie terminee).
+ * frontend (toujours false une fois la partie terminee). drawOfferedBy ("WHITE"/
+ * "BLACK"/null) est la couleur ayant une offre de nulle en attente, publique (pas
+ * une fuite anti-triche comme mySubmission : les deux joueurs doivent la voir).
  */
 public record GameStateMessage(
         String gameId,
@@ -33,6 +35,7 @@ public record GameStateMessage(
         boolean full,
         MySubmissionMessage mySubmission,
         int roundCount,
-        boolean inCheck
+        boolean inCheck,
+        String drawOfferedBy
 ) {
 }

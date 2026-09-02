@@ -18,6 +18,7 @@ record GameStateJson(
         MoveJson whiteGuessedMove,
         int whiteGuessedMoveStreak,
         MoveJson blackGuessedMove,
-        int blackGuessedMoveStreak
+        int blackGuessedMoveStreak,
+        String drawOfferedBy
 ) {
 }
