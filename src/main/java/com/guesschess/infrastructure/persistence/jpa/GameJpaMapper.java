@@ -88,7 +88,9 @@ class GameJpaMapper {
                 state.whiteGuessedMoveStreak(),
                 toMove(state.blackGuessedMove()),
                 state.blackGuessedMoveStreak(),
-                state.drawOfferedBy() == null ? null : Color.valueOf(state.drawOfferedBy())
+                state.drawOfferedBy() == null ? null : Color.valueOf(state.drawOfferedBy()),
+                state.rematchOfferedBy() == null ? null : Color.valueOf(state.rematchOfferedBy()),
+                state.rematchGameId() == null ? null : GameId.fromString(state.rematchGameId())
         );
         return Game.fromMemento(memento);
     }
@@ -105,7 +107,9 @@ class GameJpaMapper {
                 memento.whiteGuessedMoveStreak(),
                 toMoveJson(memento.blackGuessedMove()),
                 memento.blackGuessedMoveStreak(),
-                memento.drawOfferedBy() == null ? null : memento.drawOfferedBy().name()
+                memento.drawOfferedBy() == null ? null : memento.drawOfferedBy().name(),
+                memento.rematchOfferedBy() == null ? null : memento.rematchOfferedBy().name(),
+                memento.rematchGameId() == null ? null : memento.rematchGameId().toString()
         );
     }
 

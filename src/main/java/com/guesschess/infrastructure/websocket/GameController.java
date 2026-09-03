@@ -25,6 +25,7 @@ import com.guesschess.infrastructure.websocket.dto.DrawOfferRequest;
 import com.guesschess.infrastructure.websocket.dto.DrawResponseRequest;
 import com.guesschess.infrastructure.websocket.dto.ErrorMessage;
 import com.guesschess.infrastructure.websocket.dto.GameStateMessage;
+import com.guesschess.infrastructure.websocket.dto.RematchOfferRequest;
 import com.guesschess.infrastructure.websocket.dto.SubmitChatMessageRequest;
 import com.guesschess.infrastructure.websocket.dto.SubmitGuessRequest;
 import com.guesschess.infrastructure.websocket.dto.SubmitMoveRequest;
@@ -58,12 +59,17 @@ public class GameController {
     private final GameLifecycleService gameLifecycleService;
     private final GameMessageMapper mapper;
     private final SimpMessagingTemplate messagingTemplate;
+    private final GamePresenceService presenceService;
+    private final PlayersBroadcastService playersBroadcastService;
 
     public GameController(GameLifecycleService gameLifecycleService, GameMessageMapper mapper,
-                           SimpMessagingTemplate messagingTemplate) {
+                           SimpMessagingTemplate messagingTemplate, GamePresenceService presenceService,
+                           PlayersBroadcastService playersBroadcastService) {
         this.gameLifecycleService = gameLifecycleService;
         this.mapper = mapper;
         this.messagingTemplate = messagingTemplate;
+        this.presenceService = presenceService;
+        this.playersBroadcastService = playersBroadcastService;
     }
 
     /**
@@ -104,13 +110,25 @@ public class GameController {
      * en attente pour le round en cours (MySubmissionMessage) - jamais celle de
      * l'adversaire : c'est ce qui permet au frontend d'eviter de retenter, apres un
      * rechargement de page, une soumission que le serveur bloquerait.
+     *
+     * C'est aussi le seul message que le frontend envoie systematiquement a chaque
+     * (re)connexion (voir game.ts ensureSubscribed) : point d'accroche naturel pour
+     * enregistrer la presence de cette session (GamePresenceService), rediffusee sur
+     * /topic/games/{gameId}/players uniquement si cette couleur vient de passer
+     * connectee (evite une rediffusion a chaque simple resynchronisation d'etat).
      */
     @MessageMapping("/games/{gameId}/view")
     @SendToUser("/queue/game.state")
-    public GameStateMessage viewGame(@DestinationVariable String gameId, @Payload(required = false) ViewGameRequest request) {
+    public GameStateMessage viewGame(@DestinationVariable String gameId, @Payload(required = false) ViewGameRequest request,
+                                      @Header("simpSessionId") String sessionId) {
         GameId id = GameId.fromString(gameId);
         PlayerToken token = request == null || request.token() == null ? null : PlayerToken.fromString(request.token());
         GameView view = gameLifecycleService.viewGame(id, token);
+        gameLifecycleService.resolveColor(id, token).ifPresent(color -> {
+            if (presenceService.register(sessionId, id, color)) {
+                playersBroadcastService.broadcastPlayers(id);
+            }
+        });
         return mapper.toGameStateMessage(view.snapshot(), gameLifecycleService.isFull(id), view.mySubmission());
     }
 
@@ -166,6 +184,22 @@ public class GameController {
                                @Header(value = "simpSessionAttributes", required = false) Map<String, Object> sessionAttributes) {
         PlayerRef requester = WebSocketPlayerIdentity.resolve(sessionAttributes);
         GameSnapshot resolved = gameLifecycleService.respondToDraw(PlayerToken.fromString(request.token()), request.accept(), requester);
+        broadcast(resolved);
+    }
+
+    /**
+     * Propose une revanche - valable uniquement une fois la partie FINISHED (rejetee
+     * par le domaine sinon, voir handleError). Un seul et meme endpoint sert aussi bien
+     * a proposer qu'a accepter : le frontend l'appelle inconditionnellement au clic
+     * (voir GameView.vue), l'acceptation etant simplement le fait que l'AUTRE couleur
+     * l'appelle a son tour (GameLifecycleService.offerRematch le detecte et cree alors
+     * la nouvelle partie, dont l'id est diffuse via GameStateMessage.rematchGameId).
+     */
+    @MessageMapping("/games/{gameId}/rematch-offer")
+    public void offerRematch(@DestinationVariable String gameId, @Payload RematchOfferRequest request,
+                              @Header(value = "simpSessionAttributes", required = false) Map<String, Object> sessionAttributes) {
+        PlayerRef requester = WebSocketPlayerIdentity.resolve(sessionAttributes);
+        GameSnapshot resolved = gameLifecycleService.offerRematch(PlayerToken.fromString(request.token()), requester);
         broadcast(resolved);
     }
 

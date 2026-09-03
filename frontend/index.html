@@ -9,6 +9,15 @@
     <link rel="manifest" href="/site.webmanifest" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Guesschess</title>
+    <script>
+      // Bloquant et avant tout CSS : évite un flash en mode nuit (thème par défaut)
+      // le temps que le store Pinia s'initialise, pour le seul cas où ce n'est pas le défaut.
+      try {
+        if (localStorage.getItem('guesschess:nightMode') === 'false') {
+          document.documentElement.classList.add('day')
+        }
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="app"></div>

@@ -111,6 +111,7 @@ export type PlayerInfoType = 'ACCOUNT' | 'ANONYMOUS'
 export interface PlayerInfo {
   type: PlayerInfoType
   login: string | null
+  connected: boolean
 }
 
 /** GET /api/games/{id}/players - null tant que la couleur n'est pas encore liee. */
@@ -205,6 +206,8 @@ export interface GameStateMessage {
   roundCount: number
   inCheck: boolean
   drawOfferedBy: Color | null
+  rematchOfferedBy: Color | null
+  rematchGameId: string | null
 }
 
 export interface ErrorMessage {

@@ -26,14 +26,21 @@ const isAnonymous = computed(() => props.info?.type === 'ANONYMOUS')
       :class="color === 'white' ? 'bg-stone-100' : 'border border-stone-500 bg-stone-900'"
     />
     <span v-if="!info" class="text-stone-600">…</span>
-    <span v-else-if="isAnonymous" class="italic text-stone-500">{{ t('game.anonymousPlayer') }}</span>
-    <router-link
-      v-else
-      :to="`/profile/${info.login}`"
-      class="font-semibold hover:underline"
-      :class="color === 'white' ? 'text-stone-100' : 'text-stone-400'"
-    >
-      @{{ info.login }}
-    </router-link>
+    <template v-else>
+      <span
+        class="inline-block h-2 w-2 shrink-0 rounded-full"
+        :class="info.connected ? 'bg-emerald-500' : 'bg-stone-600'"
+        :title="info.connected ? t('game.playerOnline') : t('game.playerOffline')"
+      />
+      <span v-if="isAnonymous" class="italic text-stone-500">{{ t('game.anonymousPlayer') }}</span>
+      <router-link
+        v-else
+        :to="`/profile/${info.login}`"
+        class="font-semibold hover:underline"
+        :class="color === 'white' ? 'text-stone-100' : 'text-stone-400'"
+      >
+        @{{ info.login }}
+      </router-link>
+    </template>
   </div>
 </template>

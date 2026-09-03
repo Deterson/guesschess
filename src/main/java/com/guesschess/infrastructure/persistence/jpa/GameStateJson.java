@@ -19,6 +19,8 @@ record GameStateJson(
         int whiteGuessedMoveStreak,
         MoveJson blackGuessedMove,
         int blackGuessedMoveStreak,
-        String drawOfferedBy
+        String drawOfferedBy,
+        String rematchOfferedBy,
+        String rematchGameId
 ) {
 }

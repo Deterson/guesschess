@@ -4,10 +4,12 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useSettingsStore } from '../stores/settings'
+import { useThemeStore } from '../stores/theme'
 import { ApiError } from '../services/api'
 
 const authStore = useAuthStore()
 const settingsStore = useSettingsStore()
+const themeStore = useThemeStore()
 const router = useRouter()
 const { t } = useI18n()
 const error = ref<string | null>(null)
@@ -45,6 +47,16 @@ async function onToggleTurnBlinkReminder(event: Event) {
         @change="onToggleTurnBlinkReminder"
       />
       {{ t('profileSettings.turnBlinkReminder') }}
+    </label>
+
+    <label class="flex items-center gap-2 text-sm">
+      <input
+        type="checkbox"
+        :checked="themeStore.nightMode"
+        class="h-4 w-4 rounded"
+        @change="themeStore.setNightMode(($event.target as HTMLInputElement).checked)"
+      />
+      {{ t('profileSettings.nightMode') }}
     </label>
   </div>
 </template>

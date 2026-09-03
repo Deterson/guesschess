@@ -26,7 +26,7 @@
   },
   "chat": {
     "title": "Chat",
-    "empty": "Aucun message.",
+    "empty": "Aucun message",
     "placeholder": "Écrire un message…",
     "send": "Envoyer"
   },
@@ -38,7 +38,7 @@
     "guessRepetitionLinkText": "6 guess repetition",
     "resultWinGuessmate": "{link} : victoire {winner}",
     "guessmateLinkText": "Guessmate",
-    "waitingOpponentToStart": "En attente d'un adversaire pour commencer à jouer…",
+    "waitingOpponentToStart": "En attente d'un adversaire",
     "waitingOpponentSubmission": "En attente de l'adversaire…",
     "yourTurnToPlay": "À vous de jouer",
     "yourTurnToGuess": "À vous de deviner",
@@ -69,7 +69,12 @@
   },
   "profileSettings": {
     "turnBlinkReminder": "Rappel clignotant quand c'est votre tour",
+    "nightMode": "Mode nuit",
     "saveError": "Impossible d'enregistrer ce paramètre."
+  },
+  "theme": {
+    "switchToDay": "Passer en mode jour",
+    "switchToNight": "Passer en mode nuit"
   },
   "inviteBanner": {
     "created": "Partie créée: invitez votre adversaire :",
@@ -96,16 +101,21 @@
   "game": {
     "backHome": "← Accueil",
     "accessDenied": "Impossible de retrouver votre accès à cette partie.",
-    "spectatorLinkTaken": "Vous regardez cette partie en spectateur : quelqu'un d'autre s'est déjà connecté avec ce lien.",
-    "spectatorFull": "Vous regardez cette partie en spectateur : elle est déjà complète.",
     "spectatorGeneric": "Vous regardez cette partie en spectateur.",
     "joinButton": "Rejoindre cette partie",
     "gameFullError": "Cette partie est déjà complète.",
     "connectionLostReconnecting": "Connexion perdue, reconnexion en cours…",
     "dontGuess": "Ne pas deviner",
+    "tabTitleYourTurnToPlay": "À vous de jouer",
+    "tabTitleYourTurnToGuess": "À vous de deviner",
     "offerDraw": "Proposer la nulle",
     "acceptDraw": "Accepter la nulle",
     "opponentOffersDraw": "Votre adversaire propose la nulle",
+    "offerRematch": "Revanche",
+    "acceptRematch": "Accepter la revanche",
+    "opponentOffersRematch": "Votre adversaire souhaite jouer la revanche",
+    "playerOnline": "Connecté",
+    "playerOffline": "Déconnecté",
     "anonymousPlayer": "Anonyme",
     "loginModalReminder": "Vous aurez toujours accès à la partie en cours",
     "anonymousAccessReminderLink": "Connectez-vous",

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { storeToRefs } from 'pinia'
+import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useGameStore } from '../stores/game'
 import { useAuthStore } from '../stores/auth'
@@ -23,6 +24,7 @@ const props = defineProps<{
 
 const gameStore = useGameStore()
 const authStore = useAuthStore()
+const router = useRouter()
 const { t } = useI18n()
 const {
   state,
@@ -42,6 +44,8 @@ const {
 onUnmounted(() => {
   gameStore.leaveGame()
   window.removeEventListener('keydown', onKeydown)
+  document.removeEventListener('visibilitychange', onVisibilityChange)
+  stopTabTitleBlink()
 })
 
 const pendingPromotion = ref<{ from: string; to: string; options: PromotionPieceType[] } | null>(null)
@@ -206,6 +210,60 @@ const myRole = computed(() => {
   return state.value.sideToMove === myColor.value.toUpperCase() ? 'mover' : 'guesser'
 })
 
+/**
+ * Onglet du navigateur : titre changé en "à vous de jouer/deviner" et clignotant,
+ * uniquement quand c'est notre tour (rôle déterminé, pas déjà soumis) ET que
+ * l'onglet n'est pas actif - inutile de le signaler si le joueur regarde déjà
+ * l'écran de statut du jeu.
+ */
+const BASE_TAB_TITLE = 'Guesschess'
+const isTabVisible = ref(!document.hidden)
+let tabTitleBlinkInterval: ReturnType<typeof setInterval> | null = null
+let tabTitleBlinkOn = false
+
+function onVisibilityChange() {
+  isTabVisible.value = !document.hidden
+}
+
+const myTurnTabLabel = computed(() => {
+  if (
+    !myRole.value ||
+    pendingSubmission.value ||
+    !canAct.value ||
+    !state.value?.full ||
+    state.value.status === 'FINISHED'
+  ) {
+    return null
+  }
+  return myRole.value === 'mover' ? t('game.tabTitleYourTurnToPlay') : t('game.tabTitleYourTurnToGuess')
+})
+
+function stopTabTitleBlink() {
+  if (tabTitleBlinkInterval !== null) {
+    clearInterval(tabTitleBlinkInterval)
+    tabTitleBlinkInterval = null
+  }
+  document.title = BASE_TAB_TITLE
+}
+
+function startTabTitleBlink(label: string) {
+  tabTitleBlinkOn = true
+  document.title = label
+  tabTitleBlinkInterval = setInterval(() => {
+    tabTitleBlinkOn = !tabTitleBlinkOn
+    document.title = tabTitleBlinkOn ? label : BASE_TAB_TITLE
+  }, 1000)
+}
+
+watch(
+  [myTurnTabLabel, isTabVisible],
+  ([label, visible]) => {
+    stopTabTitleBlink()
+    if (label && !visible) startTabTitleBlink(label)
+  },
+  { immediate: true },
+)
+
 const drawOfferedByMe = computed(
   () => Boolean(state.value?.drawOfferedBy) && myColor.value != null && state.value?.drawOfferedBy === myColor.value.toUpperCase(),
 )
@@ -220,6 +278,33 @@ function onDrawButtonClick() {
     gameStore.offerDraw()
   }
 }
+
+const rematchOfferedByMe = computed(
+  () =>
+    Boolean(state.value?.rematchOfferedBy) && myColor.value != null && state.value?.rematchOfferedBy === myColor.value.toUpperCase(),
+)
+const rematchOfferedByOpponent = computed(
+  () =>
+    Boolean(state.value?.rematchOfferedBy) && myColor.value != null && state.value?.rematchOfferedBy !== myColor.value.toUpperCase(),
+)
+/** Par defaut true (jamais grise) tant que la presence n'est pas encore connue - voir PlayerLabel/GamePresenceService. */
+const opponentConnected = computed(() => {
+  if (!myColor.value) return true
+  const opponentInfo = myColor.value === 'white' ? players.value?.black : players.value?.white
+  return opponentInfo?.connected ?? true
+})
+
+function onRematchButtonClick() {
+  gameStore.offerRematch()
+}
+
+/** Des que les deux couleurs ont propose la revanche, le serveur cree la nouvelle partie et diffuse son id - on y navigue directement. */
+watch(
+  () => state.value?.rematchGameId,
+  (rematchGameId) => {
+    if (rematchGameId) router.push(`/game/${rematchGameId}`)
+  },
+)
 
 /**
  * pendingSubmission ne desactive plus le plateau : tant que l'adversaire n'a pas
@@ -313,6 +398,7 @@ function onKeydown(event: KeyboardEvent) {
 
 onMounted(() => {
   window.addEventListener('keydown', onKeydown)
+  document.addEventListener('visibilitychange', onVisibilityChange)
 })
 
 function submitChosenMove({ from, to, promotion }: { from: string; to: string; promotion: PromotionPieceType | null }) {
@@ -380,10 +466,10 @@ function submitNoGuess() {
             <InviteBanner v-if="showInvite" :game-id="gameId" @dismiss="inviteDismissed = true" />
 
             <div v-if="myColor && !canAct" class="mb-4 rounded-lg bg-stone-800 px-4 py-3 text-sm text-stone-300">
-              {{ t('game.spectatorLinkTaken') }}
+              {{ t('game.spectatorGeneric') }}
             </div>
             <div v-else-if="!myColor && state.full" class="mb-4 rounded-lg bg-stone-800 px-4 py-3 text-sm text-stone-300">
-              {{ t('game.spectatorFull') }}
+              {{ t('game.spectatorGeneric') }}
             </div>
             <div v-else-if="!myColor" class="mb-4 space-y-2 rounded-lg bg-stone-800 px-4 py-3 text-sm text-stone-300">
               <p>{{ t('game.spectatorGeneric') }}</p>
@@ -470,6 +556,19 @@ function submitNoGuess() {
               @click="onDrawButtonClick"
             >
               {{ drawOfferedByOpponent ? t('game.acceptDraw') : t('game.offerDraw') }}
+            </button>
+          </div>
+
+          <div v-if="myColor && canAct && state.status === 'FINISHED'" class="mt-2 flex flex-col items-center">
+            <p v-if="rematchOfferedByOpponent" class="mb-1 text-xs text-stone-400">{{ t('game.opponentOffersRematch') }}</p>
+            <button
+              type="button"
+              class="rounded-lg px-4 py-2 text-sm disabled:opacity-50"
+              :class="rematchOfferedByOpponent ? 'bg-violet-700 hover:bg-violet-600' : 'bg-stone-700 hover:bg-stone-600'"
+              :disabled="rematchOfferedByMe || !opponentConnected"
+              @click="onRematchButtonClick"
+            >
+              {{ rematchOfferedByOpponent ? t('game.acceptRematch') : t('game.offerRematch') }}
             </button>
           </div>
         </div>

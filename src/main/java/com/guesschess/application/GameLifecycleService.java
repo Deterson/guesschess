@@ -150,6 +150,36 @@ public class GameLifecycleService {
         });
     }
 
+    /**
+     * Propose une revanche, valable uniquement une fois la partie FINISHED (rejetee
+     * par le domaine sinon - voir Game.offerRematch). Un seul et meme appel sert a
+     * proposer ET a accepter : si l'AUTRE couleur avait deja propose (previousOffer),
+     * ce second appel complete la paire et declenche la creation immediate de la
+     * partie de revanche, couleurs inversees - les deux PlayerRef sont deja connus
+     * (GameAccess de la partie qui se termine), inutile de repasser par un flux
+     * d'invitation/join comme a la creation initiale.
+     */
+    public GameSnapshot offerRematch(PlayerToken token, PlayerRef requester) {
+        GameAccess access = requireAccess(token);
+        Color color = access.colorOf(token);
+        return gameRepository.withGame(access.gameId(), game -> {
+            requireOwnership(access.gameId(), color, requester);
+            Color previousOffer = game.rematchOfferedBy();
+            game.offerRematch(color);
+            if (previousOffer != null && previousOffer != color && game.rematchGameId() == null) {
+                game.confirmRematch(createRematchGame(game.variant(), access));
+            }
+            return GameSnapshot.of(game);
+        });
+    }
+
+    private GameId createRematchGame(GameVariant variant, GameAccess finishedGameAccess) {
+        CreatedGame created = createGame(variant);
+        gameAccessRepository.linkPlayer(created.gameId(), Color.WHITE, finishedGameAccess.playerOf(Color.BLACK));
+        gameAccessRepository.linkPlayer(created.gameId(), Color.BLACK, finishedGameAccess.playerOf(Color.WHITE));
+        return created.gameId();
+    }
+
     public GameSnapshot viewGame(GameId id) {
         return gameRepository.withGame(id, GameSnapshot::of);
     }

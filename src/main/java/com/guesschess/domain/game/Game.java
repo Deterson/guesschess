@@ -87,6 +87,18 @@ public final class Game {
     private Color drawOfferedBy;
 
     /**
+     * Revanche (hors roadmap initiale, comme l'offre de nulle ci-dessus) : couleur
+     * ayant propose une revanche une fois la partie FINISHED, et identifiant de la
+     * nouvelle partie une fois les deux couleurs d'accord (rematchGameId non-null).
+     * A la difference de drawOfferedBy, ne s'efface jamais automatiquement (aucun
+     * round ne peut plus se resoudre sur une partie terminee) - reste pose jusqu'a
+     * ce que rematchGameId soit fixe, la creation de cette nouvelle partie restant
+     * hors du champ de cet agregat (voir GameLifecycleService.offerRematch).
+     */
+    private Color rematchOfferedBy;
+    private GameId rematchGameId;
+
+    /**
      * Suivi de la regle de "three guess repetition" : pour chaque couleur, le dernier
      * coup devine correctement quand elle etait au trait, et le nombre de fois de suite
      * (sans coup reellement joue entre-temps) que ce meme coup a ete devine. La nulle
@@ -112,7 +124,8 @@ public final class Game {
     private Game(GameId id, GameVariant variant, Board board, List<PositionRecord> positionHistory, List<RoundResult> roundHistory,
                  GameStatus status, GameResult result, Move pendingMove, boolean guessSubmitted,
                  Move pendingGuess, Move whiteGuessedMove, int whiteGuessedMoveStreak,
-                 Move blackGuessedMove, int blackGuessedMoveStreak, Color drawOfferedBy) {
+                 Move blackGuessedMove, int blackGuessedMoveStreak, Color drawOfferedBy,
+                 Color rematchOfferedBy, GameId rematchGameId) {
         this.id = id;
         this.variant = variant;
         this.board = board;
@@ -128,6 +141,8 @@ public final class Game {
         this.blackGuessedMove = blackGuessedMove;
         this.blackGuessedMoveStreak = blackGuessedMoveStreak;
         this.drawOfferedBy = drawOfferedBy;
+        this.rematchOfferedBy = rematchOfferedBy;
+        this.rematchGameId = rematchGameId;
     }
 
     public static Game newGame() {
@@ -171,7 +186,7 @@ public final class Game {
                 memento.status(), memento.result(), memento.pendingMove(), memento.guessSubmitted(),
                 memento.pendingGuess(), memento.whiteGuessedMove(),
                 memento.whiteGuessedMoveStreak(), memento.blackGuessedMove(), memento.blackGuessedMoveStreak(),
-                memento.drawOfferedBy());
+                memento.drawOfferedBy(), memento.rematchOfferedBy(), memento.rematchGameId());
     }
 
     public GameId id() {
@@ -234,6 +249,41 @@ public final class Game {
         if (accept) {
             finish(GameResult.draw(GameResultCause.DRAW_BY_AGREEMENT));
         }
+    }
+
+    public Color rematchOfferedBy() {
+        return rematchOfferedBy;
+    }
+
+    public GameId rematchGameId() {
+        return rematchGameId;
+    }
+
+    /**
+     * Propose (ou confirme) une revanche, valable uniquement une fois la partie
+     * FINISHED. proposer rappelant cette methode alors que l'autre couleur l'a deja
+     * appelee est le mecanisme d'acceptation lui-meme (voir GameLifecycleService.
+     * offerRematch, qui detecte ce cas pour creer la nouvelle partie) : rien
+     * n'empeche ici de rappeler avec la meme couleur (idempotent), seule
+     * confirmRematch verrouille definitivement l'issue.
+     */
+    public void offerRematch(Color proposer) {
+        requireFinished();
+        if (rematchGameId != null) {
+            throw new IllegalStateException("rematch already started: " + rematchGameId);
+        }
+        this.rematchOfferedBy = proposer;
+    }
+
+    /**
+     * Fixe la partie de revanche une fois les deux couleurs d'accord (voir
+     * GameLifecycleService.offerRematch) - jamais appelee directement par le
+     * domaine, qui ne connait ni la creation de parties ni les identites des
+     * joueurs.
+     */
+    public void confirmRematch(GameId newGameId) {
+        requireFinished();
+        this.rematchGameId = newGameId;
     }
 
     /**
@@ -490,6 +540,12 @@ public final class Game {
         }
     }
 
+    private void requireFinished() {
+        if (status != GameStatus.FINISHED) {
+            throw new IllegalStateException("game is not finished yet: " + status);
+        }
+    }
+
     private void finish(GameResult gameResult) {
         this.status = GameStatus.FINISHED;
         this.result = gameResult;
@@ -513,7 +569,8 @@ public final class Game {
     public Memento toMemento() {
         return new Memento(id, variant, board, List.copyOf(positionHistory), List.copyOf(roundHistory),
                 status, result, pendingMove, guessSubmitted, pendingGuess,
-                whiteGuessedMove, whiteGuessedMoveStreak, blackGuessedMove, blackGuessedMoveStreak, drawOfferedBy);
+                whiteGuessedMove, whiteGuessedMoveStreak, blackGuessedMove, blackGuessedMoveStreak, drawOfferedBy,
+                rematchOfferedBy, rematchGameId);
     }
 
     public record Memento(
@@ -531,7 +588,9 @@ public final class Game {
             int whiteGuessedMoveStreak,
             Move blackGuessedMove,
             int blackGuessedMoveStreak,
-            Color drawOfferedBy
+            Color drawOfferedBy,
+            Color rematchOfferedBy,
+            GameId rematchGameId
     ) {
     }
 }

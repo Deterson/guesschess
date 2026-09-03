@@ -21,6 +21,10 @@ import java.util.List;
  * frontend (toujours false une fois la partie terminee). drawOfferedBy ("WHITE"/
  * "BLACK"/null) est la couleur ayant une offre de nulle en attente, publique (pas
  * une fuite anti-triche comme mySubmission : les deux joueurs doivent la voir).
+ * rematchOfferedBy ("WHITE"/"BLACK"/null) est la couleur ayant propose une revanche
+ * (uniquement pertinent une fois status=FINISHED) ; rematchGameId est l'identifiant
+ * de la nouvelle partie une fois les deux couleurs d'accord - le frontend y navigue
+ * automatiquement des qu'il le voit apparaitre (voir Game.confirmRematch).
  */
 public record GameStateMessage(
         String gameId,
@@ -36,6 +40,8 @@ public record GameStateMessage(
         MySubmissionMessage mySubmission,
         int roundCount,
         boolean inCheck,
-        String drawOfferedBy
+        String drawOfferedBy,
+        String rematchOfferedBy,
+        String rematchGameId
 ) {
 }

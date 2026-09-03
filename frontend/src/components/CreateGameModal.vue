@@ -43,6 +43,7 @@ function confirm() {
         </div>
       </fieldset>
 
+      <!-- Variante sans Guessmate désactivée pour l'instant, à remettre plus tard.
       <label class="flex items-center gap-3 rounded-lg bg-stone-900 px-4 py-3 text-sm">
         <input type="checkbox" v-model="noGuessmate" class="h-4 w-4 accent-emerald-600" />
         <i18n-t keypath="home.noGuessmateTitle" tag="span" class="text-left font-semibold">
@@ -57,6 +58,7 @@ function confirm() {
           </template>
         </i18n-t>
       </label>
+      -->
 
       <div class="flex gap-2">
         <button

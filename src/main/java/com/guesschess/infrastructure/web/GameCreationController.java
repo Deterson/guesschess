@@ -29,6 +29,7 @@ import com.guesschess.infrastructure.web.dto.JoinGameHttpResponse;
 import com.guesschess.infrastructure.web.dto.MyAccessHttpResponse;
 import com.guesschess.infrastructure.web.dto.PlayerInfoHttpResponse;
 import com.guesschess.infrastructure.websocket.GameMessageMapper;
+import com.guesschess.infrastructure.websocket.GamePresenceService;
 import com.guesschess.infrastructure.websocket.PlayersBroadcastService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
@@ -72,16 +73,18 @@ class GameCreationController {
     private final GameMessageMapper mapper;
     private final AccountService accountService;
     private final PlayersBroadcastService playersBroadcastService;
+    private final GamePresenceService presenceService;
 
     GameCreationController(GameLifecycleService gameLifecycleService, HttpPlayerIdentityResolver identityResolver,
                             SimpMessagingTemplate messagingTemplate, GameMessageMapper mapper, AccountService accountService,
-                            PlayersBroadcastService playersBroadcastService) {
+                            PlayersBroadcastService playersBroadcastService, GamePresenceService presenceService) {
         this.gameLifecycleService = gameLifecycleService;
         this.identityResolver = identityResolver;
         this.messagingTemplate = messagingTemplate;
         this.mapper = mapper;
         this.accountService = accountService;
         this.playersBroadcastService = playersBroadcastService;
+        this.presenceService = presenceService;
     }
 
     @PostMapping
@@ -176,16 +179,18 @@ class GameCreationController {
                     .body(new ErrorResponse("GAME_NOT_FOUND", "Partie introuvable"));
         }
         return ResponseEntity.ok(new GamePlayersHttpResponse(
-                toPlayerInfo(access.playerOf(Color.WHITE)), toPlayerInfo(access.playerOf(Color.BLACK))));
+                toPlayerInfo(access.playerOf(Color.WHITE), access.gameId(), Color.WHITE),
+                toPlayerInfo(access.playerOf(Color.BLACK), access.gameId(), Color.BLACK)));
     }
 
-    private PlayerInfoHttpResponse toPlayerInfo(PlayerRef ref) {
+    private PlayerInfoHttpResponse toPlayerInfo(PlayerRef ref, GameId gameId, Color color) {
         return switch (ref) {
             case null -> null;
-            case PlayerRef.Anonymous anonymous -> new PlayerInfoHttpResponse("ANONYMOUS", null);
+            case PlayerRef.Anonymous anonymous -> new PlayerInfoHttpResponse("ANONYMOUS", null, presenceService.isConnected(gameId, color));
             case PlayerRef.Account account -> {
                 AccountSnapshot snapshot = accountService.getById(account.userId());
-                yield new PlayerInfoHttpResponse("ACCOUNT", snapshot.login() != null ? snapshot.login() : snapshot.displayName());
+                yield new PlayerInfoHttpResponse("ACCOUNT", snapshot.login() != null ? snapshot.login() : snapshot.displayName(),
+                        presenceService.isConnected(gameId, color));
             }
         };
     }

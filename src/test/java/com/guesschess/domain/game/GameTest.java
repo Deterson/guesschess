@@ -349,6 +349,49 @@ class GameTest {
         assertThrows(IllegalStateException.class, () -> game.respondToDraw(Color.BLACK, true));
     }
 
+    @Test
+    void offerRematchIsRejectedWhileTheGameIsStillOngoing() {
+        Game game = Game.newGame();
+
+        assertThrows(IllegalStateException.class, () -> game.offerRematch(Color.WHITE));
+    }
+
+    @Test
+    void offerRematchRecordsTheProposingColorOnceTheGameIsFinished() {
+        Game game = Game.newGame();
+        game.offerDraw(Color.WHITE);
+        game.respondToDraw(Color.BLACK, true);
+
+        game.offerRematch(Color.WHITE);
+
+        assertEquals(Color.WHITE, game.rematchOfferedBy());
+        assertNull(game.rematchGameId());
+    }
+
+    @Test
+    void confirmRematchFixesTheRematchGameId() {
+        Game game = Game.newGame();
+        game.offerDraw(Color.WHITE);
+        game.respondToDraw(Color.BLACK, true);
+        game.offerRematch(Color.WHITE);
+        GameId rematchId = GameId.random();
+
+        game.confirmRematch(rematchId);
+
+        assertEquals(rematchId, game.rematchGameId());
+    }
+
+    @Test
+    void offerRematchIsRejectedOnceARematchHasAlreadyBeenConfirmed() {
+        Game game = Game.newGame();
+        game.offerDraw(Color.WHITE);
+        game.respondToDraw(Color.BLACK, true);
+        game.offerRematch(Color.WHITE);
+        game.confirmRematch(GameId.random());
+
+        assertThrows(IllegalStateException.class, () -> game.offerRematch(Color.BLACK));
+    }
+
     private static void play(Game game, String from, String to) {
         game.submitMove(findMove(game.legalMoves(), from, to));
         game.submitGuess(null);

@@ -26,7 +26,7 @@
   },
   "chat": {
     "title": "Chat",
-    "empty": "No messages.",
+    "empty": "No messages",
     "placeholder": "Write a message…",
     "send": "Send"
   },
@@ -38,7 +38,7 @@
     "guessRepetitionLinkText": "6 guess repetition",
     "resultWinGuessmate": "{link}: {winner} win",
     "guessmateLinkText": "Guessmate",
-    "waitingOpponentToStart": "Waiting for an opponent to start playing…",
+    "waitingOpponentToStart": "Waiting for an opponent.",
     "waitingOpponentSubmission": "Waiting for your opponent…",
     "yourTurnToPlay": "Your turn to play",
     "yourTurnToGuess": "Your turn to guess",
@@ -53,8 +53,8 @@
     "myGames": "My games",
     "modify": "Edit",
     "save": "Save",
-    "saveError": "Could not save this name.",
-    "noGamesYet": "No games yet.",
+    "saveError": "Could not save this name",
+    "noGamesYet": "No games yet",
     "waitingOpponent": "Waiting for an opponent",
     "anonymousOpponent": "Anonymous player",
     "loading": "Loading…",
@@ -65,11 +65,16 @@
   },
   "publicProfile": {
     "games": "Games",
-    "notFound": "This player doesn't exist."
+    "notFound": "This player doesn't exist"
   },
   "profileSettings": {
     "turnBlinkReminder": "Blinking reminder when it's your turn",
-    "saveError": "Could not save this setting."
+    "nightMode": "Night mode",
+    "saveError": "Could not save this setting"
+  },
+  "theme": {
+    "switchToDay": "Switch to day mode",
+    "switchToNight": "Switch to night mode"
   },
   "inviteBanner": {
     "created": "Game created: invite your opponent:",
@@ -96,16 +101,21 @@
   "game": {
     "backHome": "← Home",
     "accessDenied": "Could not find your access to this game.",
-    "spectatorLinkTaken": "You are watching this game as a spectator: someone else has already connected with this link.",
-    "spectatorFull": "You are watching this game as a spectator: it is already full.",
     "spectatorGeneric": "You are watching this game as a spectator.",
     "joinButton": "Join this game",
     "gameFullError": "This game is already full.",
     "connectionLostReconnecting": "Connection lost, reconnecting…",
     "dontGuess": "Don't guess",
+    "tabTitleYourTurnToPlay": "Your turn to play",
+    "tabTitleYourTurnToGuess": "Your turn to guess",
     "offerDraw": "Offer draw",
     "acceptDraw": "Accept draw",
     "opponentOffersDraw": "Your opponent offers a draw",
+    "offerRematch": "Rematch",
+    "acceptRematch": "Accept rematch",
+    "opponentOffersRematch": "Your opponent wants a rematch",
+    "playerOnline": "Online",
+    "playerOffline": "Offline",
     "anonymousPlayer": "Anonymous",
     "loginModalReminder": "You will always have access to this ongoing game",
     "anonymousAccessReminderLink": "Log in",

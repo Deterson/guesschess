@@ -3,3 +3,37 @@
 body {
   @apply bg-stone-900 text-stone-100;
 }
+
+:root {
+  --breathe-base: #292524;
+  --breathe-accent: #381e3b;
+}
+
+/*
+ * Mode nuit (activé par défaut) / mode jour : plutôt que de dupliquer les classes
+ * Tailwind stone-* dans chaque composant, on redéfinit ici les variables CSS que ces
+ * utilitaires consomment déjà (`bg-stone-900` compile en `background-color:
+ * var(--color-stone-900)`) - toute l'app se re-thème sans toucher aux composants.
+ * L'échelle est inversée (900 <-> 100, 800 <-> 200, ...) car les composants utilisent
+ * toujours stone-900/800 pour les fonds (sombres en nuit, donc les plus clairs en
+ * jour) et stone-100/300 pour le texte (clair en nuit, donc le plus sombre en jour).
+ * Teinte bleu-gris (Tailwind slate) plutôt que gris neutre, choisie pour ne pas entrer
+ * en concurrence avec le violet déjà utilisé comme couleur d'accent (nulle proposée).
+ */
+html.day {
+  /* Teintes reprises de la palette "slate" de Tailwind (non générée par défaut car
+     aucun utilitaire slate-* n'est utilisé ailleurs dans l'app - valeurs recopiées
+     depuis tailwindcss/theme.css plutôt que dupliquées via une classe fictive). */
+  --color-stone-900: oklch(98.4% 0.003 247.858); /* slate-50 */
+  --color-stone-800: oklch(96.8% 0.007 247.896); /* slate-100 */
+  --color-stone-700: oklch(86.9% 0.022 252.894); /* slate-300 */
+  --color-stone-600: oklch(70.4% 0.04 256.788); /* slate-400 */
+  --color-stone-500: oklch(55.4% 0.046 257.417); /* slate-500 */
+  --color-stone-400: oklch(44.6% 0.043 257.281); /* slate-600 */
+  --color-stone-300: oklch(37.2% 0.044 257.287); /* slate-700 */
+  --color-stone-200: oklch(27.9% 0.041 260.031); /* slate-800 */
+  --color-stone-100: oklch(20.8% 0.042 265.755); /* slate-900 */
+
+  --breathe-base: oklch(96.8% 0.007 247.896); /* slate-100 */
+  --breathe-accent: oklch(89.4% 0.057 293.283); /* violet-200 */
+}

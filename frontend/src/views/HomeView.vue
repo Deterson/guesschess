@@ -77,10 +77,12 @@ function openMyGames() {
 
 <template>
   <div class="mx-auto flex max-w-xl flex-col items-center gap-6 px-4 py-16 text-center">
-    <h1 class="text-3xl font-bold">Guesschess</h1>
-    <p class="text-stone-400">
-      {{ t('home.tagline') }}
-    </p>
+    <div class="flex flex-col items-center gap-1">
+      <h1 class="text-3xl font-bold">Guesschess</h1>
+      <p class="text-stone-400">
+        {{ t('home.tagline') }}
+      </p>
+    </div>
 
     <p v-if="error" class="text-sm text-red-400">{{ error }}</p>
 

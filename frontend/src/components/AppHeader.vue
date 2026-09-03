@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '../stores/auth'
 import LoginModal from './LoginModal.vue'
 import LanguageSwitch from './LanguageSwitch.vue'
+import ThemeToggle from './ThemeToggle.vue'
 
 const authStore = useAuthStore()
 const route = useRoute()
@@ -45,6 +46,7 @@ function logout() {
         {{ t('header.login') }}
       </button>
 
+      <ThemeToggle />
       <LanguageSwitch />
     </div>
   </header>

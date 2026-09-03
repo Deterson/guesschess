@@ -42,7 +42,9 @@ public record GameSnapshot(
         List<Game.PlayedMove> playedMoveHistory,
         int roundCount,
         boolean inCheck,
-        Color drawOfferedBy
+        Color drawOfferedBy,
+        Color rematchOfferedBy,
+        GameId rematchGameId
 ) {
 
     public static GameSnapshot of(Game game) {
@@ -58,7 +60,9 @@ public record GameSnapshot(
                 game.playedMoveHistory(),
                 game.roundHistory().size(),
                 game.isInCheck(),
-                game.drawOfferedBy()
+                game.drawOfferedBy(),
+                game.rematchOfferedBy(),
+                game.rematchGameId()
         );
     }
 }

@@ -19,6 +19,7 @@ import com.guesschess.domain.game.GameId;
 import com.guesschess.domain.piece.Color;
 import com.guesschess.infrastructure.persistence.InMemoryGameRepository;
 import com.guesschess.infrastructure.websocket.GameMessageMapper;
+import com.guesschess.infrastructure.websocket.GamePresenceService;
 import com.guesschess.infrastructure.websocket.PlayersBroadcastService;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import org.junit.jupiter.api.Test;
@@ -123,7 +124,7 @@ class OAuthLoginSuccessHandlerTest {
                 return true;
             }
         });
-        return new PlayersBroadcastService(gameLifecycleService, new GameMessageMapper(accountService), messagingTemplate);
+        return new PlayersBroadcastService(gameLifecycleService, new GameMessageMapper(accountService, new GamePresenceService()), messagingTemplate);
     }
 
     private OAuth2AuthenticationToken googleToken(String sub, String name, String email) {

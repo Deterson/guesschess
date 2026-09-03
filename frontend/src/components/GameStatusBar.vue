@@ -108,13 +108,13 @@ function acknowledge() {
 @keyframes breathe {
   0%,
   50% {
-    background-color: #292524;
+    background-color: var(--breathe-base);
   }
   80% {
-    background-color: #381e3b;
+    background-color: var(--breathe-accent);
   }
   100% {
-    background-color: #292524;
+    background-color: var(--breathe-base);
   }
 }
 </style>

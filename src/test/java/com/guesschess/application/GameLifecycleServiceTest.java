@@ -322,6 +322,35 @@ class GameLifecycleServiceTest {
         return createFullGame(new PlayerRef.Anonymous(AnonymousId.random()), new PlayerRef.Anonymous(AnonymousId.random()));
     }
 
+    /**
+     * Coeur de la nouvelle orchestration (contrairement a l'offre de nulle, resolue
+     * entierement au sein du meme agregat Game) : le second appel a offerRematch,
+     * fait par l'AUTRE couleur, doit creer une partie fraiche, y lier les deux memes
+     * identites mais couleurs inversees, et le publier via Game.rematchGameId - sans
+     * jamais rejouer le flux d'invitation/join normal (les deux identites sont deja
+     * connues).
+     */
+    @Test
+    void offerRematchTwiceByBothColorsCreatesANewGameWithSwappedColors() {
+        PlayerRef whiteRequester = new PlayerRef.Account(UserId.random());
+        PlayerRef blackRequester = new PlayerRef.Anonymous(AnonymousId.random());
+        CreatedGame game = createFullGame(whiteRequester, blackRequester);
+        service.offerDraw(game.whiteToken(), whiteRequester);
+        service.respondToDraw(game.blackToken(), true, blackRequester);
+
+        GameSnapshot afterFirstOffer = service.offerRematch(game.whiteToken(), whiteRequester);
+        assertEquals(Color.WHITE, afterFirstOffer.rematchOfferedBy());
+        assertNull(afterFirstOffer.rematchGameId());
+
+        GameSnapshot afterSecondOffer = service.offerRematch(game.blackToken(), blackRequester);
+        GameId rematchGameId = afterSecondOffer.rematchGameId();
+        assertNotEquals(game.gameId(), rematchGameId);
+
+        GameAccess rematchAccess = gameAccessRepository.findByGameId(rematchGameId).orElseThrow();
+        assertEquals(blackRequester, rematchAccess.playerOf(Color.WHITE));
+        assertEquals(whiteRequester, rematchAccess.playerOf(Color.BLACK));
+    }
+
     private void playRoundWithoutGuessing(PlayerToken moverToken, PlayerToken guesserToken, String from, String to) {
         MoveIntent intent = MoveIntent.of(Position.fromAlgebraic(from), Position.fromAlgebraic(to));
         service.submitMove(moverToken, intent);

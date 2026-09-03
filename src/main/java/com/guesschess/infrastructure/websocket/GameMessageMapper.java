@@ -9,6 +9,7 @@ import com.guesschess.application.account.AccountSnapshot;
 import com.guesschess.domain.board.Board;
 import com.guesschess.domain.board.Position;
 import com.guesschess.domain.game.Game;
+import com.guesschess.domain.game.GameId;
 import com.guesschess.domain.game.GameResult;
 import com.guesschess.domain.game.RoundResult;
 import com.guesschess.domain.game.PendingSubmission;
@@ -37,27 +38,34 @@ import java.util.List;
 public class GameMessageMapper {
 
     private final AccountService accountService;
+    private final GamePresenceService presenceService;
 
-    public GameMessageMapper(AccountService accountService) {
+    public GameMessageMapper(AccountService accountService, GamePresenceService presenceService) {
         this.accountService = accountService;
+        this.presenceService = presenceService;
     }
 
     /**
      * Identite affichable des deux joueurs (etape 14) - login vaut le displayName pour
      * un compte historique qui n'a pas encore choisi le sien (voir CLAUDE.md, migration
      * V9), jamais null, pour ne jamais afficher un nom vide sur une partie en cours.
+     * connected (GamePresenceService) reflete la connexion WebSocket en direct de la
+     * couleur - jamais null tant qu'un joueur reel est lie, false par defaut sinon.
      */
     public GamePlayersMessage toPlayersMessage(GameAccess access) {
-        return new GamePlayersMessage(toPlayerInfo(access.playerOf(Color.WHITE)), toPlayerInfo(access.playerOf(Color.BLACK)));
+        return new GamePlayersMessage(
+                toPlayerInfo(access.playerOf(Color.WHITE), access.gameId(), Color.WHITE),
+                toPlayerInfo(access.playerOf(Color.BLACK), access.gameId(), Color.BLACK));
     }
 
-    private PlayerInfoMessage toPlayerInfo(PlayerRef ref) {
+    private PlayerInfoMessage toPlayerInfo(PlayerRef ref, GameId gameId, Color color) {
         return switch (ref) {
             case null -> null;
-            case PlayerRef.Anonymous anonymous -> new PlayerInfoMessage("ANONYMOUS", null);
+            case PlayerRef.Anonymous anonymous -> new PlayerInfoMessage("ANONYMOUS", null, presenceService.isConnected(gameId, color));
             case PlayerRef.Account account -> {
                 AccountSnapshot snapshot = accountService.getById(account.userId());
-                yield new PlayerInfoMessage("ACCOUNT", snapshot.login() != null ? snapshot.login() : snapshot.displayName());
+                yield new PlayerInfoMessage("ACCOUNT", snapshot.login() != null ? snapshot.login() : snapshot.displayName(),
+                        presenceService.isConnected(gameId, color));
             }
         };
     }
@@ -86,7 +94,9 @@ public class GameMessageMapper {
                 toMySubmissionMessage(mySubmission),
                 snapshot.roundCount(),
                 snapshot.inCheck(),
-                snapshot.drawOfferedBy() == null ? null : snapshot.drawOfferedBy().name()
+                snapshot.drawOfferedBy() == null ? null : snapshot.drawOfferedBy().name(),
+                snapshot.rematchOfferedBy() == null ? null : snapshot.rematchOfferedBy().name(),
+                snapshot.rematchGameId() == null ? null : snapshot.rematchGameId().toString()
         );
     }
 

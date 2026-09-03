@@ -1,25 +1,29 @@
 ne rien implémenter dans ce TODO à moins que cela ait été explicitement demandé
 
---- règles générales
-- garder la possibilité d'en passant si c'est le dernier coup effectif (mon pion avance de 2 et peut être pris en passant, je guess le coup de mon adversaire, il guess mon coup, le plateau est dans le même état qu'avant et mon pion devrait toujours être pris en passant, mais ce n'est pas le cas)
+
+
+- Alex a raison, guessmate c'est de la merde. En faire une variante, garder l'autre
+
 
 --- BACK
-- réfléchir au volume des données. Combien de taille fait une partie dans la db ? imaginons que 10 000 joueurs jouent une partie par jour, combien de Mo par jour ?
+- garder la possibilité d'en passant si c'est le dernier coup effectif (mon pion avance de 2 et peut être pris en passant, je guess le coup de mon adversaire, il guess mon coup, le plateau est dans le même état qu'avant et mon pion devrait toujours être pris en passant, mais ce n'est pas le cas)
+- réfléchir au volume des données : quelle taille fait une partie dans la db ? imaginons que 10 000 joueurs jouent une partie par jour, combien de Mo par jour ?
 - protéger contre les abus (empêcher de créer 1000000 de parties, empêcher de spammer de coups en mode DDoS)
 - enlever de la verbosité des commentaires dans le back
+- avoir des tests E2E avec Cypress playwright etc
 
 --- FRONT
-- mettre un mode nuit (changeable dans les settings)
-- empêcher de quitter la page sans un prompt "les changements effectués ne seront peut-être pas sauvegardés"
+- j'ai vu sur lichess.org qu'en pleine partie, si on quitte l'onglet, ça affiche "Les changements effectués sur cette page ne seront peut-être pas sauvegardés". Est-ce que tu peux implémenter ça ? Uniquement si la partie est en cours
 - proposer de changer de style (change la couleur des cases, et adapte les couleurs du code couleur des coups joués / devinés sur les parties ET dans le tutoriel)
-- bouton "proposer la nulle"
-- bouton "rematch ?" à la fin d'un match
 - enlever toute la verbosité typique d'IA ("vous regardez cette partie en mode spectateur : elle est déjà complète" ou "quelqu'un d'autre s'est connecté avec le lien" on s'en fout, enlever cette infobulle parce que c'est écrit en dessous "Vous observez cette partie")
 - enlever le bouton "ne pas deviner" (sera sûrement fait pendant l'étape du timer)
 - rajouter du son
-- un favicon et un logo stylé
+- un favicon et un logo + stylé
 
 étapes optionnelles:
-- un mode tutoriel sur le front
+- ajouter un encart "c'est dur de faire un engine pour un jeu pareil, si vous avez des idées je suis preneur : <mail>"
+- avoir un mail @guesschess.fr?
+- avoir un environnement de dev, dispo que par moi ?
+- avoir une page admin pour naviguer les données de la bdd
 - un ordinateur qui joue (l'entraîner ? avec des noeuds etc ? ou un stockfish ?)
 - une appli mobile / webapp

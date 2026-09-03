@@ -300,6 +300,16 @@ export const useGameStore = defineStore('game', () => {
     publish(`/app/games/${gameId.value}/draw-response`, { token: token.value, accept })
   }
 
+  /**
+   * Un seul et meme appel sert a proposer ET a accepter la revanche : si l'adversaire
+   * a deja appele ce meme endpoint, ce second appel complete la paire cote serveur et
+   * declenche la creation de la nouvelle partie (voir GameLifecycleService.offerRematch) -
+   * state.rematchGameId est alors diffuse aux deux joueurs, GameView.vue y navigue.
+   */
+  function offerRematch() {
+    publish(`/app/games/${gameId.value}/rematch-offer`, { token: token.value })
+  }
+
   return {
     gameId,
     token,
@@ -324,6 +334,7 @@ export const useGameStore = defineStore('game', () => {
     sendChat,
     offerDraw,
     respondToDraw,
+    offerRematch,
     dismissError,
   }
 })
