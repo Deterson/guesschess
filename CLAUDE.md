@@ -98,9 +98,9 @@ Jeu d'échecs classique avec une règle additionnelle :
 
 ## Roadmap (ordre des prompts à donner à Claude Code)
 
-1. Modéliser le moteur d'échecs pur en Java 25 (domaine, sans Spring ni réseau)
-2. Modéliser la règle de devinette comme extension du moteur (état du round, résolution)
-3. Architecture applicative Spring Boot (couches, WebSocket vs STOMP, cycle de vie d'une partie)
+1. ✅ Modéliser le moteur d'échecs pur en Java 25 (domaine, sans Spring ni réseau)
+2. ✅ Modéliser la règle de devinette comme extension du moteur (état du round, résolution)
+3. ✅ Architecture applicative Spring Boot (couches, WebSocket vs STOMP, cycle de vie d'une partie)
 4. ✅ Persistance et comptes joueurs (fait) — PostgreSQL/JPA/Flyway, OAuth, JWT stateless. Détail : [`src/CLAUDE.md`](src/CLAUDE.md).
 5. ✅ Frontend VueJS 3 (échiquier interactif, client WebSocket, UI de devinette) (fait)
 6. ✅ Compte joueur lié à une partie (fait) — voir "Liaison compte/session ↔ partie" ci-dessous.
@@ -145,5 +145,5 @@ Jeu d'échecs classique avec une règle additionnelle :
 - **Git** : en session locale interactive, ne jamais toucher à git — l'utilisateur gère les
   commits/push. **Exception** : une session Claude Code **distante** (conteneur cloud éphémère,
   ex. lancée depuis claude.ai/code) peut et doit committer/pousser elle-même sur la branche
-  demandée — c'est le seul canal pour livrer un résultat avant que le conteneur soit recyclé.
+  demandée.
 - Les ajouts des étapes réalisées sur les CLAUDE.md doivent être succincts, il ne faut garder que ce qui est pertinent.
