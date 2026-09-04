@@ -15,12 +15,14 @@ import com.guesschess.domain.game.GameId;
 import com.guesschess.domain.game.GameNotFoundException;
 import com.guesschess.domain.game.GameVariant;
 import com.guesschess.domain.game.RoundResult;
+import com.guesschess.domain.game.TimeControl;
 import com.guesschess.domain.pggn.PggnPly;
 import com.guesschess.domain.pggn.PggnWriter;
 import com.guesschess.domain.piece.Color;
 import com.guesschess.infrastructure.security.HttpPlayerIdentityResolver;
 import com.guesschess.infrastructure.web.dto.CreateGameHttpRequest;
 import com.guesschess.infrastructure.web.dto.CreateGameHttpResponse;
+import com.guesschess.infrastructure.web.dto.TimeControlHttpRequest;
 import com.guesschess.infrastructure.web.dto.ErrorResponse;
 import com.guesschess.infrastructure.web.dto.GameHistoryEntryHttpResponse;
 import com.guesschess.infrastructure.web.dto.GameHistoryHttpResponse;
@@ -95,9 +97,10 @@ class GameCreationController {
                 ? GameVariant.GUESSCHESS
                 : GameVariant.valueOf(request.variant());
         Color creatorColor = resolveColor(request == null ? null : request.color());
+        TimeControl timeControl = resolveTimeControl(request == null ? null : request.timeControl());
         PlayerRef creator = identityResolver.resolve(httpRequest, jwt);
 
-        CreatedGame created = gameLifecycleService.createGame(variant, creatorColor, creator);
+        CreatedGame created = gameLifecycleService.createGame(variant, timeControl, creatorColor, creator);
         String creatorToken = (creatorColor == Color.WHITE ? created.whiteToken() : created.blackToken()).toString();
 
         return ResponseEntity.status(HttpStatus.CREATED).body(new CreateGameHttpResponse(
@@ -246,5 +249,9 @@ class GameCreationController {
             return ThreadLocalRandom.current().nextBoolean() ? Color.WHITE : Color.BLACK;
         }
         return Color.valueOf(requested);
+    }
+
+    private TimeControl resolveTimeControl(TimeControlHttpRequest requested) {
+        return requested == null ? null : TimeControl.of(requested.baseMinutes(), requested.incrementSeconds());
     }
 }

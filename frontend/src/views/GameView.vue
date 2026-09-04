@@ -16,6 +16,7 @@ import InviteBanner from '../components/InviteBanner.vue'
 import AuthModal from '../components/AuthModal.vue'
 import LoginModal from '../components/LoginModal.vue'
 import PlayerLabel from '../components/PlayerLabel.vue'
+import { useClock } from '../composables/useClock'
 import type { Board, ColorLower, PromotionPieceType, RoundSummaryMessage } from '../types/api'
 
 const props = defineProps<{
@@ -124,6 +125,32 @@ const bottomPlayer = computed(() => {
 const topPlayerColor = computed<ColorLower>(() => ((myColor.value ?? 'white') === 'white' ? 'black' : 'white'))
 const bottomPlayerColor = computed<ColorLower>(() => myColor.value ?? 'white')
 
+/**
+ * Pendule (étape 12) : une par couleur, dérivée du dernier GameStateMessage (jamais
+ * de source de vérité locale, voir useClock). awaitingGuess détecte la phase "le
+ * joueur au trait a joué, l'adversaire doit deviner" sans rien révéler de plus que ce
+ * que l'état public porte déjà : la pendule tourne pour l'adversaire du joueur au
+ * trait (clockRunningFor !== sideToMove) uniquement en mode temps réel.
+ */
+const whiteClock = useClock(state, 'WHITE')
+const blackClock = useClock(state, 'BLACK')
+const awaitingGuess = computed(() => {
+  const s = state.value
+  return Boolean(s?.timeControl) && s?.clockRunningFor != null && s.clockRunningFor !== s.sideToMove
+})
+
+function clockPropsFor(color: ColorLower) {
+  const clock = color === 'white' ? whiteClock : blackClock
+  return {
+    clockMs: clock.remainingMs.value,
+    clockRunning: clock.running.value,
+    urgent: awaitingGuess.value && state.value?.clockRunningFor === color.toUpperCase(),
+  }
+}
+
+const topClock = computed(() => clockPropsFor(topPlayerColor.value))
+const bottomClock = computed(() => clockPropsFor(bottomPlayerColor.value))
+
 function startJoin() {
   joinError.value = null
   if (authStore.isLoggedIn) {
@@ -209,6 +236,15 @@ const myRole = computed(() => {
   if (!state.value || !myColor.value) return null
   return state.value.sideToMove === myColor.value.toUpperCase() ? 'mover' : 'guesser'
 })
+
+/**
+ * awaitingGuess (public, calculé plus haut) pilote le clignotement des DEUX pendules -
+ * visible de tous, dérivé d'un état déjà public. Le halo autour du plateau et du
+ * message de statut, lui, ne doit clignoter que pour le joueur qui doit effectivement
+ * deviner (pas son adversaire, pas un spectateur) - awaitingGuessMine restreint donc à
+ * myRole === 'guesser'.
+ */
+const awaitingGuessMine = computed(() => awaitingGuess.value && myRole.value === 'guesser')
 
 /**
  * Onglet du navigateur : titre changé en "à vous de jouer/deviner" et clignotant,
@@ -310,9 +346,10 @@ watch(
  * pendingSubmission ne desactive plus le plateau : tant que l'adversaire n'a pas
  * soumis (donc tant que le round n'est pas resolu), le joueur peut reselectionner un
  * autre coup/devinette a tout moment - chaque nouvelle soumission remplace la
- * precedente cote serveur (voir Game.submitMove/submitGuess). Cette possibilite n'a
- * de sens que hors contexte chronometre - a restreindre une fois le controle du temps
- * modelise (etape 12 de la roadmap).
+ * precedente cote serveur (voir Game.submitMove/submitGuess). Reste valable en partie
+ * chronometree (etape 12) : la pendule concernee n'est arretee/demarree qu'a la toute
+ * premiere soumission d'un round, les suivantes sont neutres pour elle (voir
+ * Game.stopClockFor/startClockFor cote backend).
  */
 const boardDisabled = computed(
   () =>
@@ -514,7 +551,14 @@ function submitNoGuess() {
         </div>
 
         <div class="order-2 mx-auto flex w-full max-w-xl flex-col items-center gap-4 @min-[67rem]:order-none @min-[67rem]:col-start-2 @min-[67rem]:mx-0 @min-[67rem]:max-w-none">
-          <PlayerLabel class="w-full" :color="topPlayerColor" :info="topPlayer" />
+          <PlayerLabel
+            class="w-full"
+            :color="topPlayerColor"
+            :info="topPlayer"
+            :clock-ms="topClock.clockMs"
+            :clock-running="topClock.clockRunning"
+            :urgent="topClock.urgent"
+          />
 
           <ChessBoard
             :board="hoverGuessBoard ?? displayBoard ?? state.board"
@@ -526,12 +570,27 @@ function submitNoGuess() {
             :hover-guess="hoverGuessSquares"
             :ghost-move="displayGhost"
             :checked-color="checkedColor"
+            :awaiting-guess="awaitingGuessMine"
             @choose-move="onChooseMove"
           />
 
-          <PlayerLabel class="w-full" :color="bottomPlayerColor" :info="bottomPlayer" />
+          <PlayerLabel
+            class="w-full"
+            :color="bottomPlayerColor"
+            :info="bottomPlayer"
+            :clock-ms="bottomClock.clockMs"
+            :clock-running="bottomClock.clockRunning"
+            :urgent="bottomClock.urgent"
+          />
 
-          <GameStatusBar class="w-full" :state="state" :my-color="myColor" :my-role="myRole" :pending-submission="pendingSubmission" />
+          <GameStatusBar
+            class="w-full"
+            :state="state"
+            :my-color="myColor"
+            :my-role="myRole"
+            :pending-submission="pendingSubmission"
+            :awaiting-guess="awaitingGuessMine"
+          />
 
           <button
             v-if="myRole === 'guesser' && !boardDisabled"

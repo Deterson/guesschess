@@ -54,6 +54,15 @@ class GameEntity {
     @Column(name = "state", columnDefinition = "jsonb", nullable = false)
     private GameStateJson state;
 
+    /**
+     * Denormalise depuis state (etape 12) : instant auquel la pendule actuellement
+     * active tombera a zero, ou null (correspondance, pendule pas encore demarree, ou
+     * partie terminee) - permet au scheduler de flag-fall d'interroger par index plutot
+     * que de desincapsuler le JSONB de chaque partie ONGOING a chaque tick.
+     */
+    @Column(name = "clock_deadline_at")
+    private Instant clockDeadlineAt;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
@@ -65,7 +74,7 @@ class GameEntity {
     }
 
     GameEntity(UUID id, GameVariant variant, GameStatus status, Color resultWinner, GameResultCause resultCause,
-               Color sideToMove, GameStateJson state, Instant createdAt, Instant updatedAt) {
+               Color sideToMove, GameStateJson state, Instant clockDeadlineAt, Instant createdAt, Instant updatedAt) {
         this.id = id;
         this.variant = variant;
         this.status = status;
@@ -73,6 +82,7 @@ class GameEntity {
         this.resultCause = resultCause;
         this.sideToMove = sideToMove;
         this.state = state;
+        this.clockDeadlineAt = clockDeadlineAt;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
     }
@@ -105,6 +115,10 @@ class GameEntity {
         return state;
     }
 
+    Instant getClockDeadlineAt() {
+        return clockDeadlineAt;
+    }
+
     Instant getCreatedAt() {
         return createdAt;
     }
@@ -118,12 +132,13 @@ class GameEntity {
      * le dirty-checking JPA se charge de repercuter ces changements au flush/commit).
      */
     void updateFrom(GameStatus status, Color resultWinner, GameResultCause resultCause,
-                     Color sideToMove, GameStateJson state, Instant updatedAt) {
+                     Color sideToMove, GameStateJson state, Instant clockDeadlineAt, Instant updatedAt) {
         this.status = status;
         this.resultWinner = resultWinner;
         this.resultCause = resultCause;
         this.sideToMove = sideToMove;
         this.state = state;
+        this.clockDeadlineAt = clockDeadlineAt;
         this.updatedAt = updatedAt;
     }
 }

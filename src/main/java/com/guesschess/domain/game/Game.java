@@ -8,6 +8,8 @@ import com.guesschess.domain.rules.CheckDetector;
 import com.guesschess.domain.rules.MaterialEvaluator;
 import com.guesschess.domain.rules.MoveGenerator;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -23,13 +25,14 @@ import java.util.Optional;
  * submitMove et submitGuess restent tous deux librement modifiables (rappelables,
  * chaque nouvel appel ecrasant le precedent) tant que le round n'est pas resolu, donc
  * tant que l'autre moitie de la paire n'est pas arrivee - aucune limite de nombre de
- * changements. Cette possibilite de changement n'a de sens que hors contexte
- * chronometre (aucun controle du temps n'existe encore - etape 12 de la roadmap - donc
- * elle s'applique aujourd'hui a toutes les parties ; a restreindre aux seules parties
- * par correspondance sans timer une fois le controle du temps modelise). Le round se
- * resout des que la seconde des deux soumissions arrive : devinette correcte -> coup
- * annule, le trait passe au devineur sans qu'aucune piece ne bouge ; devinette fausse
- * ou absente -> coup joue normalement.
+ * changements, y compris en partie chronometree (etape 12) : la pendule concernee
+ * (voir plus bas) n'est arretee/demarree qu'au tout premier appel de submitMove/
+ * submitGuess pour ce round, les resoumissions suivantes ne la re-decomptent ni ne la
+ * relancent (stopClockFor/startClockFor sont idempotents) - une resoumission reste
+ * donc gratuite une fois la pendule deja arretee. Le round se resout des que la
+ * seconde des deux soumissions arrive : devinette correcte -> coup annule, le trait
+ * passe au devineur sans qu'aucune piece ne bouge ; devinette fausse ou absente ->
+ * coup joue normalement.
  *
  * Cas particulier (variante NOGUESSMATE, la regle de base - voir GameVariant) : si le
  * coup annule etait la parade a un echec, le roi reste en echec et le trait passe
@@ -79,6 +82,30 @@ public final class Game {
     private Move pendingGuess;
 
     /**
+     * Cadence de la partie (etape 12) - null pour une partie par correspondance, sans
+     * pendule. Une seule pendule active a la fois (clockRunningFor/clockRunningSince),
+     * exactement comme aux echecs classiques : elle tourne pour le joueur au trait tant
+     * qu'il n'a pas soumis son coup reel, puis pour son adversaire tant qu'il n'a pas
+     * soumis sa devinette (sauf s'il l'a deja soumise a l'avance, gratuitement, pendant
+     * que le joueur au trait reflechissait). Le trait passant toujours au devineur une
+     * fois le round resolu (voir resolveRound), la pendule qui redemarre ensuite est
+     * toujours la sienne. null/null = pendule a l'arret (partie par correspondance,
+     * premier round de la partie, ou partie terminee).
+     *
+     * Premier round gratuit : aucune pendule ne tourne jamais pour le tout premier
+     * coup ni la toute premiere devinette de la partie (ni decompte, ni increment) -
+     * seul le round suivant demarre reellement le decompte (voir submitMove/
+     * resolveRound). Volontaire (pas juste un decompte a zero) : le jeu ne demarre les
+     * pendules qu'a la resolution du premier round plutot qu'a la creation/jonction de
+     * la partie.
+     */
+    private final TimeControl timeControl;
+    private long whiteMillisRemaining;
+    private long blackMillisRemaining;
+    private Color clockRunningFor;
+    private Instant clockRunningSince;
+
+    /**
      * Couleur ayant une offre de nulle en attente, ou null. Effacee des qu'un round se
      * resout (coup joue ou annule par une devinette - voir resolveRound) : une offre
      * non traitee vaut implicitement refus des que la partie avance d'un coup, plutot
@@ -114,18 +141,23 @@ public final class Game {
     private Move blackGuessedMove;
     private int blackGuessedMoveStreak;
 
-    private Game(GameId id, Board initialBoard, GameVariant variant) {
+    private Game(GameId id, Board initialBoard, GameVariant variant, TimeControl timeControl) {
         this.id = id;
         this.board = initialBoard;
         this.variant = variant;
         this.positionHistory.add(new PositionRecord(initialBoard, PositionOrigin.MOVE));
+        this.timeControl = timeControl;
+        this.whiteMillisRemaining = timeControl == null ? 0 : timeControl.baseMillis();
+        this.blackMillisRemaining = timeControl == null ? 0 : timeControl.baseMillis();
     }
 
     private Game(GameId id, GameVariant variant, Board board, List<PositionRecord> positionHistory, List<RoundResult> roundHistory,
                  GameStatus status, GameResult result, Move pendingMove, boolean guessSubmitted,
                  Move pendingGuess, Move whiteGuessedMove, int whiteGuessedMoveStreak,
                  Move blackGuessedMove, int blackGuessedMoveStreak, Color drawOfferedBy,
-                 Color rematchOfferedBy, GameId rematchGameId) {
+                 Color rematchOfferedBy, GameId rematchGameId, TimeControl timeControl,
+                 long whiteMillisRemaining, long blackMillisRemaining, Color clockRunningFor,
+                 Instant clockRunningSince) {
         this.id = id;
         this.variant = variant;
         this.board = board;
@@ -143,6 +175,11 @@ public final class Game {
         this.drawOfferedBy = drawOfferedBy;
         this.rematchOfferedBy = rematchOfferedBy;
         this.rematchGameId = rematchGameId;
+        this.timeControl = timeControl;
+        this.whiteMillisRemaining = whiteMillisRemaining;
+        this.blackMillisRemaining = blackMillisRemaining;
+        this.clockRunningFor = clockRunningFor;
+        this.clockRunningSince = clockRunningSince;
     }
 
     public static Game newGame() {
@@ -158,7 +195,11 @@ public final class Game {
     }
 
     public static Game newGame(GameId id, GameVariant variant) {
-        return new Game(id, Board.initial(), variant);
+        return newGame(id, variant, null);
+    }
+
+    public static Game newGame(GameId id, GameVariant variant, TimeControl timeControl) {
+        return new Game(id, Board.initial(), variant, timeControl);
     }
 
     public static Game fromPosition(Board board) {
@@ -174,7 +215,7 @@ public final class Game {
     }
 
     public static Game fromPosition(GameId id, Board board, GameVariant variant) {
-        return new Game(id, board, variant);
+        return new Game(id, board, variant, null);
     }
 
     /**
@@ -186,7 +227,9 @@ public final class Game {
                 memento.status(), memento.result(), memento.pendingMove(), memento.guessSubmitted(),
                 memento.pendingGuess(), memento.whiteGuessedMove(),
                 memento.whiteGuessedMoveStreak(), memento.blackGuessedMove(), memento.blackGuessedMoveStreak(),
-                memento.drawOfferedBy(), memento.rematchOfferedBy(), memento.rematchGameId());
+                memento.drawOfferedBy(), memento.rematchOfferedBy(), memento.rematchGameId(),
+                memento.timeControl(), memento.whiteMillisRemaining(), memento.blackMillisRemaining(),
+                memento.clockRunningFor(), memento.clockRunningSince());
     }
 
     public GameId id() {
@@ -215,6 +258,35 @@ public final class Game {
 
     public Color drawOfferedBy() {
         return drawOfferedBy;
+    }
+
+    public TimeControl timeControl() {
+        return timeControl;
+    }
+
+    public long millisRemaining(Color color) {
+        return color == Color.WHITE ? whiteMillisRemaining : blackMillisRemaining;
+    }
+
+    public Color clockRunningFor() {
+        return clockRunningFor;
+    }
+
+    public Instant clockRunningSince() {
+        return clockRunningSince;
+    }
+
+    /**
+     * Instant auquel la pendule actuellement active (clockRunningFor) tombera a zero, ou
+     * null si aucune pendule ne tourne (correspondance, partie pas encore complete, ou
+     * terminee) - denormalise en base pour permettre au scheduler de flag-fall (voir
+     * infrastructure) d'interroger par index plutot que de desincapsuler chaque partie.
+     */
+    public Instant clockDeadline() {
+        if (clockRunningFor == null) {
+            return null;
+        }
+        return clockRunningSince.plusMillis(millisRemaining(clockRunningFor));
     }
 
     /**
@@ -390,6 +462,82 @@ public final class Game {
     }
 
     /**
+     * Termine la partie au temps si la pendule actuellement active a depasse son temps
+     * restant a l'instant now - appele par le scheduler de flag-fall (infrastructure),
+     * jamais par une soumission de joueur. Idempotent/sans effet si aucune pendule ne
+     * tourne, si la partie est deja terminee, ou si le temps n'est pas encore ecoule.
+     *
+     * @return true si la partie vient d'etre terminee par cet appel
+     */
+    public boolean forfeitOnTimeIfExpired(Instant now) {
+        if (timeControl == null || clockRunningFor == null || status != GameStatus.ONGOING) {
+            return false;
+        }
+        if (now.isBefore(clockDeadline())) {
+            return false;
+        }
+        Color loser = clockRunningFor;
+        setMillisRemaining(loser, 0);
+        clockRunningFor = null;
+        clockRunningSince = null;
+        finish(GameResult.win(loser.opposite(), GameResultCause.TIMEOUT));
+        return true;
+    }
+
+    /**
+     * Arrete la pendule de color si (et seulement si) c'est bien elle qui tournait -
+     * idempotent, donc sans effet sur une resoumission (le premier appel a deja arrete
+     * la pendule) ni sur une devinette anticipee (la pendule du devineur ne tournait pas
+     * encore). incrementApplied credite l'increment de cadence : toujours pour le coup
+     * reel du joueur au trait (meme si ce coup est ensuite annule par une devinette
+     * correcte - voir submitMove), jamais pour une devinette (deviner n'est pas jouer un
+     * coup).
+     */
+    private void stopClockFor(Color color, Instant now, boolean incrementApplied) {
+        if (timeControl == null || clockRunningFor != color) {
+            return;
+        }
+        long elapsed = Duration.between(clockRunningSince, now).toMillis();
+        long remaining = millisRemaining(color) - elapsed;
+        if (incrementApplied) {
+            remaining += timeControl.incrementMillis();
+        }
+        setMillisRemaining(color, Math.max(remaining, 0));
+        clockRunningFor = null;
+        clockRunningSince = null;
+    }
+
+    /**
+     * Demarre la pendule de color si elle ne tournait pas deja pour elle - idempotent,
+     * pour qu'une resoumission (avant que le round ne se resolve) ne relance pas une
+     * nouvelle fenetre de temps pour l'adversaire.
+     */
+    private void startClockFor(Color color, Instant now) {
+        if (timeControl == null || clockRunningFor == color) {
+            return;
+        }
+        clockRunningFor = color;
+        clockRunningSince = now;
+    }
+
+    private void setMillisRemaining(Color color, long millis) {
+        if (color == Color.WHITE) {
+            whiteMillisRemaining = millis;
+        } else {
+            blackMillisRemaining = millis;
+        }
+    }
+
+    /**
+     * Equivalent a submitGuess(guess, Instant.now()) - pour les appelants (tests, code
+     * existant) qui ne se soucient pas de la pendule, typiquement des parties sans
+     * TimeControl ou l'instant fourni n'a de toute facon aucun effet.
+     */
+    public Optional<RoundResult> submitGuess(Move guess) {
+        return submitGuess(guess, Instant.now());
+    }
+
+    /**
      * Soumission (ou modification) de la devinette par l'adversaire du joueur au
      * trait. Rappelable librement tant qu'elle n'a pas deja resolu ce round (donc
      * tant que le coup reel n'est pas aussi arrive). guess null signifie
@@ -397,17 +545,29 @@ public final class Game {
      * compte comme une soumission a part entiere : le round ne se resoudra pas tant
      * que submitGuess n'a pas ete appelee au moins une fois, meme avec null.
      *
+     * now sert uniquement a arreter la pendule du devineur si elle tournait deja
+     * (coup reel du joueur au trait deja soumis) - sans effet en correspondance ou si
+     * cette devinette est anticipee (voir stopClockFor).
+     *
      * @return le resultat du round si cette soumission completait la paire, vide si
      * le coup reel n'est pas encore arrive
      */
-    public Optional<RoundResult> submitGuess(Move guess) {
+    public Optional<RoundResult> submitGuess(Move guess, Instant now) {
         requireOngoing();
         if (guess != null && !MoveGenerator.isLegalMove(board, sideToMove(), guess)) {
             throw new IllegalArgumentException("guess must be a legal move for " + sideToMove() + ": " + guess);
         }
+        stopClockFor(sideToMove().opposite(), now, false);
         this.guessSubmitted = true;
         this.pendingGuess = guess;
-        return pendingMove != null ? Optional.of(resolveRound()) : Optional.empty();
+        return pendingMove != null ? Optional.of(resolveRound(now)) : Optional.empty();
+    }
+
+    /**
+     * Equivalent a submitMove(actualMove, Instant.now()) - voir submitGuess(Move).
+     */
+    public Optional<RoundResult> submitMove(Move actualMove) {
+        return submitMove(actualMove, Instant.now());
     }
 
     /**
@@ -417,19 +577,37 @@ public final class Game {
      * resout que si cette devinette est deja arrivee ; sinon ce coup reste en attente
      * jusqu'a ce qu'elle arrive.
      *
+     * now arrete la pendule du joueur au trait (increment credite) et, si la devinette
+     * n'est pas encore arrivee, demarre celle du devineur - sans effet en
+     * correspondance ; sans effet sur les deux pendules pour une resoumission (la
+     * pendule du joueur au trait est deja arretee depuis le premier appel de ce round).
+     * Premier round de la partie (roundHistory encore vide) : aucune pendule n'a
+     * jamais ete demarree (voir resolveRound), donc stopClockFor est deja neutre pour
+     * le mover ; startClockFor du devineur est explicitement saute ici pour que sa
+     * pendule ne demarre pas non plus - le premier coup ET la premiere devinette sont
+     * ainsi gratuits, sans increment. Le decompte demarre reellement au round suivant
+     * (resolveRound demarre alors la pendule du nouveau mover, sans condition).
+     *
      * @return le resultat du round si la devinette etait deja arrivee, vide si le
      * round doit encore attendre la devinette
      */
-    public Optional<RoundResult> submitMove(Move actualMove) {
+    public Optional<RoundResult> submitMove(Move actualMove, Instant now) {
         requireOngoing();
         if (!MoveGenerator.isLegalMove(board, sideToMove(), actualMove)) {
             throw new IllegalArgumentException("illegal move: " + actualMove);
         }
+        stopClockFor(sideToMove(), now, true);
         this.pendingMove = actualMove;
-        return guessSubmitted ? Optional.of(resolveRound()) : Optional.empty();
+        if (guessSubmitted) {
+            return Optional.of(resolveRound(now));
+        }
+        if (!roundHistory.isEmpty()) {
+            startClockFor(sideToMove().opposite(), now);
+        }
+        return Optional.empty();
     }
 
-    private RoundResult resolveRound() {
+    private RoundResult resolveRound(Instant now) {
         this.drawOfferedBy = null;
         Move actualMove = this.pendingMove;
         Move guess = this.pendingGuess;
@@ -455,6 +633,9 @@ public final class Game {
             roundResult = RoundResult.played(mover, guesser, actualMove, guess);
         }
         this.roundHistory.add(roundResult);
+        if (status == GameStatus.ONGOING) {
+            startClockFor(guesser, now);
+        }
         return roundResult;
     }
 
@@ -570,7 +751,8 @@ public final class Game {
         return new Memento(id, variant, board, List.copyOf(positionHistory), List.copyOf(roundHistory),
                 status, result, pendingMove, guessSubmitted, pendingGuess,
                 whiteGuessedMove, whiteGuessedMoveStreak, blackGuessedMove, blackGuessedMoveStreak, drawOfferedBy,
-                rematchOfferedBy, rematchGameId);
+                rematchOfferedBy, rematchGameId, timeControl, whiteMillisRemaining, blackMillisRemaining,
+                clockRunningFor, clockRunningSince);
     }
 
     public record Memento(
@@ -590,7 +772,12 @@ public final class Game {
             int blackGuessedMoveStreak,
             Color drawOfferedBy,
             Color rematchOfferedBy,
-            GameId rematchGameId
+            GameId rematchGameId,
+            TimeControl timeControl,
+            long whiteMillisRemaining,
+            long blackMillisRemaining,
+            Color clockRunningFor,
+            Instant clockRunningSince
     ) {
     }
 }

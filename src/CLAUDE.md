@@ -116,30 +116,62 @@ tout court (échec rapide voulu au boot Spring, pas seulement au moment du login
 - **Étape 11 — Historique de partie navigable** : `GET /api/games/{gameId}/history` (lecture
   seule, sans jeton) expose le détail par round (coup joué, devinette, plateau) ; `roundCount` sur
   `GameSnapshot`/`GameStateMessage` évite de le refetch à chaque message live.
-- **Étape 12 — Timers** (temps de réflexion + timer de devinette), **pas encore implémenté** :
-  configuration du contrôle de temps au moment de la création de la partie (étape 7), façon échecs
-  classique — un temps total par joueur + un bonus (incrément) ajouté après chaque coup joué (type
-  Fischer). Timer géré et arbitré côté backend (jamais côté client, cohérent avec le principe "le
-  serveur revalide tout") : le décompte réel vit dans l'agrégat `Game`/le round en cours, le
-  frontend ne fait qu'afficher un countdown dérivé d'un timestamp reçu, pas sa propre source de
-  vérité. Quand le temps d'un joueur tombe à zéro, la partie se termine immédiatement (perte au
-  temps) — nouvelle valeur de cause dans `GameResultCause`. Nécessite un mécanisme serveur pour
-  détecter le flag-fall même en l'absence de toute action du joueur — un scheduler (threads
-  virtuels / `ScheduledExecutorService`) qui surveille les timers actifs, pas une vérification
-  dépendant de la prochaine soumission.
-  **Timer de devinette** : distinct du timer de réflexion, il ne consomme pas le temps total du
-  devineur. Démarre au moment où le joueur au trait a soumis son coup réel et tant que le devineur
-  n'a pas encore soumis sa devinette ; s'arrête dès que la devinette est soumise. Durée
-  proportionnelle au temps total choisi à la création (ex. 15s pour une partie 5 min/side, 30s
-  pour 10 min/side — ratio à figer précisément, éventuellement aussi fonction du bonus par coup).
-  À expiration sans devinette soumise : aucune devinette n'est considérée faite et le coup réel est
-  simplement joué (résolution identique au cas "devinette incorrecte", sans pénalité de temps côté
-  devineur au-delà de ne pas avoir deviné).
-  **Portée mode asynchrone** : les deux timers tels que décrits (décompte live à la seconde) n'ont
-  de sens qu'en temps réel — en asynchrone les joueurs ne sont pas connectés simultanément, donc
-  ni perte au temps classique ni fenêtre de devinette chronométrée à la seconde près. Reste une
-  question ouverte séparée si l'asynchrone doit avoir son propre contrôle de temps (ex. temps par
-  coup en jours, façon correspondance) ; hors périmètre de cette étape.
+- **Étape 12 — Timers** (fait) : pendule Fischer (temps de base + incrément par coup), optionnelle
+  à la création (`TimeControl`, null = correspondance, comportement inchangé). **Une seule pendule
+  active à la fois** (`Game.clockRunningFor`/`clockRunningSince`, comme aux échecs classiques) :
+  elle tourne pour le joueur au trait, puis — dès qu'il soumet son coup réel — pour son adversaire
+  jusqu'à ce qu'il devine (sauf devinette déjà soumise à l'avance, gratuite). Pas de timer de
+  devinette séparé : deviner consomme la pendule principale du devineur (s'il tombe à zéro en
+  devinant, il perd au temps) ; l'incrément n'est crédité que sur un coup réel soumis dans les
+  temps (jamais sur une devinette), **toujours** même si ce coup est ensuite annulé par une
+  devinette correcte.
+  **Premier round gratuit** : ni le tout premier coup ni la toute première devinette de la partie
+  ne décomptent la pendule (ni increment sur ce premier coup) - aucune pendule ne démarre avant que
+  ce round ne se résolve. C'est ce même mécanisme qui remplace l'ancien démarrage explicite à la
+  jonction du deuxième joueur : plus besoin de distinguer "partie complète" de "partie déjà en
+  cours", la pendule du round 2 démarre simplement comme celle de n'importe quel round suivant (voir
+  `resolveRound`), qu'il s'agisse d'une invitation classique ou d'une revanche (les deux couleurs
+  déjà liées). `stopClockFor`/`startClockFor` sont idempotents : une resoumission (déjà permise
+  librement par le domaine) ne re-décompte ni ne relance la pendule concernée, donc pas besoin de
+  la restreindre en partie chronométrée.
+  **Flag-fall** : `GameClockScheduler` (nouveau package `infrastructure/scheduling`,
+  `@Scheduled`, threads virtuels via `spring.threads.virtual.enabled`) balaie
+  `clock_deadline_at` (colonne dénormalisée, migration V10, le reste de l'état pendule vit dans le
+  JSONB `state` comme le reste de l'agrégat) et appelle `Game.forfeitOnTimeIfExpired` sous le même
+  verrou (`GameRepository.withGame`) que les soumissions normales — nouvelle cause
+  `GameResultCause.TIMEOUT`.
+  **Piège rencontré (backend)** : `GameController.submitMove`/`submitGuess` ne diffusaient l'état
+  public (`/topic/games/{id}`) qu'une fois le round résolu ; un coup réel qui arrête la pendule du
+  mover et démarre celle du devineur sans résoudre le round (cas courant, devinette pas encore
+  soumise) ne déclenchait donc aucune diffusion, et le halo/la pendule ne se mettaient jamais à
+  jour côté adversaire avant qu'il devine. `GameSnapshot` ne révélant jamais le coup en attente,
+  diffuser aussi dans ce cas (si `timeControl != null`) est sans risque anti-triche — corrigé en
+  rediffusant explicitement dans la branche "pas encore résolu" de `submitMove`.
+  **Piège rencontré (frontend), même cause racine** : `stores/game.ts` traitait tout message sur
+  `/topic/games/{gameId}` comme "un round vient de se résoudre" et effaçait `pendingSubmission`/
+  `pendingMove` sans condition - correct tant que ce topic ne diffusait qu'à la résolution, faux
+  dès que le fix backend ci-dessus s'est mis à y diffuser aussi un coup réel encore en attente : le
+  joueur qui venait de jouer se voyait ré-afficher "à vous de jouer" alors que son coup était bien
+  enregistré serveur. Corrigé en ne réinitialisant plus que si `roundCount` a effectivement changé.
+  **Bug de production rencontré** : `GameStateJson.whiteMillisRemaining`/`blackMillisRemaining`
+  avaient été laissés en `long` primitif (au lieu de `Long`, contrairement à
+  `timeControlBaseMillis` et aux autres champs de pendule) - toute partie persistée avant cette
+  étape n'a tout simplement pas ces clés dans son JSON, et Jackson 3 refuse de mapper `null` sur un
+  primitif (`MismatchedInputException`), plantant en 500 dès qu'on rouvrait une telle partie (ex.
+  "Mes parties" après avoir joué en anonyme puis s'être connecté). Corrigé en les rendant `Long`
+  nullable, comme les autres. Le test de régression correspondant
+  (`GameJpaMapperTest.toDomainDefaultsClockFieldsForAGameJsonPersistedBeforeTimers`) passe par le
+  vrai `GameStateJsonConverter` plutôt que de construire `GameStateJson` directement en Java - seul
+  moyen de reproduire ce genre de plantage (une valeur `null` explicite en Java n'est pas la même
+  chose qu'une clé absente du JSON désérialisé).
+  **Portée mode asynchrone** : hors périmètre — la pendule ne concerne que le temps réel (démarrée
+  uniquement une fois la partie complète, décompte live). Un contrôle de temps propre à la
+  correspondance (ex. jours par coup) reste une question ouverte séparée.
+  **Revanche** : `GameLifecycleService.createRematchGame` reprend le `TimeControl` de la partie qui
+  se termine (pas juste le variant, déjà fait) - son propre premier round reste gratuit comme pour
+  toute nouvelle partie, aucun traitement particulier nécessaire.
+  `TimeControl.of`/`TimeControlHttpRequest.baseMinutes` acceptent des minutes fractionnaires
+  (`double`, ex. 0.25 = 1/4 minute) pour les cadences bullet très courtes.
 - **Étape 14 — Identifiant unique de compte (login)** : pseudonyme immuable, 3-20 caractères,
   unique insensible à la casse (index `lower(login)`, migration V9), interdit sur
   "Anonymous"/"Anonyme". `login` nullable en SQL pour les comptes créés avant cette étape ; un

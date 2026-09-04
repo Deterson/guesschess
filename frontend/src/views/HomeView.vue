@@ -8,7 +8,7 @@ import { useAuthStore } from '../stores/auth'
 import AuthModal from '../components/AuthModal.vue'
 import CreateGameModal from '../components/CreateGameModal.vue'
 import LoginModal from '../components/LoginModal.vue'
-import type { Color } from '../types/api'
+import type { Color, TimeControlHttpRequest } from '../types/api'
 
 const router = useRouter()
 const gameStore = useGameStore()
@@ -21,16 +21,18 @@ const showLoginModal = ref(false)
 const error = ref<string | null>(null)
 const noGuessmate = ref(false)
 const color = ref<Color | 'RANDOM'>('RANDOM')
+const timeControl = ref<TimeControlHttpRequest | null>(null)
 
 function openCreateModal() {
   error.value = null
   showCreateModal.value = true
 }
 
-function onCreateModalConfirm(choice: { color: Color | 'RANDOM'; noGuessmate: boolean }) {
+function onCreateModalConfirm(choice: { color: Color | 'RANDOM'; noGuessmate: boolean; timeControl: TimeControlHttpRequest | null }) {
   showCreateModal.value = false
   color.value = choice.color
   noGuessmate.value = choice.noGuessmate
+  timeControl.value = choice.timeControl
   if (authStore.isLoggedIn) {
     create(authStore.token)
   } else {
@@ -44,7 +46,7 @@ async function create(authToken: string | null) {
   error.value = null
   try {
     const variant = noGuessmate.value ? 'NOGUESSMATE' : 'GUESSCHESS'
-    const created = await createGame(variant, color.value, authToken)
+    const created = await createGame(variant, color.value, timeControl.value, authToken)
     // Le token/couleur revenus ici sont déjà vérifiés côté serveur - on peuple
     // directement le store plutôt que de forcer GameView à les redécouvrir via
     // /my-access, dont la fiabilité dépend de la propagation immédiate du cookie
@@ -109,7 +111,7 @@ function openMyGames() {
 
     <AuthModal
       :open="showAuthModal"
-      :pending-action="{ type: 'create', variant: noGuessmate ? 'NOGUESSMATE' : 'GUESSCHESS', color }"
+      :pending-action="{ type: 'create', variant: noGuessmate ? 'NOGUESSMATE' : 'GUESSCHESS', color, timeControl }"
       @anonymous="continueAnonymously"
       @close="showAuthModal = false"
     />

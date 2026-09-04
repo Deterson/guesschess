@@ -18,7 +18,7 @@ export async function resumeAfterLogin(token: string, router: Router, gameStore:
   }
 
   if (action.type === 'create') {
-    const created = await createGame(action.variant, action.color, token)
+    const created = await createGame(action.variant, action.color, action.timeControl, token)
     await gameStore.joinGame({
       gameId: created.gameId,
       token: created.creatorToken,

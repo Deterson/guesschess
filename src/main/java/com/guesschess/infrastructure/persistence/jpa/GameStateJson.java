@@ -21,6 +21,16 @@ record GameStateJson(
         int blackGuessedMoveStreak,
         String drawOfferedBy,
         String rematchOfferedBy,
-        String rematchGameId
+        String rematchGameId,
+        Long timeControlBaseMillis,
+        Long timeControlIncrementMillis,
+        // Long (pas long) : absents du JSON des parties persistees avant l'etape 12,
+        // comme timeControlBaseMillis ci-dessus - un primitif ferait echouer la
+        // deserialisation (MismatchedInputException) au lieu de degrader en 0/aucune
+        // pendule, voir GameJpaMapper.toDomain.
+        Long whiteMillisRemaining,
+        Long blackMillisRemaining,
+        String clockRunningFor,
+        Long clockRunningSinceEpochMillis
 ) {
 }

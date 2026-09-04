@@ -109,7 +109,7 @@ Jeu d'échecs classique avec une règle additionnelle :
 9. ✅ Dockerisation (fait) — images multi-stage back/front, JVM bornée, healthcheck actuator. Détail : [`.github/CLAUDE.md`](.github/CLAUDE.md).
 10. ✅ Format PGGN (Portable Game Guess Notation) (fait) — notation façon PGN avec le coup deviné entre parenthèses après le coup réel (`e4(e3)`). Détail : [`src/CLAUDE.md`](src/CLAUDE.md).
 11. ✅ Historique de partie navigable (fait), façon lichess.org. Détail : [`src/CLAUDE.md`](src/CLAUDE.md) (endpoint) et [`frontend/CLAUDE.md`](frontend/CLAUDE.md) (composants, navigation clavier).
-12. Timers (temps de réflexion + timer de devinette) — spec complète dans [`src/CLAUDE.md`](src/CLAUDE.md) (le backend pilote le décompte, jamais le client).
+12. ✅ Timers (fait) — pendule Fischer optionnelle à la création (temps réel avec presets classiques, ou correspondance sans pendule), pilotée côté backend. Détail : [`src/CLAUDE.md`](src/CLAUDE.md) (backend) et [`frontend/CLAUDE.md`](frontend/CLAUDE.md) (frontend).
 13. ✅ Tutoriel des règles (fait) — page statique FR/EN, aucun backend. Détail : [`frontend/CLAUDE.md`](frontend/CLAUDE.md).
 14. ✅ Identifiant unique de compte (login) (fait) — pseudonyme immuable 3-20 caractères, profil public `/profile/{login}`. Détail : [`src/CLAUDE.md`](src/CLAUDE.md) (backend) et [`frontend/CLAUDE.md`](frontend/CLAUDE.md) (convention d'affichage, routes).
 

@@ -61,15 +61,17 @@ public class GameController {
     private final SimpMessagingTemplate messagingTemplate;
     private final GamePresenceService presenceService;
     private final PlayersBroadcastService playersBroadcastService;
+    private final GameBroadcastService gameBroadcastService;
 
     public GameController(GameLifecycleService gameLifecycleService, GameMessageMapper mapper,
                            SimpMessagingTemplate messagingTemplate, GamePresenceService presenceService,
-                           PlayersBroadcastService playersBroadcastService) {
+                           PlayersBroadcastService playersBroadcastService, GameBroadcastService gameBroadcastService) {
         this.gameLifecycleService = gameLifecycleService;
         this.mapper = mapper;
         this.messagingTemplate = messagingTemplate;
         this.presenceService = presenceService;
         this.playersBroadcastService = playersBroadcastService;
+        this.gameBroadcastService = gameBroadcastService;
     }
 
     /**
@@ -140,9 +142,18 @@ public class GameController {
         PlayerRef requester = WebSocketPlayerIdentity.resolve(sessionAttributes);
         Optional<GameSnapshot> resolved = gameLifecycleService.submitMove(PlayerToken.fromString(request.token()), intent, requester);
         if (resolved.isPresent()) {
-            broadcast(resolved.get());
+            gameBroadcastService.broadcast(resolved.get());
         } else {
             sendToUser(sessionId, "/queue/move.ack", new AckMessage("recorded_waiting_for_guess"));
+            // Le round n'est pas resolu (la devinette n'est pas encore arrivee), mais en
+            // partie chronometree ce coup vient d'arreter la pendule du joueur au trait et
+            // de demarrer celle du devineur (voir Game.submitMove) - un changement public
+            // et sans risque anti-triche (GameSnapshot ne revele jamais le coup en attente)
+            // qu'il faut donc diffuser ici, hors du seul chemin de resolution de round.
+            GameSnapshot snapshot = gameLifecycleService.viewGame(GameId.fromString(gameId));
+            if (snapshot.timeControl() != null) {
+                gameBroadcastService.broadcast(snapshot);
+            }
         }
     }
 
@@ -156,7 +167,7 @@ public class GameController {
         PlayerRef requester = WebSocketPlayerIdentity.resolve(sessionAttributes);
         Optional<GameSnapshot> resolved = gameLifecycleService.submitGuess(PlayerToken.fromString(request.token()), intent, requester);
         if (resolved.isPresent()) {
-            broadcast(resolved.get());
+            gameBroadcastService.broadcast(resolved.get());
         } else {
             sendToUser(sessionId, "/queue/guess.ack", new AckMessage("recorded_waiting_for_move"));
         }
@@ -173,7 +184,7 @@ public class GameController {
                            @Header(value = "simpSessionAttributes", required = false) Map<String, Object> sessionAttributes) {
         PlayerRef requester = WebSocketPlayerIdentity.resolve(sessionAttributes);
         GameSnapshot resolved = gameLifecycleService.offerDraw(PlayerToken.fromString(request.token()), requester);
-        broadcast(resolved);
+        gameBroadcastService.broadcast(resolved);
     }
 
     /**
@@ -184,7 +195,7 @@ public class GameController {
                                @Header(value = "simpSessionAttributes", required = false) Map<String, Object> sessionAttributes) {
         PlayerRef requester = WebSocketPlayerIdentity.resolve(sessionAttributes);
         GameSnapshot resolved = gameLifecycleService.respondToDraw(PlayerToken.fromString(request.token()), request.accept(), requester);
-        broadcast(resolved);
+        gameBroadcastService.broadcast(resolved);
     }
 
     /**
@@ -200,7 +211,7 @@ public class GameController {
                               @Header(value = "simpSessionAttributes", required = false) Map<String, Object> sessionAttributes) {
         PlayerRef requester = WebSocketPlayerIdentity.resolve(sessionAttributes);
         GameSnapshot resolved = gameLifecycleService.offerRematch(PlayerToken.fromString(request.token()), requester);
-        broadcast(resolved);
+        gameBroadcastService.broadcast(resolved);
     }
 
     /**
@@ -239,11 +250,6 @@ public class GameController {
     @SendToUser("/queue/errors")
     public ErrorMessage handleError(Exception exception) {
         return new ErrorMessage(exception.getClass().getSimpleName(), exception.getMessage());
-    }
-
-    private void broadcast(GameSnapshot snapshot) {
-        boolean full = gameLifecycleService.isFull(snapshot.id());
-        messagingTemplate.convertAndSend("/topic/games/" + snapshot.id(), mapper.toGameStateMessage(snapshot, full));
     }
 
     /**

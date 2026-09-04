@@ -4,10 +4,13 @@ import com.guesschess.domain.game.Game;
 import com.guesschess.domain.game.GameId;
 import com.guesschess.domain.game.GameNotFoundException;
 import com.guesschess.domain.game.GameRepository;
+import com.guesschess.domain.game.GameStatus;
 import jakarta.persistence.EntityManager;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.function.Function;
 
 /**
@@ -61,5 +64,13 @@ class JpaGameRepository implements GameRepository {
         // la persistance effective se fait au flush/commit).
         mapper.updateEntity(entity, game);
         return result;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<GameId> findExpiredClockGameIds(Instant deadline) {
+        return springDataRepository.findIdsWithExpiredClock(GameStatus.ONGOING, deadline).stream()
+                .map(GameId::new)
+                .toList();
     }
 }

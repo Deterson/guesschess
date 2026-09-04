@@ -24,7 +24,15 @@ import java.util.List;
  * rematchOfferedBy ("WHITE"/"BLACK"/null) est la couleur ayant propose une revanche
  * (uniquement pertinent une fois status=FINISHED) ; rematchGameId est l'identifiant
  * de la nouvelle partie une fois les deux couleurs d'accord - le frontend y navigue
- * automatiquement des qu'il le voit apparaitre (voir Game.confirmRematch).
+ * automatiquement des qu'il le voit apparaitre (voir Game.confirmRematch). timeControl
+ * (etape 12) est null pour une partie par correspondance (pas de pendule) ;
+ * whiteMillisRemaining/blackMillisRemaining sont les temps restants tels que connus du
+ * serveur au moment de ce message (pas recalcules en continu), clockRunningFor
+ * ("WHITE"/"BLACK"/null) la couleur dont la pendule tourne actuellement (null si aucune
+ * - correspondance, partie pas encore complete, ou terminee), et serverTimeMs
+ * l'horodatage serveur de ce message : le frontend s'en sert pour corriger le decalage
+ * avec son horloge locale et faire defiler l'affichage lui-meme, sans jamais faire
+ * autorite (voir GameSnapshot).
  */
 public record GameStateMessage(
         String gameId,
@@ -42,6 +50,11 @@ public record GameStateMessage(
         boolean inCheck,
         String drawOfferedBy,
         String rematchOfferedBy,
-        String rematchGameId
+        String rematchGameId,
+        TimeControlMessage timeControl,
+        long whiteMillisRemaining,
+        long blackMillisRemaining,
+        String clockRunningFor,
+        long serverTimeMs
 ) {
 }

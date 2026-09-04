@@ -143,9 +143,17 @@ export const useGameStore = defineStore('game', () => {
       )
       subscriptions.push(
         await subscribe<GameStateMessage>(`/topic/games/${id}`, (payload) => {
+          // roundCount ne bouge que si CE message resout effectivement un round -
+          // depuis l'etape 12, ce topic diffuse aussi un coup reel qui n'a fait
+          // qu'arreter/demarrer une pendule sans resoudre le round (voir
+          // GameController.submitMove) : sans cette garde, ce message intermediaire
+          // effacerait a tort ma propre soumission encore en attente.
+          const roundResolved = payload.roundCount !== state.value?.roundCount
           state.value = payload
-          pendingSubmission.value = false
-          pendingMove.value = null
+          if (roundResolved) {
+            pendingSubmission.value = false
+            pendingMove.value = null
+          }
         }),
       )
       subscriptions.push(

@@ -14,6 +14,7 @@ import type {
   JoinGameHttpResponse,
   MyAccessHttpResponse,
   PublicProfileHttpResponse,
+  TimeControlHttpRequest,
 } from '../types/api'
 
 /**
@@ -115,8 +116,12 @@ async function request<T>(
 
 export const oauthAuthorizationUrl = (provider: string): string => `${API_URL}/oauth2/authorization/${provider}`
 
-export const createGame = (variant: GameVariant, color: Color | 'RANDOM', token: string | null) =>
-  request<CreateGameHttpResponse>('/api/games', { method: 'POST', body: { variant, color }, token, allowAnonymousFallback: true })
+export const createGame = (
+  variant: GameVariant,
+  color: Color | 'RANDOM',
+  timeControl: TimeControlHttpRequest | null,
+  token: string | null,
+) => request<CreateGameHttpResponse>('/api/games', { method: 'POST', body: { variant, color, timeControl }, token, allowAnonymousFallback: true })
 
 export const joinGame = (gameId: string, authToken: string | null) =>
   request<JoinGameHttpResponse>(`/api/games/${gameId}/join`, { method: 'POST', token: authToken, allowAnonymousFallback: true })

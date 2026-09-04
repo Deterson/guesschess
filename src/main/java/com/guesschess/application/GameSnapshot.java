@@ -7,9 +7,11 @@ import com.guesschess.domain.game.GameResult;
 import com.guesschess.domain.game.GameStatus;
 import com.guesschess.domain.game.GameVariant;
 import com.guesschess.domain.game.RoundResult;
+import com.guesschess.domain.game.TimeControl;
 import com.guesschess.domain.move.Move;
 import com.guesschess.domain.piece.Color;
 
+import java.time.Instant;
 import java.util.List;
 
 /**
@@ -28,7 +30,12 @@ import java.util.List;
  * cet historique sur chaque message d'etat. inCheck indique si sideToMove est
  * actuellement en echec sur board (Game.isInCheck(), toujours false si la partie
  * n'est plus ONGOING) - permet au frontend de surligner le roi concerne sans
- * dupliquer la detection d'echec cote client.
+ * dupliquer la detection d'echec cote client. Les champs de pendule (etape 12,
+ * timeControl null = correspondance) portent l'etat brut de l'agregat, jamais un
+ * "temps restant a l'instant present" precalcule : le frontend derive lui-meme
+ * l'affichage en continu a partir de clockRunningSince et d'un horodatage serveur
+ * (voir GameMessageMapper.toGameStateMessage), la seule source de verite restant le
+ * serveur (revalidee a chaque soumission et par le scheduler de flag-fall).
  */
 public record GameSnapshot(
         GameId id,
@@ -44,7 +51,12 @@ public record GameSnapshot(
         boolean inCheck,
         Color drawOfferedBy,
         Color rematchOfferedBy,
-        GameId rematchGameId
+        GameId rematchGameId,
+        TimeControl timeControl,
+        long whiteMillisRemaining,
+        long blackMillisRemaining,
+        Color clockRunningFor,
+        Instant clockRunningSince
 ) {
 
     public static GameSnapshot of(Game game) {
@@ -62,7 +74,12 @@ public record GameSnapshot(
                 game.isInCheck(),
                 game.drawOfferedBy(),
                 game.rematchOfferedBy(),
-                game.rematchGameId()
+                game.rematchGameId(),
+                game.timeControl(),
+                game.millisRemaining(Color.WHITE),
+                game.millisRemaining(Color.BLACK),
+                game.clockRunningFor(),
+                game.clockRunningSince()
         );
     }
 }

@@ -7,6 +7,7 @@ import com.guesschess.domain.game.Game;
 import com.guesschess.domain.game.GameId;
 import com.guesschess.domain.game.GameResult;
 import com.guesschess.domain.game.RoundResult;
+import com.guesschess.domain.game.TimeControl;
 import com.guesschess.domain.move.Move;
 import com.guesschess.domain.move.MoveType;
 import com.guesschess.domain.piece.Color;
@@ -37,6 +38,7 @@ class GameJpaMapper {
                 memento.result() != null ? memento.result().cause() : null,
                 memento.board().sideToMove(),
                 toStateJson(memento),
+                game.clockDeadline(),
                 now,
                 now
         );
@@ -50,6 +52,7 @@ class GameJpaMapper {
                 memento.result() != null ? memento.result().cause() : null,
                 memento.board().sideToMove(),
                 toStateJson(memento),
+                game.clockDeadline(),
                 Instant.now()
         );
     }
@@ -73,6 +76,12 @@ class GameJpaMapper {
                 ? List.of()
                 : state.roundHistory().stream().map(this::toRoundResult).toList();
 
+        // timeControlBaseMillis absent (null) = partie par correspondance ou creee avant
+        // l'etape 12 - meme deference que positionHistory/roundHistory ci-dessus.
+        TimeControl timeControl = state.timeControlBaseMillis() == null
+                ? null
+                : new TimeControl(state.timeControlBaseMillis(), state.timeControlIncrementMillis());
+
         Game.Memento memento = new Game.Memento(
                 new GameId(entity.getId()),
                 entity.getVariant(),
@@ -90,7 +99,12 @@ class GameJpaMapper {
                 state.blackGuessedMoveStreak(),
                 state.drawOfferedBy() == null ? null : Color.valueOf(state.drawOfferedBy()),
                 state.rematchOfferedBy() == null ? null : Color.valueOf(state.rematchOfferedBy()),
-                state.rematchGameId() == null ? null : GameId.fromString(state.rematchGameId())
+                state.rematchGameId() == null ? null : GameId.fromString(state.rematchGameId()),
+                timeControl,
+                state.whiteMillisRemaining() == null ? 0L : state.whiteMillisRemaining(),
+                state.blackMillisRemaining() == null ? 0L : state.blackMillisRemaining(),
+                state.clockRunningFor() == null ? null : Color.valueOf(state.clockRunningFor()),
+                state.clockRunningSinceEpochMillis() == null ? null : Instant.ofEpochMilli(state.clockRunningSinceEpochMillis())
         );
         return Game.fromMemento(memento);
     }
@@ -109,7 +123,13 @@ class GameJpaMapper {
                 memento.blackGuessedMoveStreak(),
                 memento.drawOfferedBy() == null ? null : memento.drawOfferedBy().name(),
                 memento.rematchOfferedBy() == null ? null : memento.rematchOfferedBy().name(),
-                memento.rematchGameId() == null ? null : memento.rematchGameId().toString()
+                memento.rematchGameId() == null ? null : memento.rematchGameId().toString(),
+                memento.timeControl() == null ? null : memento.timeControl().baseMillis(),
+                memento.timeControl() == null ? null : memento.timeControl().incrementMillis(),
+                memento.whiteMillisRemaining(),
+                memento.blackMillisRemaining(),
+                memento.clockRunningFor() == null ? null : memento.clockRunningFor().name(),
+                memento.clockRunningSince() == null ? null : memento.clockRunningSince().toEpochMilli()
         );
     }
 

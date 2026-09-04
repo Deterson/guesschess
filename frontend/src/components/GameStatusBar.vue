@@ -10,11 +10,14 @@ const props = withDefaults(
     myColor?: string | null
     myRole?: 'mover' | 'guesser' | null
     pendingSubmission?: boolean
+    /** Halo rouge (étape 12) : c'est à MOI de deviner et le temps presse - jamais pour l'adversaire. */
+    awaitingGuess?: boolean
   }>(),
   {
     myColor: null,
     myRole: null,
     pendingSubmission: false,
+    awaitingGuess: false,
   },
 )
 
@@ -37,7 +40,8 @@ const resultText = computed(() => {
   const result = props.state.result
   if (!result || isGuessRepetitionDraw.value || isGuessmate.value) return null
   if (!result.winner) return t('gameStatusBar.resultDraw')
-  return t('gameStatusBar.resultWin', { winner: WIN_LABELS.value[result.winner] })
+  const key = result.cause === 'TIMEOUT' ? 'gameStatusBar.resultWinTimeout' : 'gameStatusBar.resultWin'
+  return t(key, { winner: WIN_LABELS.value[result.winner] })
 })
 
 const resultBgClass = computed(() => {
@@ -76,7 +80,11 @@ function acknowledge() {
 <template>
   <div
     class="mb-4 flex flex-col items-center gap-1 rounded-lg px-4 py-3 text-center text-sm"
-    :class="[resultBgClass ?? (isBreathing ? 'animate-breathe' : 'bg-stone-800'), isBreathing ? 'cursor-pointer' : '']"
+    :class="[
+      resultBgClass ?? (isBreathing ? 'animate-breathe' : 'bg-stone-800'),
+      isBreathing ? 'cursor-pointer' : '',
+      awaitingGuess ? 'guess-halo-ring' : '',
+    ]"
     @click="acknowledge"
   >
     <p v-if="!myColor" class="text-stone-400">{{ t('gameStatusBar.spectating') }}</p>

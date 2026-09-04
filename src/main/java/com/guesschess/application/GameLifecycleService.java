@@ -10,11 +10,13 @@ import com.guesschess.domain.game.GameResult;
 import com.guesschess.domain.game.GameStatus;
 import com.guesschess.domain.game.GameVariant;
 import com.guesschess.domain.game.PendingSubmission;
+import com.guesschess.domain.game.TimeControl;
 import com.guesschess.domain.move.Move;
 import com.guesschess.domain.pggn.PggnWriter;
 import com.guesschess.domain.piece.Color;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -39,7 +41,15 @@ public class GameLifecycleService {
     }
 
     public CreatedGame createGame(GameVariant variant) {
-        Game game = Game.newGame(variant);
+        return createGame(variant, null);
+    }
+
+    /**
+     * timeControl null = partie par correspondance, sans pendule (etape 12) - la
+     * pendule elle-meme ne demarre qu'une fois la partie complete, voir joinGame.
+     */
+    public CreatedGame createGame(GameVariant variant, TimeControl timeControl) {
+        Game game = Game.newGame(GameId.random(), variant, timeControl);
         gameRepository.insert(game);
 
         PlayerToken whiteToken = PlayerToken.random();
@@ -55,7 +65,16 @@ public class GameLifecycleService {
      * paresseux de submitMove/submitGuess (premier coup/devinette soumis).
      */
     public CreatedGame createGame(GameVariant variant, Color creatorColor, PlayerRef creator) {
-        CreatedGame created = createGame(variant);
+        return createGame(variant, null, creatorColor, creator);
+    }
+
+    /**
+     * Variante (etape 7 + 12) qui lie immediatement le createur a la couleur choisie et
+     * pose la cadence choisie - voir createGame(GameVariant, TimeControl) et
+     * createGame(GameVariant, Color, PlayerRef).
+     */
+    public CreatedGame createGame(GameVariant variant, TimeControl timeControl, Color creatorColor, PlayerRef creator) {
+        CreatedGame created = createGame(variant, timeControl);
         gameAccessRepository.linkPlayer(created.gameId(), creatorColor, creator);
         return created;
     }
@@ -87,7 +106,7 @@ public class GameLifecycleService {
             requireColor(access, token, game.sideToMove());
             requireOwnership(access.gameId(), color, requester);
             Move move = resolveMove(game, intent);
-            return game.submitMove(move).map(result -> GameSnapshot.of(game));
+            return game.submitMove(move, Instant.now()).map(result -> GameSnapshot.of(game));
         });
     }
 
@@ -114,7 +133,7 @@ public class GameLifecycleService {
             requireColor(access, token, game.sideToMove().opposite());
             requireOwnership(access.gameId(), color, requester);
             Move guess = intent == null ? null : resolveMove(game, intent);
-            return game.submitGuess(guess).map(result -> GameSnapshot.of(game));
+            return game.submitGuess(guess, Instant.now()).map(result -> GameSnapshot.of(game));
         });
     }
 
@@ -167,14 +186,20 @@ public class GameLifecycleService {
             Color previousOffer = game.rematchOfferedBy();
             game.offerRematch(color);
             if (previousOffer != null && previousOffer != color && game.rematchGameId() == null) {
-                game.confirmRematch(createRematchGame(game.variant(), access));
+                game.confirmRematch(createRematchGame(game.variant(), game.timeControl(), access));
             }
             return GameSnapshot.of(game);
         });
     }
 
-    private GameId createRematchGame(GameVariant variant, GameAccess finishedGameAccess) {
-        CreatedGame created = createGame(variant);
+    /**
+     * timeControl (etape 12) reprend celui de la partie qui se termine, pour que la
+     * revanche garde la meme cadence - jamais les temps restants (une revanche
+     * redemarre a temps plein, comme createGame ; le premier round y est de toute
+     * facon gratuit, voir Game).
+     */
+    private GameId createRematchGame(GameVariant variant, TimeControl timeControl, GameAccess finishedGameAccess) {
+        CreatedGame created = createGame(variant, timeControl);
         gameAccessRepository.linkPlayer(created.gameId(), Color.WHITE, finishedGameAccess.playerOf(Color.BLACK));
         gameAccessRepository.linkPlayer(created.gameId(), Color.BLACK, finishedGameAccess.playerOf(Color.WHITE));
         return created.gameId();

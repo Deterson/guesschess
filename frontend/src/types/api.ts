@@ -21,6 +21,7 @@ export type GameResultCause =
   | 'DRAW_THREE_GUESS_REPETITION'
   | 'DRAW_INSUFFICIENT_MATERIAL'
   | 'DRAW_BY_AGREEMENT'
+  | 'TIMEOUT'
 
 /** "wP", "bK"... ou null pour une case vide (voir GameMessageMapper.toCode). */
 export type PieceCode = `${'w' | 'b'}${'P' | 'N' | 'B' | 'R' | 'Q' | 'K'}`
@@ -29,9 +30,16 @@ export type Board = BoardCell[][]
 
 // ---- REST (infrastructure/web/dto) ----
 
+/** Cadence choisie a la creation (etape 12) - absent/null = partie par correspondance. */
+export interface TimeControlHttpRequest {
+  baseMinutes: number
+  incrementSeconds: number
+}
+
 export interface CreateGameHttpRequest {
   variant: GameVariant | null
   color: Color | 'RANDOM'
+  timeControl: TimeControlHttpRequest | null
 }
 
 export interface CreateGameHttpResponse {
@@ -191,6 +199,12 @@ export interface MySubmissionMessage {
   promotion: PromotionPieceType | null
 }
 
+/** Cadence de la partie (etape 12) - absent sur GameStateMessage pour une correspondance. */
+export interface TimeControlMessage {
+  baseMillis: number
+  incrementMillis: number
+}
+
 export interface GameStateMessage {
   gameId: string
   variant: GameVariant
@@ -208,6 +222,14 @@ export interface GameStateMessage {
   drawOfferedBy: Color | null
   rematchOfferedBy: Color | null
   rematchGameId: string | null
+  /** Pendule (etape 12) - timeControl null = partie par correspondance, sans pendule. */
+  timeControl: TimeControlMessage | null
+  whiteMillisRemaining: number
+  blackMillisRemaining: number
+  /** Couleur dont la pendule tourne actuellement, ou null (aucune - voir GameStateMessage.java). */
+  clockRunningFor: Color | null
+  /** Horodatage serveur (epoch ms) de ce message - sert a corriger le decalage d'horloge client. */
+  serverTimeMs: number
 }
 
 export interface ErrorMessage {

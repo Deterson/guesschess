@@ -47,6 +47,27 @@
   (notation PGGN cliquable), `ChessBoard.vue` avec une prop `ghostMove` dédiée pour la devinette en
   navigation (distincte de `hoverGuess`, le survol manuel en direct), navigation clavier ←/→,
   `historyIndex` (`null`=direct, `-1`=départ, `0..n-1`=après le round i).
+- **Étape 12 — Timers** : `CreateGameModal.vue` ajoute un choix de cadence (correspondance, par
+  défaut, ou temps réel). Presets classiques en grille 2 colonnes × 4 lignes, cliquer sur l'un
+  d'eux lance la partie immédiatement (pas besoin de confirmer en plus) ; le champ minutes libre
+  accepte les fractions (`1/2`, `1/4`) et les décimales (`,` ou `.`) pour les cadences bullet, voir
+  `parseMinutes`. Pendule affichée dans `PlayerLabel.vue` (props `clockMs`/`clockRunning`/
+  `urgent`), doublée de taille (`text-2xl`), au bord droit de la ligne. `useClock.ts` (composable)
+  dérive un décompte local par couleur depuis `GameStateMessage` — jamais de source de vérité côté
+  client, juste une interpolation entre deux messages.
+  **Halo rouge** : deux portées distinctes calculées dans `GameView.vue`. `awaitingGuess` (public,
+  `clockRunningFor !== sideToMove`) pilote uniquement le clignotement des pendules — visible des
+  deux joueurs, sans rien exposer de plus que l'état déjà public. `awaitingGuessMine` (`&&
+  myRole === 'guesser'`) restreint en plus le halo du plateau (`ChessBoard`) et celui du message de
+  statut (`GameStatusBar`, prop `awaitingGuess`) au seul joueur qui doit effectivement deviner —
+  jamais son adversaire, jamais un spectateur. Animation partagée (`guess-halo-glow`/
+  `guess-halo-ring`, définies globalement dans `style.css` plutôt que dupliquées par composant) :
+  volontairement lente et peu saturée, pas une alarme.
+  **Piège rencontré** : la diffusion publique mi-round ajoutée côté backend (voir `src/CLAUDE.md`)
+  a révélé un bug préexistant de `stores/game.ts`, qui effaçait `pendingSubmission`/`pendingMove`
+  sur CHAQUE message de `/topic/games/{gameId}` en supposant qu'il ne pouvait signifier qu'"un
+  round vient de se résoudre" — faux dès qu'un message intermédiaire (pendule, offre de nulle...)
+  y transite aussi. Corrigé en ne réinitialisant que si `roundCount` a changé.
 - **Étape 13 — Tutoriel des règles** : `HowToPlayView.vue` (`/how-to-play`), contenu FR/EN
   statique, aucun backend. Réutilise `ChessBoard.vue` en `disabled` avec des positions codées en
   dur. Trois exemples via les props de surbrillance existantes de `ChessBoard` (devinette

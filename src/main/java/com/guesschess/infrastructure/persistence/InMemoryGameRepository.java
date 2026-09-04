@@ -4,7 +4,10 @@ import com.guesschess.domain.game.Game;
 import com.guesschess.domain.game.GameId;
 import com.guesschess.domain.game.GameNotFoundException;
 import com.guesschess.domain.game.GameRepository;
+import com.guesschess.domain.game.GameStatus;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
@@ -43,5 +46,14 @@ public class InMemoryGameRepository implements GameRepository {
         @SuppressWarnings("unchecked")
         T typedResult = (T) result[0];
         return typedResult;
+    }
+
+    @Override
+    public List<GameId> findExpiredClockGameIds(Instant deadline) {
+        return games.values().stream()
+                .filter(game -> game.status() == GameStatus.ONGOING)
+                .filter(game -> game.clockDeadline() != null && !game.clockDeadline().isAfter(deadline))
+                .map(Game::id)
+                .toList();
     }
 }

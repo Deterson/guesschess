@@ -10,6 +10,44 @@ body {
 }
 
 /*
+ * Halo rouge "il faut deviner maintenant" (étape 12) - partagé entre ChessBoard
+ * (glow, élément large), GameStatusBar et la pendule de PlayerLabel (ring, éléments
+ * compacts) pour un rendu cohérent. Lent et peu saturé exprès (feedback d'ambiance,
+ * pas une alarme) - voir CLAUDE.md frontend.
+ */
+@keyframes guess-halo-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 3px rgba(239, 68, 68, 0.55),
+      0 0 18px 5px rgba(239, 68, 68, 0.3);
+  }
+  50% {
+    box-shadow:
+      0 0 0 3px rgba(239, 68, 68, 0.2),
+      0 0 6px 1px rgba(239, 68, 68, 0.1);
+  }
+}
+
+@keyframes guess-halo-ring {
+  0%,
+  100% {
+    box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.55);
+  }
+  50% {
+    box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.2);
+  }
+}
+
+.guess-halo-glow {
+  animation: guess-halo-glow 2.6s ease-in-out infinite;
+}
+
+.guess-halo-ring {
+  animation: guess-halo-ring 2.6s ease-in-out infinite;
+}
+
+/*
  * Mode nuit (activé par défaut) / mode jour : plutôt que de dupliquer les classes
  * Tailwind stone-* dans chaque composant, on redéfinit ici les variables CSS que ces
  * utilitaires consomment déjà (`bg-stone-900` compile en `background-color:

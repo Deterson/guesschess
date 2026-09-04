@@ -27,6 +27,8 @@ const props = withDefaults(
     hoverGuess?: { from: string; to: string } | null
     ghostMove?: { from: string; to: string; piece: PieceCode } | null
     checkedColor?: ColorLower | null
+    /** Halo rouge (étape 12) : le joueur au trait a joué, l'adversaire doit deviner - temps réel uniquement. */
+    awaitingGuess?: boolean
   }>(),
   {
     legalMoves: () => [],
@@ -37,6 +39,7 @@ const props = withDefaults(
     hoverGuess: null,
     ghostMove: null,
     checkedColor: null,
+    awaitingGuess: false,
   },
 )
 
@@ -272,6 +275,7 @@ function onSquarePointerCancel(event: PointerEvent) {
   <div
     ref="boardRef"
     class="chess-board relative grid aspect-square w-full max-w-xl touch-none grid-cols-8 grid-rows-8 overflow-hidden rounded-lg border-2 border-stone-700 select-none"
+    :class="{ 'guess-halo-glow': awaitingGuess }"
   >
     <template v-for="rank in displayRanks" :key="`rank-${rank}`">
       <button

@@ -26,8 +26,10 @@ import com.guesschess.infrastructure.websocket.dto.MySubmissionMessage;
 import com.guesschess.infrastructure.websocket.dto.PlayerInfoMessage;
 import com.guesschess.infrastructure.websocket.dto.ResultMessage;
 import com.guesschess.infrastructure.websocket.dto.RoundSummaryMessage;
+import com.guesschess.infrastructure.websocket.dto.TimeControlMessage;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.util.List;
 
 /**
@@ -96,7 +98,13 @@ public class GameMessageMapper {
                 snapshot.inCheck(),
                 snapshot.drawOfferedBy() == null ? null : snapshot.drawOfferedBy().name(),
                 snapshot.rematchOfferedBy() == null ? null : snapshot.rematchOfferedBy().name(),
-                snapshot.rematchGameId() == null ? null : snapshot.rematchGameId().toString()
+                snapshot.rematchGameId() == null ? null : snapshot.rematchGameId().toString(),
+                snapshot.timeControl() == null ? null
+                        : new TimeControlMessage(snapshot.timeControl().baseMillis(), snapshot.timeControl().incrementMillis()),
+                snapshot.whiteMillisRemaining(),
+                snapshot.blackMillisRemaining(),
+                snapshot.clockRunningFor() == null ? null : snapshot.clockRunningFor().name(),
+                Instant.now().toEpochMilli()
         );
     }
 

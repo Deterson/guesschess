@@ -1,6 +1,7 @@
 package com.guesschess.domain.game;
 
 import com.guesschess.domain.move.Move;
+import com.guesschess.domain.piece.Color;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -66,6 +67,22 @@ class GameMementoTest {
         assertEquals(GameStatus.FINISHED, reconstructed.status());
         assertEquals(original.result(), reconstructed.result());
         assertEquals(GameResultCause.CHECKMATE, reconstructed.result().cause());
+    }
+
+    @Test
+    void timedGameWithARunningClockSurvivesARoundTrip() {
+        TimeControl timeControl = TimeControl.of(5, 3);
+        Game original = Game.newGame(GameId.random(), GameVariant.GUESSCHESS, timeControl);
+        play(original, "e2", "e4"); // round 1, gratuit - fait passer le trait (et la pendule) a BLACK
+        original.submitMove(findMove(original.legalMoves(), "e7", "e5")); // round 2 : la pendule tourne pour de vrai
+
+        Game reconstructed = Game.fromMemento(original.toMemento());
+
+        assertEquals(original.timeControl(), reconstructed.timeControl());
+        assertEquals(original.clockRunningFor(), reconstructed.clockRunningFor());
+        assertEquals(original.clockRunningSince(), reconstructed.clockRunningSince());
+        assertEquals(original.millisRemaining(Color.WHITE), reconstructed.millisRemaining(Color.WHITE));
+        assertEquals(original.millisRemaining(Color.BLACK), reconstructed.millisRemaining(Color.BLACK));
     }
 
     private static void play(Game game, String from, String to) {

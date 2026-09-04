@@ -7,6 +7,7 @@ import com.guesschess.domain.game.GameId;
 import com.guesschess.domain.game.GameNotFoundException;
 import com.guesschess.domain.game.GameStatus;
 import com.guesschess.domain.game.GameVariant;
+import com.guesschess.domain.game.TimeControl;
 import com.guesschess.domain.piece.Color;
 import com.guesschess.infrastructure.persistence.InMemoryGameAccessRepository;
 import com.guesschess.infrastructure.persistence.InMemoryGameRepository;
@@ -349,6 +350,31 @@ class GameLifecycleServiceTest {
         GameAccess rematchAccess = gameAccessRepository.findByGameId(rematchGameId).orElseThrow();
         assertEquals(blackRequester, rematchAccess.playerOf(Color.WHITE));
         assertEquals(whiteRequester, rematchAccess.playerOf(Color.BLACK));
+    }
+
+    /**
+     * La revanche doit reprendre la cadence de la partie qui se termine (etape 12) -
+     * pas juste le variant, deja couvert par le test precedent. Sa pendule ne demarre
+     * pas pour autant des sa creation : comme toute partie, son tout premier round est
+     * gratuit (voir Game), qu'elle soit complete des sa creation (revanche) ou apres
+     * un join (invitation initiale).
+     */
+    @Test
+    void rematchReusesTheOriginalGamesTimeControl() {
+        PlayerRef whiteRequester = new PlayerRef.Account(UserId.random());
+        PlayerRef blackRequester = new PlayerRef.Anonymous(AnonymousId.random());
+        TimeControl timeControl = TimeControl.of(5, 2);
+        CreatedGame game = service.createGame(GameVariant.GUESSCHESS, timeControl, Color.WHITE, whiteRequester);
+        service.joinGame(game.gameId(), blackRequester);
+        service.offerDraw(game.whiteToken(), whiteRequester);
+        service.respondToDraw(game.blackToken(), true, blackRequester);
+
+        service.offerRematch(game.whiteToken(), whiteRequester);
+        GameId rematchGameId = service.offerRematch(game.blackToken(), blackRequester).rematchGameId();
+
+        GameSnapshot rematchSnapshot = service.viewGame(rematchGameId);
+        assertEquals(timeControl, rematchSnapshot.timeControl());
+        assertNull(rematchSnapshot.clockRunningFor());
     }
 
     private void playRoundWithoutGuessing(PlayerToken moverToken, PlayerToken guesserToken, String from, String to) {
