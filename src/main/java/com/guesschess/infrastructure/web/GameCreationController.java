@@ -10,6 +10,8 @@ import com.guesschess.application.NoOpenColorException;
 import com.guesschess.application.PlayerRef;
 import com.guesschess.application.account.AccountService;
 import com.guesschess.application.account.AccountSnapshot;
+import com.guesschess.application.computer.ComputerLevel;
+import com.guesschess.application.computer.ComputerUnavailableException;
 import com.guesschess.domain.game.Game;
 import com.guesschess.domain.game.GameId;
 import com.guesschess.domain.game.GameNotFoundException;
@@ -30,6 +32,7 @@ import com.guesschess.infrastructure.web.dto.GamePlayersHttpResponse;
 import com.guesschess.infrastructure.web.dto.JoinGameHttpResponse;
 import com.guesschess.infrastructure.web.dto.MyAccessHttpResponse;
 import com.guesschess.infrastructure.web.dto.PlayerInfoHttpResponse;
+import com.guesschess.infrastructure.computer.ComputerPlayerService;
 import com.guesschess.infrastructure.websocket.GameMessageMapper;
 import com.guesschess.infrastructure.websocket.GamePresenceService;
 import com.guesschess.infrastructure.websocket.PlayersBroadcastService;
@@ -76,10 +79,12 @@ class GameCreationController {
     private final AccountService accountService;
     private final PlayersBroadcastService playersBroadcastService;
     private final GamePresenceService presenceService;
+    private final ComputerPlayerService computerPlayerService;
 
     GameCreationController(GameLifecycleService gameLifecycleService, HttpPlayerIdentityResolver identityResolver,
                             SimpMessagingTemplate messagingTemplate, GameMessageMapper mapper, AccountService accountService,
-                            PlayersBroadcastService playersBroadcastService, GamePresenceService presenceService) {
+                            PlayersBroadcastService playersBroadcastService, GamePresenceService presenceService,
+                            ComputerPlayerService computerPlayerService) {
         this.gameLifecycleService = gameLifecycleService;
         this.identityResolver = identityResolver;
         this.messagingTemplate = messagingTemplate;
@@ -87,12 +92,13 @@ class GameCreationController {
         this.accountService = accountService;
         this.playersBroadcastService = playersBroadcastService;
         this.presenceService = presenceService;
+        this.computerPlayerService = computerPlayerService;
     }
 
     @PostMapping
-    ResponseEntity<CreateGameHttpResponse> createGame(@RequestBody(required = false) CreateGameHttpRequest request,
-                                                        HttpServletRequest httpRequest,
-                                                        @AuthenticationPrincipal Jwt jwt) {
+    ResponseEntity<?> createGame(@RequestBody(required = false) CreateGameHttpRequest request,
+                                  HttpServletRequest httpRequest,
+                                  @AuthenticationPrincipal Jwt jwt) {
         GameVariant variant = request == null || request.variant() == null
                 ? GameVariant.GUESSCHESS
                 : GameVariant.valueOf(request.variant());
@@ -100,7 +106,25 @@ class GameCreationController {
         TimeControl timeControl = resolveTimeControl(request == null ? null : request.timeControl());
         PlayerRef creator = identityResolver.resolve(httpRequest, jwt);
 
-        CreatedGame created = gameLifecycleService.createGame(variant, timeControl, creatorColor, creator);
+        CreatedGame created;
+        if (request != null && "COMPUTER".equals(request.opponent())) {
+            ComputerLevel level;
+            try {
+                level = ComputerLevel.valueOf(request.computerLevel());
+            } catch (IllegalArgumentException | NullPointerException e) {
+                return ResponseEntity.badRequest()
+                        .body(new ErrorResponse("INVALID_COMPUTER_LEVEL", "Niveau d'ordinateur invalide"));
+            }
+            try {
+                created = gameLifecycleService.createComputerGame(variant, timeControl, creatorColor, creator, level);
+            } catch (ComputerUnavailableException e) {
+                return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                        .body(new ErrorResponse("COMPUTER_UNAVAILABLE", "L'ordinateur n'est pas disponible pour le moment"));
+            }
+            computerPlayerService.onRoundStarted(created.gameId());
+        } else {
+            created = gameLifecycleService.createGame(variant, timeControl, creatorColor, creator);
+        }
         String creatorToken = (creatorColor == Color.WHITE ? created.whiteToken() : created.blackToken()).toString();
 
         return ResponseEntity.status(HttpStatus.CREATED).body(new CreateGameHttpResponse(
@@ -189,12 +213,13 @@ class GameCreationController {
     private PlayerInfoHttpResponse toPlayerInfo(PlayerRef ref, GameId gameId, Color color) {
         return switch (ref) {
             case null -> null;
-            case PlayerRef.Anonymous anonymous -> new PlayerInfoHttpResponse("ANONYMOUS", null, presenceService.isConnected(gameId, color));
+            case PlayerRef.Anonymous anonymous -> new PlayerInfoHttpResponse("ANONYMOUS", null, presenceService.isConnected(gameId, color), null);
             case PlayerRef.Account account -> {
                 AccountSnapshot snapshot = accountService.getById(account.userId());
                 yield new PlayerInfoHttpResponse("ACCOUNT", snapshot.login() != null ? snapshot.login() : snapshot.displayName(),
-                        presenceService.isConnected(gameId, color));
+                        presenceService.isConnected(gameId, color), null);
             }
+            case PlayerRef.Computer computer -> new PlayerInfoHttpResponse("COMPUTER", null, true, computer.level().name());
         };
     }
 

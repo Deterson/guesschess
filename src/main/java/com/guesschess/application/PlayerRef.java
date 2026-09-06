@@ -1,14 +1,16 @@
 package com.guesschess.application;
 
+import com.guesschess.application.computer.ComputerLevel;
 import com.guesschess.domain.account.AnonymousId;
 import com.guesschess.domain.account.UserId;
 
 /**
- * Identifiant d'un joueur reel derriere une couleur d'une partie (etape 6 de la
- * roadmap) : soit un compte, soit une identite anonyme persistante, jamais les deux.
- * Reference uniquement l'identifiant du contexte "Compte joueur" (pas l'agregat User
- * ni son comportement), un couplage minimal deliberement accepte pour ce lien plutot
- * qu'un partage de modele entre les deux bounded contexts.
+ * Identifiant d'un joueur derriere une couleur d'une partie (etape 6 de la roadmap,
+ * Computer ajoute etape 15) : un compte, une identite anonyme persistante, ou un
+ * ordinateur (jamais deux a la fois). Reference uniquement l'identifiant du contexte
+ * "Compte joueur" (pas l'agregat User ni son comportement), un couplage minimal
+ * deliberement accepte pour ce lien plutot qu'un partage de modele entre les deux
+ * bounded contexts.
  */
 public sealed interface PlayerRef {
 
@@ -24,6 +26,20 @@ public sealed interface PlayerRef {
         public Anonymous {
             if (anonymousId == null) {
                 throw new IllegalArgumentException("anonymousId must not be null");
+            }
+        }
+    }
+
+    /**
+     * Ordinateur (etape 15) : pas d'identifiant de compte, juste un niveau de force
+     * (ComputerPlayerService.chooseMove s'en sert pour piloter le moteur). Lie a la
+     * creation de la partie exactement comme les deux autres cas, via
+     * GameLifecycleService.createComputerGame - jamais via un flux "rejoindre".
+     */
+    record Computer(ComputerLevel level) implements PlayerRef {
+        public Computer {
+            if (level == null) {
+                throw new IllegalArgumentException("level must not be null");
             }
         }
     }

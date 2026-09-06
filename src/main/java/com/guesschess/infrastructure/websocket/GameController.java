@@ -17,6 +17,7 @@ import com.guesschess.domain.game.GameId;
 import com.guesschess.domain.game.GameNotFoundException;
 import com.guesschess.domain.game.GameVariant;
 import com.guesschess.domain.piece.Color;
+import com.guesschess.infrastructure.computer.ComputerPlayerService;
 import com.guesschess.infrastructure.websocket.dto.AckMessage;
 import com.guesschess.infrastructure.websocket.dto.ChatMessage;
 import com.guesschess.infrastructure.websocket.dto.CreateGameRequest;
@@ -62,16 +63,19 @@ public class GameController {
     private final GamePresenceService presenceService;
     private final PlayersBroadcastService playersBroadcastService;
     private final GameBroadcastService gameBroadcastService;
+    private final ComputerPlayerService computerPlayerService;
 
     public GameController(GameLifecycleService gameLifecycleService, GameMessageMapper mapper,
                            SimpMessagingTemplate messagingTemplate, GamePresenceService presenceService,
-                           PlayersBroadcastService playersBroadcastService, GameBroadcastService gameBroadcastService) {
+                           PlayersBroadcastService playersBroadcastService, GameBroadcastService gameBroadcastService,
+                           ComputerPlayerService computerPlayerService) {
         this.gameLifecycleService = gameLifecycleService;
         this.mapper = mapper;
         this.messagingTemplate = messagingTemplate;
         this.presenceService = presenceService;
         this.playersBroadcastService = playersBroadcastService;
         this.gameBroadcastService = gameBroadcastService;
+        this.computerPlayerService = computerPlayerService;
     }
 
     /**
@@ -143,6 +147,7 @@ public class GameController {
         Optional<GameSnapshot> resolved = gameLifecycleService.submitMove(PlayerToken.fromString(request.token()), intent, requester);
         if (resolved.isPresent()) {
             gameBroadcastService.broadcast(resolved.get());
+            computerPlayerService.onRoundStarted(resolved.get().id());
         } else {
             sendToUser(sessionId, "/queue/move.ack", new AckMessage("recorded_waiting_for_guess"));
             // Le round n'est pas resolu (la devinette n'est pas encore arrivee), mais en
@@ -168,6 +173,7 @@ public class GameController {
         Optional<GameSnapshot> resolved = gameLifecycleService.submitGuess(PlayerToken.fromString(request.token()), intent, requester);
         if (resolved.isPresent()) {
             gameBroadcastService.broadcast(resolved.get());
+            computerPlayerService.onRoundStarted(resolved.get().id());
         } else {
             sendToUser(sessionId, "/queue/guess.ack", new AckMessage("recorded_waiting_for_move"));
         }

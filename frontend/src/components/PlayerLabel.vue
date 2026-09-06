@@ -25,6 +25,10 @@ const props = withDefaults(
 const { t } = useI18n()
 
 const isAnonymous = computed(() => props.info?.type === 'ANONYMOUS')
+const isComputer = computed(() => props.info?.type === 'COMPUTER')
+const computerLabel = computed(() =>
+  props.info?.level ? t('game.computerOpponent', { level: t(`game.computerLevel.${props.info.level.toLowerCase()}`) }) : '',
+)
 
 const formattedClock = computed(() => {
   if (props.clockMs == null) return null
@@ -49,6 +53,7 @@ const formattedClock = computed(() => {
         :title="info.connected ? t('game.playerOnline') : t('game.playerOffline')"
       />
       <span v-if="isAnonymous" class="italic text-stone-500">{{ t('game.anonymousPlayer') }}</span>
+      <span v-else-if="isComputer" class="italic text-stone-500">{{ computerLabel }}</span>
       <router-link
         v-else
         :to="`/profile/${info.login}`"

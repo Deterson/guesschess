@@ -2,13 +2,13 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { createGame } from '../services/api'
+import { createGame, createComputerGame } from '../services/api'
 import { useGameStore } from '../stores/game'
 import { useAuthStore } from '../stores/auth'
 import AuthModal from '../components/AuthModal.vue'
 import CreateGameModal from '../components/CreateGameModal.vue'
 import LoginModal from '../components/LoginModal.vue'
-import type { Color, TimeControlHttpRequest } from '../types/api'
+import type { Color, ComputerLevel, TimeControlHttpRequest } from '../types/api'
 
 const router = useRouter()
 const gameStore = useGameStore()
@@ -16,23 +16,37 @@ const authStore = useAuthStore()
 const { t } = useI18n()
 const creating = ref(false)
 const showCreateModal = ref(false)
+const showComputerModal = ref(false)
 const showAuthModal = ref(false)
 const showLoginModal = ref(false)
 const error = ref<string | null>(null)
 const noGuessmate = ref(false)
 const color = ref<Color | 'RANDOM'>('RANDOM')
 const timeControl = ref<TimeControlHttpRequest | null>(null)
+const computerLevel = ref<ComputerLevel | null>(null)
 
 function openCreateModal() {
   error.value = null
   showCreateModal.value = true
 }
 
-function onCreateModalConfirm(choice: { color: Color | 'RANDOM'; noGuessmate: boolean; timeControl: TimeControlHttpRequest | null }) {
+function openComputerModal() {
+  error.value = null
+  showComputerModal.value = true
+}
+
+function onCreateModalConfirm(choice: {
+  color: Color | 'RANDOM'
+  noGuessmate: boolean
+  timeControl: TimeControlHttpRequest | null
+  computerLevel: ComputerLevel | null
+}) {
   showCreateModal.value = false
+  showComputerModal.value = false
   color.value = choice.color
   noGuessmate.value = choice.noGuessmate
   timeControl.value = choice.timeControl
+  computerLevel.value = choice.computerLevel
   if (authStore.isLoggedIn) {
     create(authStore.token)
   } else {
@@ -46,7 +60,9 @@ async function create(authToken: string | null) {
   error.value = null
   try {
     const variant = noGuessmate.value ? 'NOGUESSMATE' : 'GUESSCHESS'
-    const created = await createGame(variant, color.value, timeControl.value, authToken)
+    const created = computerLevel.value
+      ? await createComputerGame(variant, color.value, timeControl.value, computerLevel.value, authToken)
+      : await createGame(variant, color.value, timeControl.value, authToken)
     // Le token/couleur revenus ici sont déjà vérifiés côté serveur - on peuple
     // directement le store plutôt que de forcer GameView à les redécouvrir via
     // /my-access, dont la fiabilité dépend de la propagation immédiate du cookie
@@ -102,16 +118,26 @@ function openMyGames() {
         {{ creating ? t('home.creating') : t('home.createButton') }}
       </button>
 
+      <button
+        type="button"
+        class="rounded-lg bg-stone-700 px-6 py-3 font-semibold hover:bg-stone-600 disabled:opacity-50"
+        :disabled="creating"
+        @click="openComputerModal"
+      >
+        {{ t('home.playComputerButton') }}
+      </button>
+
       <button type="button" class="rounded-lg bg-stone-700 px-6 py-2 font-semibold hover:bg-stone-600" @click="openMyGames">
         {{ t('profile.myGames') }}
       </button>
     </div>
 
     <CreateGameModal :open="showCreateModal" @confirm="onCreateModalConfirm" @close="showCreateModal = false" />
+    <CreateGameModal :open="showComputerModal" vs-computer @confirm="onCreateModalConfirm" @close="showComputerModal = false" />
 
     <AuthModal
       :open="showAuthModal"
-      :pending-action="{ type: 'create', variant: noGuessmate ? 'NOGUESSMATE' : 'GUESSCHESS', color, timeControl }"
+      :pending-action="{ type: 'create', variant: noGuessmate ? 'NOGUESSMATE' : 'GUESSCHESS', color, timeControl, computerLevel }"
       @anonymous="continueAnonymously"
       @close="showAuthModal = false"
     />

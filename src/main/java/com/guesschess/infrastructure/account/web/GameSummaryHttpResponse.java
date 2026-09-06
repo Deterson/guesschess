@@ -13,6 +13,6 @@ package com.guesschess.infrastructure.account.web;
 record GameSummaryHttpResponse(String gameId, String myColor, String opponentName, OpponentType opponentType, String outcome, String[][] board) {
 
     enum OpponentType {
-        NONE, ACCOUNT, ANONYMOUS
+        NONE, ACCOUNT, ANONYMOUS, COMPUTER
     }
 }

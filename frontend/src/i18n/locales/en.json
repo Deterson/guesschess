@@ -117,6 +117,12 @@
     "playerOnline": "Online",
     "playerOffline": "Offline",
     "anonymousPlayer": "Anonymous",
+    "computerOpponent": "Computer ({level})",
+    "computerLevel": {
+      "easy": "Easy",
+      "medium": "Medium",
+      "hard": "Hard"
+    },
     "loginModalReminder": "You will always have access to this ongoing game",
     "anonymousAccessReminderLink": "Log in",
     "anonymousAccessReminderSuffix": "to access this game from anywhere"
@@ -134,7 +140,10 @@
     "noGuessmateTitle": "No-{link} variant",
     "noGuessmateDescription": "Correctly guessing the move that parries a check does not end the game immediately. You have to checkmate the king or eat it. This can lead to longer games.",
     "createButton": "Create a game",
-    "creating": "Creating…"
+    "creating": "Creating…",
+    "playComputerButton": "Play against the computer",
+    "createComputerModalTitle": "Game against the computer",
+    "levelLegend": "Level"
   },
   "howToPlay": {
     "pggnTitle": "PGGN notation",

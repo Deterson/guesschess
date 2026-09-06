@@ -1,5 +1,8 @@
 package com.guesschess.application;
 
+import com.guesschess.application.computer.ComputerLevel;
+import com.guesschess.application.computer.ComputerUnavailableException;
+import com.guesschess.application.computer.FakeChessEngine;
 import com.guesschess.domain.account.AnonymousId;
 import com.guesschess.domain.account.UserId;
 import com.guesschess.domain.board.Position;
@@ -35,7 +38,7 @@ class GameLifecycleServiceTest {
     @BeforeEach
     void setUp() {
         gameAccessRepository = new InMemoryGameAccessRepository();
-        service = new GameLifecycleService(new InMemoryGameRepository(), gameAccessRepository);
+        service = new GameLifecycleService(new InMemoryGameRepository(), gameAccessRepository, new FakeChessEngine());
     }
 
     @Test
@@ -45,6 +48,29 @@ class GameLifecycleServiceTest {
 
         assertNotEquals(first.whiteToken(), first.blackToken());
         assertNotEquals(first.gameId(), second.gameId());
+    }
+
+    @Test
+    void createComputerGameLinksTheOppositeColorToAComputer() {
+        PlayerRef human = new PlayerRef.Anonymous(AnonymousId.random());
+
+        CreatedGame created = service.createComputerGame(GameVariant.GUESSCHESS, null, Color.WHITE, human, ComputerLevel.HARD);
+
+        GameAccess access = gameAccessRepository.findByGameId(created.gameId()).orElseThrow();
+        assertEquals(human, access.whitePlayer());
+        assertEquals(new PlayerRef.Computer(ComputerLevel.HARD), access.blackPlayer());
+        assertTrue(access.isFull());
+    }
+
+    @Test
+    void createComputerGameFailsWithoutCreatingAGameWhenTheEngineIsUnavailable() {
+        FakeChessEngine unavailableEngine = new FakeChessEngine();
+        unavailableEngine.setAvailable(false);
+        GameLifecycleService serviceWithoutEngine = new GameLifecycleService(new InMemoryGameRepository(), gameAccessRepository, unavailableEngine);
+        PlayerRef human = new PlayerRef.Anonymous(AnonymousId.random());
+
+        assertThrows(ComputerUnavailableException.class,
+                () -> serviceWithoutEngine.createComputerGame(GameVariant.GUESSCHESS, null, Color.WHITE, human, ComputerLevel.EASY));
     }
 
     @Test

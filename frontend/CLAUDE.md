@@ -73,6 +73,12 @@
   dur. Trois exemples via les props de surbrillance existantes de `ChessBoard` (devinette
   incorrecte, devinette correcte, Guessmate) ; Guessmate présenté comme seule variante (pas de
   mention du choix GUESSCHESS/GUESSMATE de l'accueil).
+- **Étape 15 — Jouer contre l'ordinateur** : bouton dédié sous "Créer une partie" (`HomeView.vue`),
+  ouvre `CreateGameModal.vue` avec la prop `vsComputer` (ajoute un fieldset "Niveau" facile/moyen/
+  difficile, réutilise couleur/cadence tels quels). `PlayerLabel.vue` affiche "Ordinateur (niveau)"
+  pour `info.type === 'COMPUTER'` (jamais de lien de profil, contrairement à un compte). Erreur
+  `COMPUTER_UNAVAILABLE` (503, Stockfish non configuré côté serveur) affichée telle quelle comme
+  n'importe quelle autre erreur de création de partie.
 - **Étape 14 — Identifiant unique de compte (login)** : `login` affiché au-dessus/en-dessous du
   plateau (`PlayerLabel.vue`, tenu à jour en direct par `PlayersBroadcastService` sur
   `/topic/games/{id}/players`), "Anonyme"/"Anonymous" en italique pour les identités anonymes.

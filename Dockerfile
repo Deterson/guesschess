@@ -18,12 +18,17 @@ FROM eclipse-temurin:25-jre AS runtime
 WORKDIR /app
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends curl \
+    && apt-get install -y --no-install-recommends curl stockfish \
     && rm -rf /var/lib/apt/lists/* \
     && addgroup --system spring && adduser --system --ingroup spring spring
 
 COPY --from=build /app/target/app.jar app.jar
 USER spring
+
+# Paquet Debian "stockfish" (etape 15) : installe le binaire pour l'architecture cible
+# (ARM64 sur le Pi comme x86_64 en dev) dans /usr/games, convention Debian pour ce
+# paquet - voir StockfishChessEngine/CLAUDE.md.
+ENV STOCKFISH_PATH=/usr/games/stockfish
 
 EXPOSE 8080
 HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=5 \

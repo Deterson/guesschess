@@ -117,6 +117,12 @@
     "playerOnline": "Connecté",
     "playerOffline": "Déconnecté",
     "anonymousPlayer": "Anonyme",
+    "computerOpponent": "Ordinateur ({level})",
+    "computerLevel": {
+      "easy": "Facile",
+      "medium": "Moyen",
+      "hard": "Difficile"
+    },
     "loginModalReminder": "Vous aurez toujours accès à la partie en cours",
     "anonymousAccessReminderLink": "Connectez-vous",
     "anonymousAccessReminderSuffix": "pour accéder à cette partie n'importe où"
@@ -134,7 +140,10 @@
     "noGuessmateTitle": "Variante sans {link}",
     "noGuessmateDescription": "Deviner correctement le coup qui pare un échec ne met pas fin à la partie. Le roi doit être mangé (ou maté). Cette variante peut ralonger les parties.",
     "createButton": "Créer une partie",
-    "creating": "Création…"
+    "creating": "Création…",
+    "playComputerButton": "Jouer contre l'ordinateur",
+    "createComputerModalTitle": "Partie contre l'ordinateur",
+    "levelLegend": "Niveau"
   },
   "howToPlay": {
     "pggnTitle": "Notation PGGN",

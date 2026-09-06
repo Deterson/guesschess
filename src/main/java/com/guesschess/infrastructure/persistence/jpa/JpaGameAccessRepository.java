@@ -4,6 +4,7 @@ import com.guesschess.application.GameAccess;
 import com.guesschess.application.GameAccessRepository;
 import com.guesschess.application.PlayerRef;
 import com.guesschess.application.PlayerToken;
+import com.guesschess.application.computer.ComputerLevel;
 import com.guesschess.domain.account.AnonymousId;
 import com.guesschess.domain.account.UserId;
 import com.guesschess.domain.game.GameId;
@@ -62,10 +63,16 @@ class JpaGameAccessRepository implements GameAccessRepository {
         String type = switch (ref) {
             case PlayerRef.Account account -> "ACCOUNT";
             case PlayerRef.Anonymous anonymous -> "ANONYMOUS";
+            // Le niveau est encode dans le type lui-meme ("COMPUTER_EASY"...) plutot
+            // que dans une colonne dediee (etape 15) : evite une migration pour un
+            // seul champ, playerId restant simplement null pour ce cas (pas de compte
+            // ni d'identite anonyme a referencer).
+            case PlayerRef.Computer computer -> "COMPUTER_" + computer.level().name();
         };
         UUID playerId = switch (ref) {
             case PlayerRef.Account account -> account.userId().value();
             case PlayerRef.Anonymous anonymous -> anonymous.anonymousId().value();
+            case PlayerRef.Computer computer -> null;
         };
         if (color == Color.WHITE) {
             springDataRepository.linkWhitePlayerIfAbsent(gameId.value(), type, playerId);
@@ -113,6 +120,9 @@ class JpaGameAccessRepository implements GameAccessRepository {
     private PlayerRef toPlayerRef(String type, UUID playerId) {
         if (type == null) {
             return null;
+        }
+        if (type.startsWith("COMPUTER_")) {
+            return new PlayerRef.Computer(ComputerLevel.valueOf(type.substring("COMPUTER_".length())));
         }
         return switch (type) {
             case "ACCOUNT" -> new PlayerRef.Account(new UserId(playerId));

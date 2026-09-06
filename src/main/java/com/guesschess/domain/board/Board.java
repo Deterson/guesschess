@@ -233,4 +233,75 @@ public final class Board {
     public boolean isSamePosition(Board other) {
         return equals(other);
     }
+
+    /**
+     * Notation FEN standard (etape 15, moteur externe via StockfishChessEngine) -
+     * serialise la position courante independamment de tout historique. Prefere a un
+     * "position startpos moves ..." reconstruit depuis les coups joues : la regle de
+     * devinette introduit des passes de trait (Board.pass(), une devinette correcte
+     * annule le coup sans deplacer aucune piece) qu'un moteur UCI ne peut pas
+     * representer dans une liste de coups - il deduit le trait de la seule parite du
+     * nombre de coups recus, qui se desynchronise des le premier round annule de la
+     * partie. Le FEN evite le probleme en decrivant toujours la position exacte, sans
+     * historique.
+     */
+    public String toFen() {
+        StringBuilder fen = new StringBuilder();
+        for (int rank = 7; rank >= 0; rank--) {
+            int emptyRun = 0;
+            for (int file = 0; file < 8; file++) {
+                Piece piece = squares[index(file, rank)];
+                if (piece == null) {
+                    emptyRun++;
+                    continue;
+                }
+                if (emptyRun > 0) {
+                    fen.append(emptyRun);
+                    emptyRun = 0;
+                }
+                fen.append(fenLetter(piece));
+            }
+            if (emptyRun > 0) {
+                fen.append(emptyRun);
+            }
+            if (rank > 0) {
+                fen.append('/');
+            }
+        }
+        fen.append(sideToMove == Color.WHITE ? " w " : " b ");
+        fen.append(fenCastlingRights());
+        fen.append(' ').append(enPassantTarget == null ? "-" : enPassantTarget.toAlgebraic());
+        fen.append(' ').append(halfmoveClock);
+        fen.append(' ').append(fullmoveNumber);
+        return fen.toString();
+    }
+
+    private static char fenLetter(Piece piece) {
+        char letter = switch (piece.type()) {
+            case PAWN -> 'p';
+            case KNIGHT -> 'n';
+            case BISHOP -> 'b';
+            case ROOK -> 'r';
+            case QUEEN -> 'q';
+            case KING -> 'k';
+        };
+        return piece.color() == Color.WHITE ? Character.toUpperCase(letter) : letter;
+    }
+
+    private String fenCastlingRights() {
+        StringBuilder rights = new StringBuilder();
+        if (castlingRights.whiteKingside()) {
+            rights.append('K');
+        }
+        if (castlingRights.whiteQueenside()) {
+            rights.append('Q');
+        }
+        if (castlingRights.blackKingside()) {
+            rights.append('k');
+        }
+        if (castlingRights.blackQueenside()) {
+            rights.append('q');
+        }
+        return rights.isEmpty() ? "-" : rights.toString();
+    }
 }

@@ -91,6 +91,12 @@ tout court (échec rapide voulu au boot Spring, pas seulement au moment du login
   redirection *initiée par* Google/GitHub, donc cross-site du point de vue du navigateur ; un
   cookie `Strict` y est silencieusement omis, ce qui faisait perdre le lien anonyme → compte pour
   un joueur qui se connecte en pleine partie jouée anonymement.
+- `STOCKFISH_PATH` — (étape 15) chemin du binaire Stockfish, **facultatif** (contrairement aux
+  autres variables ci-dessus) : absent/introuvable ne bloque pas le démarrage, seule la création
+  d'une partie contre l'ordinateur échoue. Docker : déjà positionné par le Dockerfile
+  (`/usr/games/stockfish`, paquet Debian). Dev local Windows : binaire officiel (build "universal",
+  Sept. 2025) installé à `C:\Users\drde6\tools\stockfish.exe`, positionné dans `.env` (chemin à
+  revoir si l'utilisateur change de machine/emplacement, comme pour le JDK/Node ci-dessus).
 
 ## Détail des étapes de la roadmap (liste complète : [`../CLAUDE.md`](../CLAUDE.md))
 
@@ -172,6 +178,33 @@ tout court (échec rapide voulu au boot Spring, pas seulement au moment du login
   toute nouvelle partie, aucun traitement particulier nécessaire.
   `TimeControl.of`/`TimeControlHttpRequest.baseMinutes` acceptent des minutes fractionnaires
   (`double`, ex. 0.25 = 1/4 minute) pour les cadences bullet très courtes.
+- **Étape 15 — Jouer contre l'ordinateur** : `PlayerRef.Computer(ComputerLevel)` (pas de compte,
+  lié immédiatement aux deux couleurs à la création via `GameLifecycleService.createComputerGame` -
+  jamais de flux "rejoindre"). `StockfishChessEngine` (port `ChessEngine`, `application/computer/`)
+  pilote un binaire Stockfish externe en UCI (`ProcessBuilder`, un process par appel - pas de pool,
+  chaque partie/coup a de toute façon besoin du sien) ; position reconstruite via
+  `position startpos moves ...` (notation UCI longue), jamais de FEN. Niveaux : `UCI_LimitStrength`+
+  `UCI_Elo` (facile ≈ 1320 + choix aléatoire pondéré parmi le top-3 MultiPV pour descendre sous le
+  plancher natif de l'engin ; moyen ≈ 1500 ; difficile = pleine puissance), `movetime` borné (300-
+  1500ms) pour limiter le coût CPU. Un seul et même appel (`chooseMove`) sert à jouer son propre coup
+  ET à deviner celui de l'adversaire (même question posée au moteur) - voir `ComputerPlayerService`,
+  qui détermine ce rôle via `Game.sideToMove()` et déclenche l'action sur un thread virtuel à chaque
+  début de round (création de partie, ou résolution du round précédent - jamais de polling).
+  `STOCKFISH_PATH` (`guesschess.stockfish.path`) optionnel : absent/binaire introuvable ne bloque pas
+  le démarrage de l'app, seule la création d'une partie contre l'ordinateur échoue alors
+  (`ComputerUnavailableException` → 503 `COMPUTER_UNAVAILABLE`, vérifié avant même de créer la
+  partie). Docker : paquet Debian `stockfish` (`/usr/games/stockfish`, dispo nativement en ARM64
+  pour le Pi) plutôt qu'un téléchargement manuel par architecture.
+  **Piège rencontré (corrigé, migration V11)** : la contrainte posée en V6 sur `game_access`
+  exigeait que `*_player_type` et `*_player_id` soient tous les deux nuls ou tous les deux non-nuls
+  - rejetait `PlayerRef.Computer` (type non-null, id null, un ordinateur n'ayant pas de compte),
+  plantait la creation d'une partie contre l'ordinateur en 500 (`DataIntegrityViolationException`).
+  Assouplie pour autoriser explicitement `type LIKE 'COMPUTER_%' AND id IS NULL`.
+  **Piège rencontré (dev local)** : `.env` sourcé par `source .env` (bash) - un chemin Windows avec
+  antislashs (`C:\Users\...`) non quoté se fait manger ses antislashs par bash (`\U`, `\d`... sont
+  interpretes comme de l'echappement, silencieusement supprimes), rendant le chemin invalide sans
+  aucune erreur visible (juste `isAvailable()` qui renvoie false). Utiliser des slashs (`C:/Users/...`)
+  dans `.env`, qui fonctionnent aussi bien pour Java/NIO sous Windows.
 - **Étape 14 — Identifiant unique de compte (login)** : pseudonyme immuable, 3-20 caractères,
   unique insensible à la casse (index `lower(login)`, migration V9), interdit sur
   "Anonymous"/"Anonyme". `login` nullable en SQL pour les comptes créés avant cette étape ; un

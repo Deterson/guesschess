@@ -1,5 +1,8 @@
 package com.guesschess.application;
 
+import com.guesschess.application.computer.ChessEngine;
+import com.guesschess.application.computer.ComputerLevel;
+import com.guesschess.application.computer.ComputerUnavailableException;
 import com.guesschess.domain.account.UserId;
 import com.guesschess.domain.board.Board;
 import com.guesschess.domain.game.Game;
@@ -30,10 +33,12 @@ public class GameLifecycleService {
 
     private final GameRepository gameRepository;
     private final GameAccessRepository gameAccessRepository;
+    private final ChessEngine chessEngine;
 
-    public GameLifecycleService(GameRepository gameRepository, GameAccessRepository gameAccessRepository) {
+    public GameLifecycleService(GameRepository gameRepository, GameAccessRepository gameAccessRepository, ChessEngine chessEngine) {
         this.gameRepository = gameRepository;
         this.gameAccessRepository = gameAccessRepository;
+        this.chessEngine = chessEngine;
     }
 
     public CreatedGame createGame() {
@@ -198,6 +203,25 @@ public class GameLifecycleService {
      * redemarre a temps plein, comme createGame ; le premier round y est de toute
      * facon gratuit, voir Game).
      */
+    /**
+     * Variante (etape 15) qui lie le createur humain a la couleur choisie exactement
+     * comme createGame(variant, timeControl, creatorColor, creator), puis lie
+     * immediatement la couleur opposee a un ordinateur du niveau demande - la partie
+     * est donc complete des sa creation, sans flux "rejoindre" (voir
+     * GameCreationController). Le premier round demarre aussitot : c'est a l'appelant
+     * de declencher ComputerPlayerService.onRoundStarted pour que l'ordinateur joue ou
+     * devine sans attendre, si son role l'exige des ce round.
+     */
+    public CreatedGame createComputerGame(GameVariant variant, TimeControl timeControl, Color creatorColor,
+                                           PlayerRef creator, ComputerLevel level) {
+        if (!chessEngine.isAvailable()) {
+            throw new ComputerUnavailableException();
+        }
+        CreatedGame created = createGame(variant, timeControl, creatorColor, creator);
+        gameAccessRepository.linkPlayer(created.gameId(), creatorColor.opposite(), new PlayerRef.Computer(level));
+        return created;
+    }
+
     private GameId createRematchGame(GameVariant variant, TimeControl timeControl, GameAccess finishedGameAccess) {
         CreatedGame created = createGame(variant, timeControl);
         gameAccessRepository.linkPlayer(created.gameId(), Color.WHITE, finishedGameAccess.playerOf(Color.BLACK));

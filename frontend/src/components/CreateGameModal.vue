@@ -1,13 +1,20 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { Color, TimeControlHttpRequest } from '../types/api'
+import type { Color, ComputerLevel, TimeControlHttpRequest } from '../types/api'
 
-defineProps<{
-  open: boolean
-}>()
+const props = withDefaults(
+  defineProps<{
+    open: boolean
+    /** Etape 15 : ajoute le choix du niveau, cache la variante sans Guessmate. */
+    vsComputer?: boolean
+  }>(),
+  { vsComputer: false },
+)
 const emit = defineEmits<{
-  confirm: [{ color: Color | 'RANDOM'; noGuessmate: boolean; timeControl: TimeControlHttpRequest | null }]
+  confirm: [
+    { color: Color | 'RANDOM'; noGuessmate: boolean; timeControl: TimeControlHttpRequest | null; computerLevel: ComputerLevel | null },
+  ]
   close: []
 }>()
 
@@ -17,6 +24,7 @@ const noGuessmate = ref(false)
 const mode = ref<'CORRESPONDENCE' | 'REALTIME'>('CORRESPONDENCE')
 const baseMinutesText = ref('5')
 const incrementSeconds = ref(0)
+const computerLevel = ref<ComputerLevel>('MEDIUM')
 
 /** Combinaisons classiques, proposees exhaustivement (voir CLAUDE.md, etape 12). */
 const PRESETS: { baseMinutes: number; incrementSeconds: number }[] = [
@@ -56,14 +64,34 @@ function applyPreset(preset: { baseMinutes: number; incrementSeconds: number }) 
 function confirm() {
   if (!canConfirm.value) return
   const timeControl = mode.value === 'REALTIME' ? { baseMinutes: baseMinutesValue.value!, incrementSeconds: incrementSeconds.value } : null
-  emit('confirm', { color: color.value, noGuessmate: noGuessmate.value, timeControl })
+  emit('confirm', { color: color.value, noGuessmate: noGuessmate.value, timeControl, computerLevel: props.vsComputer ? computerLevel.value : null })
 }
 </script>
 
 <template>
   <div v-if="open" class="fixed inset-0 z-10 flex items-center justify-center bg-black/60">
     <div class="w-full max-w-sm space-y-4 rounded-lg bg-stone-800 p-6 text-left shadow-xl">
-      <p class="text-center font-semibold text-stone-200">{{ t('home.createModalTitle') }}</p>
+      <p class="text-center font-semibold text-stone-200">
+        {{ vsComputer ? t('home.createComputerModalTitle') : t('home.createModalTitle') }}
+      </p>
+
+      <fieldset v-if="vsComputer" class="w-full rounded-lg bg-stone-900 px-4 py-3">
+        <legend class="px-1 text-sm font-semibold">{{ t('home.levelLegend') }}</legend>
+        <div class="flex gap-4 text-sm text-stone-300">
+          <label class="flex items-center gap-2">
+            <input type="radio" v-model="computerLevel" value="EASY" class="accent-emerald-600" />
+            {{ t('game.computerLevel.easy') }}
+          </label>
+          <label class="flex items-center gap-2">
+            <input type="radio" v-model="computerLevel" value="MEDIUM" class="accent-emerald-600" />
+            {{ t('game.computerLevel.medium') }}
+          </label>
+          <label class="flex items-center gap-2">
+            <input type="radio" v-model="computerLevel" value="HARD" class="accent-emerald-600" />
+            {{ t('game.computerLevel.hard') }}
+          </label>
+        </div>
+      </fieldset>
 
       <fieldset class="w-full rounded-lg bg-stone-900 px-4 py-3">
         <legend class="px-1 text-sm font-semibold">{{ t('home.colorLegend') }}</legend>

@@ -4,6 +4,7 @@ import type {
   AccountResponse,
   AccountSettingsHttpResponse,
   Color,
+  ComputerLevel,
   CompleteRegistrationHttpResponse,
   CreateGameHttpResponse,
   ErrorResponse,
@@ -122,6 +123,21 @@ export const createGame = (
   timeControl: TimeControlHttpRequest | null,
   token: string | null,
 ) => request<CreateGameHttpResponse>('/api/games', { method: 'POST', body: { variant, color, timeControl }, token, allowAnonymousFallback: true })
+
+/** Etape 15 : partie contre l'ordinateur, deja complete des la creation (voir CLAUDE.md). */
+export const createComputerGame = (
+  variant: GameVariant,
+  color: Color | 'RANDOM',
+  timeControl: TimeControlHttpRequest | null,
+  computerLevel: ComputerLevel,
+  token: string | null,
+) =>
+  request<CreateGameHttpResponse>('/api/games', {
+    method: 'POST',
+    body: { variant, color, timeControl, opponent: 'COMPUTER', computerLevel },
+    token,
+    allowAnonymousFallback: true,
+  })
 
 export const joinGame = (gameId: string, authToken: string | null) =>
   request<JoinGameHttpResponse>(`/api/games/${gameId}/join`, { method: 'POST', token: authToken, allowAnonymousFallback: true })

@@ -5,6 +5,7 @@ import com.guesschess.application.GameAccessRepository;
 import com.guesschess.application.GameLifecycleService;
 import com.guesschess.application.PlayerRef;
 import com.guesschess.application.PlayerToken;
+import com.guesschess.application.computer.FakeChessEngine;
 import com.guesschess.application.account.AccountService;
 import com.guesschess.application.account.AccountSnapshot;
 import com.guesschess.domain.account.AccountSettingKey;
@@ -117,7 +118,7 @@ class OAuthLoginSuccessHandlerTest {
      * besoin d'etre fonctionnelles au-dela de compiler, seulement non-null.
      */
     private PlayersBroadcastService playersBroadcastService(AccountService accountService) {
-        var gameLifecycleService = new GameLifecycleService(new InMemoryGameRepository(), new RecordingGameAccessRepository());
+        var gameLifecycleService = new GameLifecycleService(new InMemoryGameRepository(), new RecordingGameAccessRepository(), new FakeChessEngine());
         var messagingTemplate = new SimpMessagingTemplate(new MessageChannel() {
             @Override
             public boolean send(Message<?> message, long timeout) {

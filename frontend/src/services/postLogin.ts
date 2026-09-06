@@ -1,7 +1,7 @@
 import type { Router } from 'vue-router'
 import type { useGameStore } from '../stores/game'
 import { consume as consumePendingAction } from './pendingAction'
-import { createGame, joinGame } from './api'
+import { createGame, createComputerGame, joinGame } from './api'
 
 /**
  * Rejoue l'action que l'utilisateur voulait faire avant de devoir passer par OAuth
@@ -18,7 +18,9 @@ export async function resumeAfterLogin(token: string, router: Router, gameStore:
   }
 
   if (action.type === 'create') {
-    const created = await createGame(action.variant, action.color, action.timeControl, token)
+    const created = action.computerLevel
+      ? await createComputerGame(action.variant, action.color, action.timeControl, action.computerLevel, token)
+      : await createGame(action.variant, action.color, action.timeControl, token)
     await gameStore.joinGame({
       gameId: created.gameId,
       token: created.creatorToken,

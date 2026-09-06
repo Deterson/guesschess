@@ -165,4 +165,46 @@ class BoardTest {
         Move move = Move.doublePawnPush(Position.fromAlgebraic("e2"), Position.fromAlgebraic("e4"), pawn);
         assertEquals(MoveType.DOUBLE_PAWN_PUSH, move.type());
     }
+
+    @Test
+    void toFenMatchesStandardStartingPosition() {
+        Board board = Board.initial();
+
+        assertEquals("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", board.toFen());
+    }
+
+    @Test
+    void toFenReflectsMovesEnPassantAndPartialCastlingRights() {
+        Board board = Board.initial()
+                .applyMove(Move.doublePawnPush(Position.fromAlgebraic("e2"), Position.fromAlgebraic("e4"),
+                        Piece.of(PieceType.PAWN, Color.WHITE)))
+                .applyMove(Move.normal(Position.fromAlgebraic("g8"), Position.fromAlgebraic("f6"),
+                        Piece.of(PieceType.KNIGHT, Color.BLACK), null));
+
+        assertEquals("rnbqkb1r/pppppppp/5n2/8/4P3/8/PPPP1PPP/RNBQKBNR w KQkq - 1 2", board.toFen());
+    }
+
+    /**
+     * Cas critique (etape 15) : apres un round annule par une devinette correcte
+     * (Board.pass(), aucune piece ne bouge), le FEN doit refleter le trait qui a
+     * quand meme change de camp - c'est precisement ce qu'un moteur UCI nourri d'une
+     * liste de coups ne peut pas voir (voir Board.toFen), d'ou le choix du FEN plutot
+     * que "position startpos moves ...".
+     */
+    @Test
+    void toFenReflectsSideToMoveAfterAPass() {
+        Board board = Board.initial().pass();
+
+        assertEquals("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 1 1", board.toFen());
+    }
+
+    @Test
+    void toFenUsesDashWhenNoCastlingRightsRemain() {
+        Board board = Board.empty()
+                .withPiece(Position.fromAlgebraic("e1"), Piece.of(PieceType.KING, Color.WHITE))
+                .withPiece(Position.fromAlgebraic("e8"), Piece.of(PieceType.KING, Color.BLACK))
+                .withCastlingRights(CastlingRights.none());
+
+        assertEquals("4k3/8/8/8/8/8/8/4K3 w - - 0 1", board.toFen());
+    }
 }

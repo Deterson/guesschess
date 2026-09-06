@@ -32,6 +32,8 @@ function opponentLabel(game: GameSummaryHttpResponse): string {
       return game.opponentName ?? ''
     case 'ANONYMOUS':
       return t('profile.anonymousOpponent')
+    case 'COMPUTER':
+      return t('game.computerOpponent', { level: t(`game.computerLevel.${(game.opponentName ?? 'EASY').toLowerCase()}`) })
     default:
       return t('profile.waitingOpponent')
   }

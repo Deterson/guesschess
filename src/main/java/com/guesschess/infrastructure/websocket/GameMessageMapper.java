@@ -63,12 +63,13 @@ public class GameMessageMapper {
     private PlayerInfoMessage toPlayerInfo(PlayerRef ref, GameId gameId, Color color) {
         return switch (ref) {
             case null -> null;
-            case PlayerRef.Anonymous anonymous -> new PlayerInfoMessage("ANONYMOUS", null, presenceService.isConnected(gameId, color));
+            case PlayerRef.Anonymous anonymous -> new PlayerInfoMessage("ANONYMOUS", null, presenceService.isConnected(gameId, color), null);
             case PlayerRef.Account account -> {
                 AccountSnapshot snapshot = accountService.getById(account.userId());
                 yield new PlayerInfoMessage("ACCOUNT", snapshot.login() != null ? snapshot.login() : snapshot.displayName(),
-                        presenceService.isConnected(gameId, color));
+                        presenceService.isConnected(gameId, color), null);
             }
+            case PlayerRef.Computer computer -> new PlayerInfoMessage("COMPUTER", null, true, computer.level().name());
         };
     }
 

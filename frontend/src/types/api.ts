@@ -36,10 +36,15 @@ export interface TimeControlHttpRequest {
   incrementSeconds: number
 }
 
+export type ComputerLevel = 'EASY' | 'MEDIUM' | 'HARD'
+
 export interface CreateGameHttpRequest {
   variant: GameVariant | null
   color: Color | 'RANDOM'
   timeControl: TimeControlHttpRequest | null
+  /** Etape 15 : absent/null ou 'HUMAN' = flux habituel, 'COMPUTER' + computerLevel = jouer contre l'ordinateur. */
+  opponent?: 'COMPUTER'
+  computerLevel?: ComputerLevel
 }
 
 export interface CreateGameHttpResponse {
@@ -113,13 +118,15 @@ export interface CompleteRegistrationHttpResponse {
 /** Code d'erreur renvoye par PATCH /api/account/login et POST /api/registration/complete. */
 export type LoginErrorCode = 'LOGIN_INVALID_FORMAT' | 'LOGIN_RESERVED' | 'LOGIN_TAKEN' | 'LOGIN_ALREADY_SET' | 'PENDING_TOKEN_INVALID'
 
-/** Identite d'un joueur pour l'affichage au-dessus/en-dessous du plateau (etape 14). */
-export type PlayerInfoType = 'ACCOUNT' | 'ANONYMOUS'
+/** Identite d'un joueur pour l'affichage au-dessus/en-dessous du plateau (etape 14, COMPUTER etape 15). */
+export type PlayerInfoType = 'ACCOUNT' | 'ANONYMOUS' | 'COMPUTER'
 
 export interface PlayerInfo {
   type: PlayerInfoType
   login: string | null
   connected: boolean
+  /** Niveau ('EASY'/'MEDIUM'/'HARD'), non-null uniquement pour type='COMPUTER'. */
+  level: ComputerLevel | null
 }
 
 /** GET /api/games/{id}/players - null tant que la couleur n'est pas encore liee. */
@@ -135,8 +142,8 @@ export interface AccountSettingsHttpResponse {
 
 export type GameOutcome = 'WON' | 'LOST' | 'DRAW' | 'ONGOING'
 
-/** Une ligne de "Mes parties" (etape 8 - GET /api/account/games). */
-export type OpponentType = 'NONE' | 'ACCOUNT' | 'ANONYMOUS'
+/** Une ligne de "Mes parties" (etape 8 - GET /api/account/games, COMPUTER etape 15). */
+export type OpponentType = 'NONE' | 'ACCOUNT' | 'ANONYMOUS' | 'COMPUTER'
 
 export interface GameSummaryHttpResponse {
   gameId: string

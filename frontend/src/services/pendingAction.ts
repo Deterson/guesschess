@@ -1,9 +1,16 @@
-import type { Color, GameVariant, TimeControlHttpRequest } from '../types/api'
+import type { Color, ComputerLevel, GameVariant, TimeControlHttpRequest } from '../types/api'
 
 const STORAGE_KEY = 'guesschess_pending_action'
 
 export type PendingAction =
-  | { type: 'create'; variant: GameVariant; color: Color | 'RANDOM'; timeControl: TimeControlHttpRequest | null }
+  | {
+      type: 'create'
+      variant: GameVariant
+      color: Color | 'RANDOM'
+      timeControl: TimeControlHttpRequest | null
+      /** Etape 15 : non-null = partie contre l'ordinateur (voir postLogin.ts). */
+      computerLevel?: ComputerLevel | null
+    }
   | { type: 'join'; gameId: string }
   | { type: 'login'; returnTo: string }
 
