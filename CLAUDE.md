@@ -112,6 +112,15 @@ Jeu d'échecs classique avec une règle additionnelle :
 12. ✅ Timers (fait) — pendule Fischer optionnelle à la création (temps réel avec presets classiques, ou correspondance sans pendule), pilotée côté backend. Détail : [`src/CLAUDE.md`](src/CLAUDE.md) (backend) et [`frontend/CLAUDE.md`](frontend/CLAUDE.md) (frontend).
 13. ✅ Tutoriel des règles (fait) — page statique FR/EN, aucun backend. Détail : [`frontend/CLAUDE.md`](frontend/CLAUDE.md).
 14. ✅ Identifiant unique de compte (login) (fait) — pseudonyme immuable 3-20 caractères, profil public `/profile/{login}`. Détail : [`src/CLAUDE.md`](src/CLAUDE.md) (backend) et [`frontend/CLAUDE.md`](frontend/CLAUDE.md) (convention d'affichage, routes).
+15. ⬜ Jouer contre l'ordinateur — à réfléchir avant de trancher : quel moteur (Stockfish via une lib
+    Java type `chesslib`/binaire UCI, ou un moteur maison plus simple) ; coût en compute sur un Pi 4
+    partagé avec le reste de l'appli, notamment si plusieurs parties contre l'IA tournent en même
+    temps ; niveaux de difficulté (profondeur de recherche Stockfish, ou delta d'Elo simulé) ; et
+    surtout comment l'ordinateur devine — la piste naturelle est de le faire deviner le meilleur coup
+    Stockfish à la position courante, mais reste à voir si un pur "meilleur coup" donne une
+    difficulté de devinette réaliste/amusante ou si ça demande d'introduire du bruit.
+16. ⬜ Ajouter du son — un son pour le coup joué, un pour le coup deviné (résolution du round), un
+    pour la fin de partie (victoire/nulle/défaite).
 
 ## Liaison compte/session ↔ partie (étapes 6-7)
 

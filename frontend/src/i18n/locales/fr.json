@@ -106,7 +106,6 @@
     "joinButton": "Rejoindre cette partie",
     "gameFullError": "Cette partie est déjà complète.",
     "connectionLostReconnecting": "Connexion perdue, reconnexion en cours…",
-    "dontGuess": "Ne pas deviner",
     "tabTitleYourTurnToPlay": "À vous de jouer",
     "tabTitleYourTurnToGuess": "À vous de deviner",
     "offerDraw": "Proposer la nulle",

@@ -46,6 +46,7 @@ onUnmounted(() => {
   gameStore.leaveGame()
   window.removeEventListener('keydown', onKeydown)
   document.removeEventListener('visibilitychange', onVisibilityChange)
+  window.removeEventListener('beforeunload', onBeforeUnload)
   stopTabTitleBlink()
 })
 
@@ -360,6 +361,17 @@ const boardDisabled = computed(
     historyIndex.value !== null,
 )
 
+/** Avertissement natif du navigateur (façon lichess) uniquement pour une partie en cours en mode temps réel : pas de pendule à perdre en correspondance. */
+const shouldWarnBeforeUnload = computed(
+  () => Boolean(state.value?.timeControl) && state.value?.status === 'ONGOING' && Boolean(state.value?.full),
+)
+
+function onBeforeUnload(event: BeforeUnloadEvent) {
+  if (!shouldWarnBeforeUnload.value) return
+  event.preventDefault()
+  event.returnValue = ''
+}
+
 /**
  * Round de l'historique actuellement affiché (null en direct, ou en dehors des
  * bornes de historyRounds - jamais le cas normalement, garde défensive).
@@ -436,6 +448,7 @@ function onKeydown(event: KeyboardEvent) {
 onMounted(() => {
   window.addEventListener('keydown', onKeydown)
   document.addEventListener('visibilitychange', onVisibilityChange)
+  window.addEventListener('beforeunload', onBeforeUnload)
 })
 
 function submitChosenMove({ from, to, promotion }: { from: string; to: string; promotion: PromotionPieceType | null }) {
@@ -469,9 +482,6 @@ function onPromotionSelected(promotion: PromotionPieceType) {
   pendingPromotion.value = null
 }
 
-function submitNoGuess() {
-  gameStore.submitGuess(null, null, null)
-}
 </script>
 
 <template>
@@ -591,15 +601,6 @@ function submitNoGuess() {
             :pending-submission="pendingSubmission"
             :awaiting-guess="awaitingGuessMine"
           />
-
-          <button
-            v-if="myRole === 'guesser' && !boardDisabled"
-            type="button"
-            class="rounded-lg bg-stone-700 px-4 py-2 text-sm hover:bg-stone-600"
-            @click="submitNoGuess"
-          >
-            {{ t('game.dontGuess') }}
-          </button>
         </div>
 
         <div class="order-4 mx-auto w-full max-w-xl @min-[67rem]:order-none @min-[67rem]:col-start-3 @min-[67rem]:mx-0 @min-[67rem]:max-w-none">

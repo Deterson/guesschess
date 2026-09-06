@@ -106,7 +106,6 @@
     "joinButton": "Join this game",
     "gameFullError": "This game is already full.",
     "connectionLostReconnecting": "Connection lost, reconnecting…",
-    "dontGuess": "Don't guess",
     "tabTitleYourTurnToPlay": "Your turn to play",
     "tabTitleYourTurnToGuess": "Your turn to guess",
     "offerDraw": "Offer draw",

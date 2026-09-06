@@ -13,15 +13,11 @@ ne rien implémenter dans ce TODO à moins que cela ait été explicitement dema
 - avoir des tests E2E avec Cypress playwright etc
 
 --- FRONT
-- j'ai vu sur lichess.org qu'en pleine partie, si on quitte l'onglet, ça affiche "Les changements effectués sur cette page ne seront peut-être pas sauvegardés". Est-ce que tu peux implémenter ça ? Uniquement si la partie est en cours
 - proposer de changer de style (change la couleur des cases, et adapte les couleurs du code couleur des coups joués / devinés sur les parties ET dans le tutoriel)
 - enlever toute la verbosité typique d'IA ("vous regardez cette partie en mode spectateur : elle est déjà complète" ou "quelqu'un d'autre s'est connecté avec le lien" on s'en fout, enlever cette infobulle parce que c'est écrit en dessous "Vous observez cette partie")
-- enlever le bouton "ne pas deviner" (sera sûrement fait pendant l'étape du timer)
-- rajouter du son
 - un favicon et un logo + stylé
 
 étapes optionnelles:
-- ajouter un encart "c'est dur de faire un engine pour un jeu pareil, si vous avez des idées je suis preneur : <mail>"
 - avoir un mail @guesschess.fr?
 - avoir un environnement de dev, dispo que par moi ?
 - avoir une page admin pour naviguer les données de la bdd
