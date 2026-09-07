@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { createGame, createComputerGame } from '../services/api'
+import { createGame, createComputerGame, getDefaultVariant } from '../services/api'
 import { useGameStore } from '../stores/game'
 import { useAuthStore } from '../stores/auth'
 import AuthModal from '../components/AuthModal.vue'
 import CreateGameModal from '../components/CreateGameModal.vue'
 import LoginModal from '../components/LoginModal.vue'
-import type { Color, ComputerLevel, TimeControlHttpRequest } from '../types/api'
+import type { Color, ComputerLevel, GameVariant, TimeControlHttpRequest } from '../types/api'
 
 const router = useRouter()
 const gameStore = useGameStore()
@@ -24,6 +24,16 @@ const noGuessmate = ref(false)
 const color = ref<Color | 'RANDOM'>('RANDOM')
 const timeControl = ref<TimeControlHttpRequest | null>(null)
 const computerLevel = ref<ComputerLevel | null>(null)
+/** Etape 16 : feature flag backend (guesschess.default-variant) coche la case "variante Guessmate" en consequence. */
+const defaultVariant = ref<GameVariant>('GUESSCHESS')
+
+onMounted(async () => {
+  try {
+    defaultVariant.value = (await getDefaultVariant()).variant
+  } catch {
+    // Reste sur le fallback GUESSCHESS si l'appel echoue - pas bloquant, juste la case a cocher.
+  }
+})
 
 function openCreateModal() {
   error.value = null
@@ -132,8 +142,19 @@ function openMyGames() {
       </button>
     </div>
 
-    <CreateGameModal :open="showCreateModal" @confirm="onCreateModalConfirm" @close="showCreateModal = false" />
-    <CreateGameModal :open="showComputerModal" vs-computer @confirm="onCreateModalConfirm" @close="showComputerModal = false" />
+    <CreateGameModal
+      :open="showCreateModal"
+      :default-variant="defaultVariant"
+      @confirm="onCreateModalConfirm"
+      @close="showCreateModal = false"
+    />
+    <CreateGameModal
+      :open="showComputerModal"
+      vs-computer
+      :default-variant="defaultVariant"
+      @confirm="onCreateModalConfirm"
+      @close="showComputerModal = false"
+    />
 
     <AuthModal
       :open="showAuthModal"

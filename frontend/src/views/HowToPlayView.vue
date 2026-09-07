@@ -1,9 +1,28 @@
 <script setup lang="ts">
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ChessBoard from '../components/ChessBoard.vue'
-import type { Board, BoardCell, PieceCode, RoundSummaryMessage } from '../types/api'
+import { getDefaultVariant } from '../services/api'
+import type { Board, BoardCell, GameVariant, PieceCode, RoundSummaryMessage } from '../types/api'
 
 const { t } = useI18n()
+
+/**
+ * Etape 16 : feature flag backend (guesschess.default-variant) - quand la variante par
+ * defaut n'est pas Guessmate, cette page presente Guessmate comme une variante parmi
+ * d'autres (titre, section "Fin de partie") plutot que comme LE comportement par
+ * defaut (voir CLAUDE.md, "Guessmate presente comme seule variante").
+ */
+const defaultVariant = ref<GameVariant>('GUESSCHESS')
+const isGuessmateDefault = computed(() => defaultVariant.value === 'GUESSCHESS')
+
+onMounted(async () => {
+  try {
+    defaultVariant.value = (await getDefaultVariant()).variant
+  } catch {
+    // Reste sur le fallback GUESSCHESS (comportement actuel) si l'appel echoue.
+  }
+})
 
 const FILES = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
 
@@ -144,9 +163,18 @@ const example3Guess = { from: 'e1', to: 'f2' }
         </div>
       </section>
 
+      <section v-if="!isGuessmateDefault" class="flex flex-col gap-4">
+        <div class="text-center">
+          <h2 class="text-xl font-semibold">{{ t('howToPlay.endOfGameTitle') }}</h2>
+          <p class="mt-1 text-sm text-stone-400">{{ t('howToPlay.endOfGameText') }}</p>
+        </div>
+      </section>
+
       <section id="guessmate" class="flex flex-col gap-4 scroll-mt-8">
         <div class="text-center">
-          <h2 class="text-xl font-semibold text-red-400">{{ t('howToPlay.example3Title') }}</h2>
+          <h2 class="text-xl font-semibold text-red-400">
+            {{ isGuessmateDefault ? t('howToPlay.example3Title') : t('howToPlay.example3TitleVariant') }}
+          </h2>
           <p class="mt-1 text-sm text-stone-400">{{ t('howToPlay.example3Text') }}</p>
         </div>
         <div class="mx-auto w-full max-w-sm">
@@ -154,7 +182,7 @@ const example3Guess = { from: 'e1', to: 'f2' }
           <p class="mt-2 text-center font-mono text-sm text-stone-400">(Kf2)#</p>
           <p class="mt-2 text-center text-sm text-gray-500">{{ t('howToPlay.example3Caption') }}</p>
         </div>
-        <div class="mx-auto w-full max-w-sm rounded-lg border-2 border-violet-400 px-4 py-3 text-sm text-stone-300">
+        <div v-if="isGuessmateDefault" class="mx-auto w-full max-w-sm rounded-lg border-2 border-violet-400 px-4 py-3 text-sm text-stone-300">
           <p class="mb-1 font-semibold text-violet-300">{{ t('howToPlay.noGuessmateVariantTitle') }}</p>
           <p class="text-stone-400">{{ t('home.noGuessmateDescription') }}</p>
         </div>

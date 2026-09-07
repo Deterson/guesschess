@@ -24,6 +24,7 @@ import com.guesschess.domain.piece.Color;
 import com.guesschess.infrastructure.security.HttpPlayerIdentityResolver;
 import com.guesschess.infrastructure.web.dto.CreateGameHttpRequest;
 import com.guesschess.infrastructure.web.dto.CreateGameHttpResponse;
+import com.guesschess.infrastructure.web.dto.DefaultVariantHttpResponse;
 import com.guesschess.infrastructure.web.dto.TimeControlHttpRequest;
 import com.guesschess.infrastructure.web.dto.ErrorResponse;
 import com.guesschess.infrastructure.web.dto.GameHistoryEntryHttpResponse;
@@ -40,6 +41,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -80,11 +82,13 @@ class GameCreationController {
     private final PlayersBroadcastService playersBroadcastService;
     private final GamePresenceService presenceService;
     private final ComputerPlayerService computerPlayerService;
+    private final GameVariant defaultVariant;
 
     GameCreationController(GameLifecycleService gameLifecycleService, HttpPlayerIdentityResolver identityResolver,
                             SimpMessagingTemplate messagingTemplate, GameMessageMapper mapper, AccountService accountService,
                             PlayersBroadcastService playersBroadcastService, GamePresenceService presenceService,
-                            ComputerPlayerService computerPlayerService) {
+                            ComputerPlayerService computerPlayerService,
+                            @Value("${guesschess.default-variant:GUESSCHESS}") String defaultVariant) {
         this.gameLifecycleService = gameLifecycleService;
         this.identityResolver = identityResolver;
         this.messagingTemplate = messagingTemplate;
@@ -93,6 +97,17 @@ class GameCreationController {
         this.playersBroadcastService = playersBroadcastService;
         this.presenceService = presenceService;
         this.computerPlayerService = computerPlayerService;
+        this.defaultVariant = GameVariant.valueOf(defaultVariant);
+    }
+
+    /**
+     * Etape 16 : feature flag guesschess.default-variant, lu ici pour que la modale de
+     * creation cote frontend coche par defaut la case "variante Guessmate" en
+     * consequence, sans avoir a dupliquer la valeur dans le code frontend.
+     */
+    @GetMapping("/default-variant")
+    ResponseEntity<?> defaultVariant() {
+        return ResponseEntity.ok(new DefaultVariantHttpResponse(defaultVariant.name()));
     }
 
     @PostMapping
@@ -100,7 +115,7 @@ class GameCreationController {
                                   HttpServletRequest httpRequest,
                                   @AuthenticationPrincipal Jwt jwt) {
         GameVariant variant = request == null || request.variant() == null
-                ? GameVariant.GUESSCHESS
+                ? defaultVariant
                 : GameVariant.valueOf(request.variant());
         Color creatorColor = resolveColor(request == null ? null : request.color());
         TimeControl timeControl = resolveTimeControl(request == null ? null : request.timeControl());

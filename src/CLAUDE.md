@@ -97,6 +97,11 @@ tout court (échec rapide voulu au boot Spring, pas seulement au moment du login
   (`/usr/games/stockfish`, paquet Debian). Dev local Windows : binaire officiel (build "universal",
   Sept. 2025) installé à `C:\Users\drde6\tools\stockfish.exe`, positionné dans `.env` (chemin à
   revoir si l'utilisateur change de machine/emplacement, comme pour le JDK/Node ci-dessus).
+- `DEFAULT_GAME_VARIANT` — **facultatif**, défaut `GUESSCHESS`. Feature flag
+  (`guesschess.default-variant`) pour trancher en prod entre variante Guessmate ou
+  No-Guessmate par défaut sans rebuild ; lu par `GameCreationController`, exposé en lecture
+  au frontend via `GET /api/games/default-variant` (coche la case correspondante dans la
+  modale de création).
 
 ## Détail des étapes de la roadmap (liste complète : [`../CLAUDE.md`](../CLAUDE.md))
 

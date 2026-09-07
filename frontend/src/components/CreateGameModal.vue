@@ -1,16 +1,18 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { Color, ComputerLevel, TimeControlHttpRequest } from '../types/api'
+import type { Color, ComputerLevel, GameVariant, TimeControlHttpRequest } from '../types/api'
 import SegmentedControl from './SegmentedControl.vue'
 
 const props = withDefaults(
   defineProps<{
     open: boolean
-    /** Etape 15 : ajoute le choix du niveau, cache la variante sans Guessmate. */
+    /** Etape 15 : ajoute le choix du niveau. */
     vsComputer?: boolean
+    /** Etape 16 : coche la case "variante Guessmate" par defaut selon le feature flag backend (voir HomeView). */
+    defaultVariant?: GameVariant
   }>(),
-  { vsComputer: false },
+  { vsComputer: false, defaultVariant: 'GUESSCHESS' },
 )
 const emit = defineEmits<{
   confirm: [
@@ -21,7 +23,18 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 const color = ref<Color | 'RANDOM'>('RANDOM')
-const noGuessmate = ref(false)
+/**
+ * Reste undefined tant que l'utilisateur n'a pas touche la case, pour que la valeur par
+ * defaut suive reactivement defaultVariant (arrive de facon asynchrone depuis
+ * HomeView) plutot que de figer une valeur au montage du composant.
+ */
+const guessmateOverride = ref<boolean | undefined>(undefined)
+const guessmate = computed({
+  get: () => guessmateOverride.value ?? props.defaultVariant === 'GUESSCHESS',
+  set: (value: boolean) => {
+    guessmateOverride.value = value
+  },
+})
 const mode = ref<'CORRESPONDENCE' | 'REALTIME'>('CORRESPONDENCE')
 const baseMinutesText = ref('5')
 const incrementSeconds = ref(0)
@@ -80,7 +93,7 @@ function applyPreset(preset: { baseMinutes: number; incrementSeconds: number }) 
 function confirm() {
   if (!canConfirm.value) return
   const timeControl = mode.value === 'REALTIME' ? { baseMinutes: baseMinutesValue.value!, incrementSeconds: incrementSeconds.value } : null
-  emit('confirm', { color: color.value, noGuessmate: noGuessmate.value, timeControl, computerLevel: props.vsComputer ? computerLevel.value : null })
+  emit('confirm', { color: color.value, noGuessmate: !guessmate.value, timeControl, computerLevel: props.vsComputer ? computerLevel.value : null })
 }
 </script>
 
@@ -139,10 +152,9 @@ function confirm() {
         </div>
       </fieldset>
 
-      <!-- Variante sans Guessmate désactivée pour l'instant, à remettre plus tard.
       <label class="flex items-center gap-3 rounded-lg bg-stone-900 px-4 py-3 text-sm">
-        <input type="checkbox" v-model="noGuessmate" class="h-4 w-4 accent-emerald-600" />
-        <i18n-t keypath="home.noGuessmateTitle" tag="span" class="text-left font-semibold">
+        <input type="checkbox" v-model="guessmate" class="h-4 w-4 accent-emerald-600" />
+        <i18n-t keypath="home.guessmateTitle" tag="span" class="text-left font-semibold">
           <template #link>
             <router-link
               to="/how-to-play#guessmate"
@@ -154,7 +166,6 @@ function confirm() {
           </template>
         </i18n-t>
       </label>
-      -->
 
       <div class="flex gap-2">
         <button

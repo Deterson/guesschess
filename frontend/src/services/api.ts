@@ -7,6 +7,7 @@ import type {
   ComputerLevel,
   CompleteRegistrationHttpResponse,
   CreateGameHttpResponse,
+  DefaultVariantHttpResponse,
   ErrorResponse,
   GameHistoryHttpResponse,
   GamePlayersHttpResponse,
@@ -116,6 +117,9 @@ async function request<T>(
 }
 
 export const oauthAuthorizationUrl = (provider: string): string => `${API_URL}/oauth2/authorization/${provider}`
+
+/** Etape 16 : feature flag guesschess.default-variant, coche par defaut la case "variante Guessmate" de la modale de creation. */
+export const getDefaultVariant = () => request<DefaultVariantHttpResponse>('/api/games/default-variant')
 
 export const createGame = (
   variant: GameVariant,

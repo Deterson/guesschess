@@ -54,6 +54,31 @@ class GameCreationControllerIntegrationTest {
     private final HttpClient httpClient = HttpClient.newHttpClient();
     private final ObjectMapper objectMapper = new ObjectMapper();
 
+    /**
+     * Etape 16 : GET /api/games/default-variant expose le feature flag
+     * guesschess.default-variant (GUESSCHESS par defaut, voir application.properties)
+     * pour que la modale de creation cote frontend sache quoi cocher par defaut.
+     */
+    @Test
+    void defaultVariantExposesTheConfiguredFlag() throws Exception {
+        HttpResponse<String> response = getRaw("/api/games/default-variant");
+
+        assertEquals(200, response.statusCode());
+        JsonNode body = objectMapper.readTree(response.body());
+        assertEquals("GUESSCHESS", body.get("variant").asString());
+    }
+
+    /**
+     * Creer une partie sans preciser de variante doit reprendre ce meme flag plutot
+     * qu'une valeur GUESSCHESS codee en dur.
+     */
+    @Test
+    void creatingAGameWithoutAVariantFallsBackToTheDefaultVariantFlag() throws Exception {
+        JsonNode created = post("/api/games", "{\"color\":\"WHITE\"}");
+
+        assertEquals("GUESSCHESS", created.get("variant").asString());
+    }
+
     @Test
     void creatingAGameLinksTheCreatorToTheChosenColor() throws Exception {
         JsonNode created = post("/api/games", "{\"variant\":\"GUESSCHESS\",\"color\":\"WHITE\"}");

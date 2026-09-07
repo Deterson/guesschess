@@ -54,6 +54,11 @@ export interface CreateGameHttpResponse {
   creatorToken: string
 }
 
+/** GET /api/games/default-variant (etape 16, feature flag guesschess.default-variant). */
+export interface DefaultVariantHttpResponse {
+  variant: GameVariant
+}
+
 export interface ErrorResponse {
   error: string
   message: string
