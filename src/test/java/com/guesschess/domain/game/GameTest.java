@@ -98,6 +98,31 @@ class GameTest {
     }
 
     @Test
+    void enPassantStaysAvailableAcrossRoundsCancelledByCorrectGuesses() {
+        Game game = Game.newGame();
+
+        play(game, "e2", "e4");
+        play(game, "a7", "a6");
+        play(game, "e4", "e5");
+        play(game, "d7", "d5");
+
+        // White's attempt to capture en passant is itself correctly guessed and
+        // cancelled: the board does not move at all, so the pawn must still be
+        // capturable en passant afterwards.
+        guessCorrectly(game, "e5", "d6");
+        // A completely unrelated black round is also cancelled by a correct guess -
+        // the board still hasn't moved since the double push.
+        guessCorrectly(game, "b8", "c6");
+
+        Move enPassant = findMove(game.legalMoves(), "e5", "d6");
+        game.submitMove(enPassant);
+        game.submitGuess(null);
+
+        assertNull(game.board().pieceAt(Position.fromAlgebraic("d5")));
+        assertEquals(Piece.of(PieceType.PAWN, Color.WHITE), game.board().pieceAt(Position.fromAlgebraic("d6")));
+    }
+
+    @Test
     void promotionDuringARealGameReplacesThePawn() {
         Board board = Board.empty()
                 .withPiece(Position.fromAlgebraic("a7"), Piece.of(PieceType.PAWN, Color.WHITE))

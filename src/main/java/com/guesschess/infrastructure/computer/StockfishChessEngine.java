@@ -98,9 +98,33 @@ public class StockfishChessEngine implements ChessEngine {
             throw new StockfishUnavailableException("STOCKFISH_PATH is not configured");
         }
         EngineSettings settings = EngineSettings.forLevel(level);
-        List<String> candidates = search(board, settings);
+        List<String> candidates = searchWithRetry(board, settings);
         String chosenUci = pickAmongCandidates(candidates, settings);
         return matchLegalMove(chosenUci, legalMoves);
+    }
+
+    private static final int SEARCH_ATTEMPTS = 2;
+
+    /**
+     * Un echec de communication UCI (ex. le process ferme stdout avant "bestmove") est
+     * observe occasionnellement en dev local sans cause identifiee (probablement le
+     * lancement/l'arret d'un process par appel, voir javadoc de la classe, qui se prete
+     * a une interference ponctuelle de l'antivirus ou de l'OS) - une nouvelle tentative
+     * avec un process frais resout la grande majorite des cas. Sans ce filet, l'echec
+     * remontait jusqu'a ComputerPlayerService.act qui l'avalait silencieusement,
+     * laissant la partie bloquee indefiniment (l'ordinateur ne soumettant jamais son
+     * coup/sa devinette).
+     */
+    private List<String> searchWithRetry(Board board, EngineSettings settings) {
+        StockfishUnavailableException lastFailure = null;
+        for (int attempt = 1; attempt <= SEARCH_ATTEMPTS; attempt++) {
+            try {
+                return search(board, settings);
+            } catch (StockfishUnavailableException e) {
+                lastFailure = e;
+            }
+        }
+        throw lastFailure;
     }
 
     /**

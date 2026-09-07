@@ -5,6 +5,10 @@
 
 ## Environnement de dev
 
+- ⚠️ **Le backend Spring Boot tourne en local** sur cette machine Windows (`./mvnw spring-boot:run`
+  ou IDE), jamais sur la VM distante — seul Postgres (Docker) y tourne, voir point suivant. Erreur
+  déjà faite plusieurs fois : ne pas supposer que "le backend ne tourne pas" faute de pouvoir SSH
+  sur la VM, et ne pas y chercher/lancer un process backend.
 - **VM Docker distante** : le Docker de dev (Postgres inclus) tourne sur une VM AWS EC2 distante,
   IP fixe (Elastic IP, donc stable d'un redémarrage à l'autre) `35.180.147.199`, SSH ouvert, `.pem`
   situé à `C:\Users\drde6\.ssh\guesschess-dev-docker.pem`. Pas de Docker local sur la machine de
@@ -205,11 +209,60 @@ tout court (échec rapide voulu au boot Spring, pas seulement au moment du login
   - rejetait `PlayerRef.Computer` (type non-null, id null, un ordinateur n'ayant pas de compte),
   plantait la creation d'une partie contre l'ordinateur en 500 (`DataIntegrityViolationException`).
   Assouplie pour autoriser explicitement `type LIKE 'COMPUTER_%' AND id IS NULL`.
+  **Piège rencontré (dev local, Windows)** : le process Stockfish lancé/tué à chaque `chooseMove`
+  (voir plus haut) échoue occasionnellement en dev local (`StockfishUnavailableException: stockfish
+  closed its output before sending 'bestmove'`), cause précise non identifiée (suspecté : lancement
+  répété d'un process par l'antivirus/l'OS). `ComputerPlayerService.act` avalait cette exception sans
+  filet, laissant le round bloqué indéfiniment (l'ordinateur ne soumettant plus jamais rien).
+  Corrigé : `StockfishChessEngine` retente une fois avec un process frais avant d'abandonner, et
+  `ComputerPlayerService` retombe sur un coup légal aléatoire si le moteur échoue quand même -
+  dégrade la qualité d'un seul coup plutôt que de bloquer la partie.
   **Piège rencontré (dev local)** : `.env` sourcé par `source .env` (bash) - un chemin Windows avec
   antislashs (`C:\Users\...`) non quoté se fait manger ses antislashs par bash (`\U`, `\d`... sont
   interpretes comme de l'echappement, silencieusement supprimes), rendant le chemin invalide sans
   aucune erreur visible (juste `isAvailable()` qui renvoie false). Utiliser des slashs (`C:/Users/...`)
   dans `.env`, qui fonctionnent aussi bien pour Java/NIO sous Windows.
+- **Étape 17 (planifiée) — IA « guess-aware »** : constat de départ, `ComputerPlayerService` pose
+  aujourd'hui la même question à `ChessEngine.chooseMove` pour jouer et pour deviner ("meilleur
+  coup pour cette position ?") — aucune des deux décisions ne modélise le fait qu'une devinette
+  correcte *annule* le coup réel plutôt que de le laisser se jouer. Résultat concret : l'engin
+  élague tout sacrifice sur une pièce protégée par un seul défenseur (ex. dame qui prend une pièce
+  défendue une fois), alors qu'en guesschess ce sacrifice est sain si (a) l'adversaire ne devine
+  pas la prise et (b) la reprise qui suit est ensuite facilement devinable donc annulable — deux
+  conditions que l'évaluation d'échecs classique ne voit pas.
+  - **Architecture envisagée** : nouveau domain/application service (ex.
+    `application/computer/GuessAwareMoveSelector`) au-dessus du port `ChessEngine` existant plutôt
+    que dans `StockfishChessEngine` — garder l'échange UCI pur d'un côté, la stratégie guesschess
+    de l'autre. `ChessEngine` reste l'oracle d'évaluation (position + coup candidat → score), pas
+    de moteur d'échecs maison.
+  - **Perf** : une décision guess-aware a besoin de plusieurs évaluations par coup (candidat,
+    réponse probable de l'adversaire, confiance dans cette réponse) là où `chooseMove` n'en fait
+    qu'une, alors que `StockfishChessEngine` relance un process par appel aujourd'hui (voir
+    ci-dessus) — passer à une session UCI persistante par partie (process gardé ouvert entre les
+    rounds, plusieurs `position`/`go` dessus) avant ou en même temps que cette étape, pas après.
+  - **Stratégie 1 — ignorer une réfutation parable** : pour chaque coup réel candidat, chercher la
+    meilleure réponse adverse sur la position résultante et estimer si elle est "évidente" (seule
+    pièce capable de reprendre, ou net écart de score avec la 2e meilleure réponse via MultiPV). Si
+    oui, ne pas compter cette réfutation à sa pleine valeur dans le calcul du coup candidat — le
+    pire cas réel (l'ordinateur devine et annule cette réponse le round suivant) est bien meilleur
+    que ce qu'un minimax classique suppose. Seuil de confiance approximatif au début (écart
+    MultiPV), affinable plus tard.
+  - **Stratégie 2 — varier après une parade** : si le dernier coup réel de l'ordinateur vient
+    d'être deviné/annulé, ne pas se contenter de rejouer le même coup au round suivant — préférer,
+    à qualité proche, un autre candidat du top MultiPV. Particulièrement sensible en ouverture (peu
+    de coups sensés, donc plus facile à deviner une deuxième fois de suite). Nécessite de garder
+    une trace courte ("dernier coup réel annulé pour ce joueur ordinateur") plutôt que de la
+    déduire de l'historique complet à chaque décision.
+  - **Stratégie 3 — varier la devinette elle-même** : symétrique de la stratégie 2 côté devineur.
+    Éviter de deviner deux fois d'affilée le même coup adverse, surtout en ouverture (peu de coups
+    sensés → plus vite lu par l'adversaire s'il devine que l'ordinateur devine toujours pareil) —
+    sauf si ce coup reste très nettement le meilleur (net écart de score via MultiPV), auquel cas le
+    deviner à nouveau reste correct. Même trace courte que la stratégie 2 ("dernière devinette de
+    ce joueur ordinateur"), réutilisable des deux côtés.
+  - **Tests** : logique du nouveau service testable unitairement (confiance dans une réfutation,
+    choix du coup avec réfutation parable, non-répétition après parade, non-répétition de
+    devinette) avec un `ChessEngine` de test plutôt qu'un vrai Stockfish, pour rester rapide et
+    déterministe.
 - **Étape 14 — Identifiant unique de compte (login)** : pseudonyme immuable, 3-20 caractères,
   unique insensible à la casse (index `lower(login)`, migration V9), interdit sur
   "Anonymous"/"Anonyme". `login` nullable en SQL pour les comptes créés avant cette étape ; un

@@ -21,6 +21,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Fait jouer/deviner l'ordinateur (etape 15 de la roadmap) : declenchee a chaque debut
@@ -85,8 +86,8 @@ public class ComputerPlayerService {
 
     private void act(GameId gameId, PlayerToken token, boolean computerIsMover, Board board,
                       List<Move> legalMoves, ComputerLevel level) {
+        Move chosen = chooseMoveOrFallback(gameId, board, legalMoves, level);
         try {
-            Move chosen = chessEngine.chooseMove(board, legalMoves, level);
             MoveIntent intent = chosen.promotionType() == null
                     ? MoveIntent.of(chosen.from(), chosen.to())
                     : MoveIntent.promotingTo(chosen.from(), chosen.to(), chosen.promotionType());
@@ -99,6 +100,24 @@ public class ComputerPlayerService {
             });
         } catch (Exception e) {
             log.error("computer player failed to act for game {}", gameId, e);
+        }
+    }
+
+    /**
+     * Filet de secours si le moteur echoue malgre la nouvelle tentative deja faite
+     * cote StockfishChessEngine (process/communication toujours indisponible) : un
+     * coup aleatoire parmi les coups legaux plutot que de laisser le round bloque
+     * indefiniment - sans lui, cette exception etait avalee par le catch de act() et
+     * l'ordinateur ne soumettait alors plus jamais rien pour ce round, laissant
+     * l'humain attendre indefiniment (bug rencontre en pratique). Degrade la qualite
+     * de ce seul coup, jamais la progression de la partie.
+     */
+    private Move chooseMoveOrFallback(GameId gameId, Board board, List<Move> legalMoves, ComputerLevel level) {
+        try {
+            return chessEngine.chooseMove(board, legalMoves, level);
+        } catch (Exception e) {
+            log.error("computer player engine failed for game {}, falling back to a random legal move", gameId, e);
+            return legalMoves.get(ThreadLocalRandom.current().nextInt(legalMoves.size()));
         }
     }
 

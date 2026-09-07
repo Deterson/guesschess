@@ -166,12 +166,14 @@ public final class Board {
 
     /**
      * Passe le trait sans deplacer aucune piece (devinette correcte qui annule le coup
-     * reel). La case en passant tombe, comme apres n'importe quel autre coup : son
-     * exploitation n'est valable que pour la reponse immediate qui vient d'etre sautee.
+     * reel). Le plateau n'ayant physiquement pas change, la case en passant eventuelle
+     * doit survivre : sinon un pion qui vient de bondir de 2 cases devient impossible a
+     * prendre en passant des que le round suivant est lui-meme annule par une devinette
+     * correcte, alors qu'aucun coup reel n'a encore ete joue depuis le double pas.
      */
     public Board pass() {
         int newFullmoveNumber = sideToMove == Color.BLACK ? fullmoveNumber + 1 : fullmoveNumber;
-        return new Board(squares.clone(), sideToMove.opposite(), castlingRights, null, halfmoveClock + 1, newFullmoveNumber);
+        return new Board(squares.clone(), sideToMove.opposite(), castlingRights, enPassantTarget, halfmoveClock + 1, newFullmoveNumber);
     }
 
     private CastlingRights updatedCastlingRights(Position from, Position to, Piece moved) {

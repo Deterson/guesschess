@@ -90,6 +90,11 @@ Jeu d'échecs classique avec une règle additionnelle :
 - **Historique de matchs** : quasi gratuit vu que l'état des parties est déjà persisté en base pour l'asynchrone — il suffit de ne pas supprimer les parties terminées.
 - **Classement ELO** : prévu comme un module séparé, ajouté plus tard, qui lit l'historique de matchs et calcule les scores sans toucher au moteur d'échecs ni à la mécanique de devinette.
 - **OAuth** (Google/GitHub, etc.) : authentification, en plus ou à la place de comptes email/mot de passe classiques.
+- **Variante "devinette cachée"** (idée, pas encore développée) : le coup deviné ne serait jamais
+  révélé à l'adversaire (seul le résultat annulé/non-annulé le serait), contrairement au
+  comportement actuel. S'ajouterait vraisemblablement à `GameVariant` (`GUESSCHESS`/`NOGUESSMATE`
+  existants), avec un impact à vérifier plus tard sur le format PGGN (qui note aujourd'hui le coup
+  deviné entre parenthèses, voir étape 10) et sur l'affichage historique.
 
 ### ⚠️ Points de vigilance pour la v1 (à cause de ces fonctionnalités futures)
 
@@ -117,6 +122,9 @@ Jeu d'échecs classique avec une règle additionnelle :
     (backend) et [`frontend/CLAUDE.md`](frontend/CLAUDE.md) (frontend).
 16. ⬜ Ajouter du son — un son pour le coup joué, un pour le coup deviné (résolution du round), un
     pour la fin de partie (victoire/nulle/défaite).
+17. ⬜ IA « guess-aware » — le choix du coup réel de l'ordinateur doit tenir compte de la mécanique
+    de devinette elle-même (pas seulement de l'évaluation d'échecs classique), pour exploiter les
+    tactiques propres au guesschess plutôt que de les ignorer. Détail : [`src/CLAUDE.md`](src/CLAUDE.md).
 
 ## Liaison compte/session ↔ partie (étapes 6-7)
 

@@ -83,6 +83,25 @@ class ComputerPlayerServiceTest {
     }
 
     @Test
+    void computerFallsBackToALegalMoveWhenTheEngineFailsInsteadOfLeavingTheRoundStuck() {
+        PlayerRef human = new PlayerRef.Anonymous(new AnonymousId(UUID.randomUUID()));
+        CreatedGame created = gameLifecycleService.createComputerGame(
+                com.guesschess.domain.game.GameVariant.GUESSCHESS, null, Color.BLACK, human, ComputerLevel.EASY);
+        GameId gameId = created.gameId();
+        GameAccess access = gameAccessRepository.findByGameId(gameId).orElseThrow();
+
+        chessEngine.alwaysChoose((board, legalMoves) -> {
+            throw new RuntimeException("simulated engine failure (e.g. Stockfish process crash)");
+        });
+
+        computerPlayerService.onRoundStarted(gameId);
+
+        await().atMost(Duration.ofSeconds(2)).untilAsserted(() ->
+                org.junit.jupiter.api.Assertions.assertTrue(
+                        gameLifecycleService.viewGame(gameId, access.whiteToken()).mySubmission().submitted()));
+    }
+
+    @Test
     void onRoundStartedDoesNothingForAHumanVsHumanGame() {
         PlayerRef white = new PlayerRef.Anonymous(new AnonymousId(UUID.randomUUID()));
         PlayerRef black = new PlayerRef.Anonymous(new AnonymousId(UUID.randomUUID()));
