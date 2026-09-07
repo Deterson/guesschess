@@ -26,9 +26,13 @@ const props = withDefaults(
     pendingMove?: { from: string; to: string } | null
     hoverGuess?: { from: string; to: string } | null
     ghostMove?: { from: string; to: string; piece: PieceCode } | null
+    /** Coup deviné, affiché en fondu juste après la résolution d'un round - uniquement côté joueur, voir GameView.vue. */
+    resolvedGuessFlash?: { from: string; to: string; piece: PieceCode; id: number } | null
     checkedColor?: ColorLower | null
     /** Halo rouge (étape 12) : le joueur au trait a joué, l'adversaire doit deviner - temps réel uniquement. */
     awaitingGuess?: boolean
+    /** Halo blanc directionnel : de quel côté du plateau (haut/bas, selon l'orientation) se trouve le joueur au trait. */
+    turnIndicator?: 'top' | 'bottom' | null
   }>(),
   {
     legalMoves: () => [],
@@ -38,8 +42,10 @@ const props = withDefaults(
     pendingMove: null,
     hoverGuess: null,
     ghostMove: null,
+    resolvedGuessFlash: null,
     checkedColor: null,
     awaitingGuess: false,
+    turnIndicator: null,
   },
 )
 
@@ -153,6 +159,12 @@ function isHoverGuessSquare(square: string): boolean {
 
 function isGhostMoveSquare(square: string): boolean {
   return props.ghostMove != null && (square === props.ghostMove.from || square === props.ghostMove.to)
+}
+
+function isResolvedGuessFlashSquare(square: string): boolean {
+  return (
+    props.resolvedGuessFlash != null && (square === props.resolvedGuessFlash.from || square === props.resolvedGuessFlash.to)
+  )
 }
 
 const checkedKingSquare = computed(() => {
@@ -272,11 +284,17 @@ function onSquarePointerCancel(event: PointerEvent) {
 </script>
 
 <template>
-  <div
-    ref="boardRef"
-    class="chess-board relative grid aspect-square w-full max-w-xl touch-none grid-cols-8 grid-rows-8 overflow-hidden rounded-lg border-2 border-stone-700 select-none"
-    :class="{ 'guess-halo-glow': awaitingGuess }"
-  >
+  <div class="relative w-full max-w-xl">
+    <div
+      v-if="turnIndicator"
+      class="turn-halo pointer-events-none absolute inset-x-6 h-10"
+      :class="turnIndicator === 'top' ? '-top-8' : '-bottom-8'"
+    />
+    <div
+      ref="boardRef"
+      class="chess-board relative grid aspect-square w-full touch-none grid-cols-8 grid-rows-8 overflow-hidden rounded-lg border-2 border-stone-700 select-none"
+      :class="{ 'guess-halo-glow': awaitingGuess }"
+    >
     <template v-for="rank in displayRanks" :key="`rank-${rank}`">
       <button
         v-for="file in displayFiles"
@@ -310,6 +328,11 @@ function onSquarePointerCancel(event: PointerEvent) {
           class="pointer-events-none absolute inset-0"
           style="background: radial-gradient(circle, rgba(239, 68, 68, 0.9) 0%, rgba(239, 68, 68, 0.55) 45%, rgba(239, 68, 68, 0) 78%)"
         />
+        <span
+          v-if="isResolvedGuessFlashSquare(algebraic(file, rank))"
+          :key="`flash-ring-${resolvedGuessFlash!.id}-${algebraic(file, rank)}`"
+          class="guess-flash-fade-ring pointer-events-none absolute inset-0 ring-4 ring-violet-500 ring-inset"
+        />
         <img
           v-if="
             iconOf(pieceAt(file, rank)) &&
@@ -317,7 +340,9 @@ function onSquarePointerCancel(event: PointerEvent) {
             pendingMove?.from !== algebraic(file, rank) &&
             pendingMove?.to !== algebraic(file, rank) &&
             ghostMove?.from !== algebraic(file, rank) &&
-            ghostMove?.to !== algebraic(file, rank)
+            ghostMove?.to !== algebraic(file, rank) &&
+            resolvedGuessFlash?.from !== algebraic(file, rank) &&
+            resolvedGuessFlash?.to !== algebraic(file, rank)
           "
           :src="iconOf(pieceAt(file, rank))!"
           class="h-[80%] w-[80%] drop-shadow"
@@ -335,6 +360,14 @@ function onSquarePointerCancel(event: PointerEvent) {
           v-if="ghostMove?.to === algebraic(file, rank)"
           :src="iconOf(ghostMove.piece)!"
           class="h-[80%] w-[80%] opacity-40 grayscale"
+          draggable="false"
+          alt=""
+        />
+        <img
+          v-if="resolvedGuessFlash?.to === algebraic(file, rank)"
+          :key="`flash-piece-${resolvedGuessFlash!.id}`"
+          :src="iconOf(resolvedGuessFlash!.piece)!"
+          class="guess-flash-fade-piece h-[80%] w-[80%] grayscale"
           draggable="false"
           alt=""
         />
@@ -363,6 +396,7 @@ function onSquarePointerCancel(event: PointerEvent) {
       draggable="false"
       alt=""
     />
+    </div>
   </div>
 </template>
 
@@ -370,5 +404,51 @@ function onSquarePointerCancel(event: PointerEvent) {
 .chess-board {
   --square-dark: #6daec3;
   --square-light: #fef3c7;
+}
+
+/* Halo blanc "à qui de jouer" : émane du bord haut ou bas du plateau (selon
+   l'orientation), pour se repérer d'un coup d'œil sans lire le statut. Element
+   dédié positionné hors du plateau (plutôt qu'un drop-shadow sur .chess-board)
+   pour rester strictement d'un seul côté - un drop-shadow décalé déborde aussi
+   légèrement du côté opposé dès que son flou dépasse son décalage. */
+.turn-halo {
+  background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.35) 45%, rgba(255, 255, 255, 0) 75%);
+  filter: blur(6px);
+}
+
+/* Mode jour : le halo blanc se fond dans le fond quasi-blanc - inversé en halo
+   sombre pour rester visible, même principe que le reste du thème jour/nuit. */
+:global(html.day) .turn-halo {
+  background: radial-gradient(ellipse at center, rgba(15, 23, 42, 0.45) 0%, rgba(15, 23, 42, 0.18) 45%, rgba(15, 23, 42, 0) 75%);
+}
+
+@keyframes guess-flash-fade-ring {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  15%,
+  85% {
+    opacity: 1;
+  }
+}
+
+@keyframes guess-flash-fade-piece {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  15%,
+  85% {
+    opacity: 0.4;
+  }
+}
+
+.guess-flash-fade-ring {
+  animation: guess-flash-fade-ring 1s ease-in-out;
+}
+
+.guess-flash-fade-piece {
+  animation: guess-flash-fade-piece 1s ease-in-out;
 }
 </style>

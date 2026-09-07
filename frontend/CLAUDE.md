@@ -68,6 +68,12 @@
   sur CHAQUE message de `/topic/games/{gameId}` en supposant qu'il ne pouvait signifier qu'"un
   round vient de se résoudre" — faux dès qu'un message intermédiaire (pendule, offre de nulle...)
   y transite aussi. Corrigé en ne réinitialisant que si `roundCount` a changé.
+  **Halo blanc "à qui de jouer"** (`ChessBoard.vue`, prop `turnIndicator`, calculé dans
+  `GameView.vue` à partir de `sideToMove` vs `bottomPlayerColor`) : élément dédié positionné hors du
+  plateau (pas un `box-shadow`/`drop-shadow` sur `.chess-board`), car un flou plus large que le
+  décalage déborde aussi légèrement du côté opposé — invisible en pratique avec le halo rouge
+  (saturé) mais flagrant en blanc pur. Inversé en halo sombre en mode jour (`:global(html.day)`)
+  car un blanc sur fond quasi-blanc est invisible.
 - **Étape 13 — Tutoriel des règles** : `HowToPlayView.vue` (`/how-to-play`), contenu FR/EN
   statique, aucun backend. Réutilise `ChessBoard.vue` en `disabled` avec des positions codées en
   dur. Trois exemples via les props de surbrillance existantes de `ChessBoard` (devinette

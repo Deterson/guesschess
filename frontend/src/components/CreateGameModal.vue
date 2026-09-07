@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { Color, ComputerLevel, TimeControlHttpRequest } from '../types/api'
+import SegmentedControl from './SegmentedControl.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -55,6 +56,21 @@ function parseMinutes(text: string): number | null {
 const baseMinutesValue = computed(() => parseMinutes(baseMinutesText.value))
 const canConfirm = computed(() => mode.value !== 'REALTIME' || baseMinutesValue.value != null)
 
+const levelOptions = computed(() => [
+  { value: 'EASY' as ComputerLevel, label: t('game.computerLevel.easy') },
+  { value: 'MEDIUM' as ComputerLevel, label: t('game.computerLevel.medium') },
+  { value: 'HARD' as ComputerLevel, label: t('game.computerLevel.hard') },
+])
+const colorOptions = computed(() => [
+  { value: 'WHITE' as Color | 'RANDOM', label: t('common.white') },
+  { value: 'BLACK' as Color | 'RANDOM', label: t('common.black') },
+  { value: 'RANDOM' as Color | 'RANDOM', label: t('home.random') },
+])
+const modeOptions = computed(() => [
+  { value: 'CORRESPONDENCE' as const, label: t('home.correspondenceOption') },
+  { value: 'REALTIME' as const, label: t('home.realTimeOption') },
+])
+
 function applyPreset(preset: { baseMinutes: number; incrementSeconds: number }) {
   baseMinutesText.value = String(preset.baseMinutes)
   incrementSeconds.value = preset.incrementSeconds
@@ -77,52 +93,17 @@ function confirm() {
 
       <fieldset v-if="vsComputer" class="w-full rounded-lg bg-stone-900 px-4 py-3">
         <legend class="px-1 text-sm font-semibold">{{ t('home.levelLegend') }}</legend>
-        <div class="flex gap-4 text-sm text-stone-300">
-          <label class="flex items-center gap-2">
-            <input type="radio" v-model="computerLevel" value="EASY" class="accent-emerald-600" />
-            {{ t('game.computerLevel.easy') }}
-          </label>
-          <label class="flex items-center gap-2">
-            <input type="radio" v-model="computerLevel" value="MEDIUM" class="accent-emerald-600" />
-            {{ t('game.computerLevel.medium') }}
-          </label>
-          <label class="flex items-center gap-2">
-            <input type="radio" v-model="computerLevel" value="HARD" class="accent-emerald-600" />
-            {{ t('game.computerLevel.hard') }}
-          </label>
-        </div>
+        <SegmentedControl v-model="computerLevel" :options="levelOptions" />
       </fieldset>
 
       <fieldset class="w-full rounded-lg bg-stone-900 px-4 py-3">
         <legend class="px-1 text-sm font-semibold">{{ t('home.colorLegend') }}</legend>
-        <div class="flex gap-4 text-sm text-stone-300">
-          <label class="flex items-center gap-2">
-            <input type="radio" v-model="color" value="WHITE" class="accent-emerald-600" />
-            {{ t('common.white') }}
-          </label>
-          <label class="flex items-center gap-2">
-            <input type="radio" v-model="color" value="BLACK" class="accent-emerald-600" />
-            {{ t('common.black') }}
-          </label>
-          <label class="flex items-center gap-2">
-            <input type="radio" v-model="color" value="RANDOM" class="accent-emerald-600" />
-            {{ t('home.random') }}
-          </label>
-        </div>
+        <SegmentedControl v-model="color" :options="colorOptions" />
       </fieldset>
 
       <fieldset class="w-full rounded-lg bg-stone-900 px-4 py-3">
         <legend class="px-1 text-sm font-semibold">{{ t('home.timeControlLegend') }}</legend>
-        <div class="flex gap-4 text-sm text-stone-300">
-          <label class="flex items-center gap-2">
-            <input type="radio" v-model="mode" value="CORRESPONDENCE" class="accent-emerald-600" />
-            {{ t('home.correspondenceOption') }}
-          </label>
-          <label class="flex items-center gap-2">
-            <input type="radio" v-model="mode" value="REALTIME" class="accent-emerald-600" />
-            {{ t('home.realTimeOption') }}
-          </label>
-        </div>
+        <SegmentedControl v-model="mode" :options="modeOptions" />
 
         <div v-if="mode === 'REALTIME'" class="mt-3 space-y-3">
           <div class="grid grid-cols-2 gap-2">

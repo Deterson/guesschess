@@ -17,7 +17,7 @@ import AuthModal from '../components/AuthModal.vue'
 import LoginModal from '../components/LoginModal.vue'
 import PlayerLabel from '../components/PlayerLabel.vue'
 import { useClock } from '../composables/useClock'
-import type { Board, ColorLower, PromotionPieceType, RoundSummaryMessage } from '../types/api'
+import type { Board, ColorLower, PieceCode, PromotionPieceType, RoundSummaryMessage } from '../types/api'
 
 const props = defineProps<{
   gameId: string
@@ -48,6 +48,7 @@ onUnmounted(() => {
   document.removeEventListener('visibilitychange', onVisibilityChange)
   window.removeEventListener('beforeunload', onBeforeUnload)
   stopTabTitleBlink()
+  if (resolvedGuessFlashTimeout) clearTimeout(resolvedGuessFlashTimeout)
 })
 
 const pendingPromotion = ref<{ from: string; to: string; options: PromotionPieceType[] } | null>(null)
@@ -192,6 +193,13 @@ function squareToIndices(square: string): [number, number] {
   return [FILES.indexOf(square[0]), Number(square.slice(1)) - 1]
 }
 
+/**
+ * Deplace une piece sur une copie du plateau - utilise uniquement pour l'apercu client
+ * (survol de la devinette) d'un coup non encore/jamais reellement joue, jamais pour le
+ * plateau reel qui vient toujours du serveur. Fait aussi suivre la tour en cas de
+ * roque (roi qui se deplace de deux cases horizontalement) : sans ca, seul le roi
+ * bougeait dans l'apercu (bug corrige).
+ */
 function applyMoveToBoard(board: Board, from: string, to: string): Board {
   const [fFile, fRank] = squareToIndices(from)
   const [tFile, tRank] = squareToIndices(to)
@@ -199,6 +207,15 @@ function applyMoveToBoard(board: Board, from: string, to: string): Board {
   const next = board.map((row) => row.slice())
   next[fRank][fFile] = null
   next[tRank][tFile] = piece
+
+  if ((piece === 'wK' || piece === 'bK') && fRank === tRank && Math.abs(tFile - fFile) === 2) {
+    const kingside = tFile > fFile
+    const rookFromFile = kingside ? 7 : 0
+    const rookToFile = kingside ? tFile - 1 : tFile + 1
+    next[fRank][rookToFile] = next[fRank][rookFromFile]
+    next[fRank][rookFromFile] = null
+  }
+
   return next
 }
 
@@ -237,6 +254,50 @@ const myRole = computed(() => {
   if (!state.value || !myColor.value) return null
   return state.value.sideToMove === myColor.value.toUpperCase() ? 'mover' : 'guesser'
 })
+
+/** Halo blanc "à qui de jouer" : bas si le joueur au trait est en bas du plateau affiché (nous, ou blancs pour un spectateur), haut sinon. Masqué tant que la partie n'a pas commencé/est finie, sideToMove n'ayant alors rien de significatif à indiquer. */
+const turnIndicator = computed<'top' | 'bottom' | null>(() => {
+  if (!state.value?.full || state.value.status === 'FINISHED') return null
+  return state.value.sideToMove.toLowerCase() === bottomPlayerColor.value ? 'bottom' : 'top'
+})
+
+/**
+ * Coup deviné affiché en fondu (~1s) juste après la résolution d'un round - uniquement
+ * pour le joueur qui a joué le coup réel de CE round (round.mover), jamais pour le
+ * devineur (qui connaît déjà sa propre devinette) ni un spectateur, et seulement si la
+ * devinette diffère du coup réellement joué (sinon rien de nouveau à montrer). La pièce
+ * est résolue sur le plateau tel qu'il était juste AVANT la résolution (dernier
+ * GameStateMessage reçu avant celui-ci), pas via historyRounds qui n'est rafraîchi
+ * qu'après un aller-retour REST asynchrone (voir stores/game.ts) et arriverait donc
+ * trop tard pour déclencher l'animation de façon fiable.
+ */
+const resolvedGuessFlash = ref<{ from: string; to: string; piece: PieceCode; id: number } | null>(null)
+let resolvedGuessFlashTimeout: ReturnType<typeof setTimeout> | null = null
+let resolvedGuessFlashCounter = 0
+
+watch(
+  () => state.value,
+  (newState, oldState) => {
+    if (!newState || !oldState || !myColor.value) return
+    if (newState.roundCount === oldState.roundCount) return
+    const round = newState.lastRound
+    if (!round?.guessedFrom || !round.guessedTo) return
+    if (round.guessedFrom === round.actualFrom && round.guessedTo === round.actualTo) return
+    if (round.mover !== myColor.value.toUpperCase()) return
+    const piece = pieceAtSquareOf(oldState.board, round.guessedFrom)
+    if (!piece) return
+
+    resolvedGuessFlashCounter += 1
+    resolvedGuessFlash.value = { from: round.guessedFrom, to: round.guessedTo, piece, id: resolvedGuessFlashCounter }
+    if (resolvedGuessFlashTimeout) clearTimeout(resolvedGuessFlashTimeout)
+    resolvedGuessFlashTimeout = setTimeout(() => {
+      resolvedGuessFlash.value = null
+    }, 1000)
+  },
+)
+
+/** Masqué en navigation historique : les cases resteraient les mêmes mais le plateau affiché ne correspondrait plus au round qui vient de se résoudre. */
+const displayResolvedGuessFlash = computed(() => (historyIndex.value === null ? resolvedGuessFlash.value : null))
 
 /**
  * awaitingGuess (public, calculé plus haut) pilote le clignotement des DEUX pendules -
@@ -579,8 +640,10 @@ function onPromotionSelected(promotion: PromotionPieceType) {
             :pending-move="pendingMove"
             :hover-guess="hoverGuessSquares"
             :ghost-move="displayGhost"
+            :resolved-guess-flash="displayResolvedGuessFlash"
             :checked-color="checkedColor"
             :awaiting-guess="awaitingGuessMine"
+            :turn-indicator="historyIndex === null ? turnIndicator : null"
             @choose-move="onChooseMove"
           />
 

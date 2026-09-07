@@ -13,8 +13,8 @@ ne rien implémenter dans ce TODO à moins que cela ait été explicitement dema
 - avoir des tests E2E avec Cypress playwright etc
 
 --- FRONT
-- quand le coup deviné c'est un roque, on voit que le roi bouger quand on hover
-- quand on vient de jouer un coup, voir le coup deviné mauvais en breathe pendant une seconde
+- les boutons radio sont moches ("niveau", "votre couleur", "cadence" etc si tu en trouves d'autres), j'aimerais un style généralisé à tout le site, de "button style radio group" ou "segmented control" plutôt que des coches rondes radio moches
+- le chat devrait partir du bas de la div qui est à gauche du board, et la textarea devrait être en bas sans bouger, les messages apparaîtraient en remontant, comme twitch
 - proposer de changer de style (change la couleur des cases, et adapte les couleurs du code couleur des coups joués / devinés sur les parties ET dans le tutoriel)
 - enlever toute la verbosité typique d'IA ("vous regardez cette partie en mode spectateur : elle est déjà complète" ou "quelqu'un d'autre s'est connecté avec le lien" on s'en fout, enlever cette infobulle parce que c'est écrit en dessous "Vous observez cette partie")
 - un favicon et un logo + stylé
