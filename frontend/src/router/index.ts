@@ -4,6 +4,7 @@ import GameView from '../views/GameView.vue'
 import OAuthCallbackView from '../views/OAuthCallbackView.vue'
 import ChooseLoginView from '../views/ChooseLoginView.vue'
 import HowToPlayView from '../views/HowToPlayView.vue'
+import CreditsView from '../views/CreditsView.vue'
 import ProfileLayout from '../views/ProfileLayout.vue'
 import ProfileGamesView from '../views/ProfileGamesView.vue'
 import ProfileSettingsView from '../views/ProfileSettingsView.vue'
@@ -32,6 +33,7 @@ const router = createRouter({
     { path: '/oauth-callback', name: 'oauth-callback', component: OAuthCallbackView },
     { path: '/choose-login', name: 'choose-login', component: ChooseLoginView },
     { path: '/how-to-play', name: 'how-to-play', component: HowToPlayView },
+    { path: '/credits', name: 'credits', component: CreditsView },
     {
       path: '/my-profile',
       component: ProfileLayout,

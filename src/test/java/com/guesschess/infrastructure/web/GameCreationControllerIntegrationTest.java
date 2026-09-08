@@ -56,7 +56,7 @@ class GameCreationControllerIntegrationTest {
 
     /**
      * Etape 16 : GET /api/games/default-variant expose le feature flag
-     * guesschess.default-variant (GUESSCHESS par defaut, voir application.properties)
+     * guesschess.default-variant (GUESSMATE par defaut, voir application.properties)
      * pour que la modale de creation cote frontend sache quoi cocher par defaut.
      */
     @Test
@@ -65,23 +65,23 @@ class GameCreationControllerIntegrationTest {
 
         assertEquals(200, response.statusCode());
         JsonNode body = objectMapper.readTree(response.body());
-        assertEquals("GUESSCHESS", body.get("variant").asString());
+        assertEquals("GUESSMATE", body.get("variant").asString());
     }
 
     /**
      * Creer une partie sans preciser de variante doit reprendre ce meme flag plutot
-     * qu'une valeur GUESSCHESS codee en dur.
+     * qu'une valeur GUESSMATE codee en dur.
      */
     @Test
     void creatingAGameWithoutAVariantFallsBackToTheDefaultVariantFlag() throws Exception {
         JsonNode created = post("/api/games", "{\"color\":\"WHITE\"}");
 
-        assertEquals("GUESSCHESS", created.get("variant").asString());
+        assertEquals("GUESSMATE", created.get("variant").asString());
     }
 
     @Test
     void creatingAGameLinksTheCreatorToTheChosenColor() throws Exception {
-        JsonNode created = post("/api/games", "{\"variant\":\"GUESSCHESS\",\"color\":\"WHITE\"}");
+        JsonNode created = post("/api/games", "{\"variant\":\"GUESSMATE\",\"color\":\"WHITE\"}");
 
         assertEquals("WHITE", created.get("creatorColor").asString());
         assertNotNull(created.get("creatorToken").asString());
@@ -95,7 +95,7 @@ class GameCreationControllerIntegrationTest {
      */
     @Test
     void joiningClaimsTheOnlyOpenColor() throws Exception {
-        JsonNode created = post("/api/games", "{\"variant\":\"GUESSCHESS\",\"color\":\"WHITE\"}");
+        JsonNode created = post("/api/games", "{\"variant\":\"GUESSMATE\",\"color\":\"WHITE\"}");
         String gameId = created.get("gameId").asString();
 
         HttpResponse<String> response = postRaw("/api/games/" + gameId + "/join", null);
@@ -108,7 +108,7 @@ class GameCreationControllerIntegrationTest {
 
     @Test
     void joiningAGameThatIsAlreadyFullIsRejected() throws Exception {
-        JsonNode created = post("/api/games", "{\"variant\":\"GUESSCHESS\",\"color\":\"WHITE\"}");
+        JsonNode created = post("/api/games", "{\"variant\":\"GUESSMATE\",\"color\":\"WHITE\"}");
         String gameId = created.get("gameId").asString();
         postRaw("/api/games/" + gameId + "/join", null);
 
@@ -124,7 +124,7 @@ class GameCreationControllerIntegrationTest {
      */
     @Test
     void joiningBroadcastsFullStateToSpectatorsAlreadyWatching() throws Exception {
-        JsonNode created = post("/api/games", "{\"variant\":\"GUESSCHESS\",\"color\":\"WHITE\"}");
+        JsonNode created = post("/api/games", "{\"variant\":\"GUESSMATE\",\"color\":\"WHITE\"}");
         String gameId = created.get("gameId").asString();
 
         WebSocketStompClient stompClient = new WebSocketStompClient(new StandardWebSocketClient());
@@ -172,7 +172,7 @@ class GameCreationControllerIntegrationTest {
         HttpClient cookieAwareClient = HttpClient.newBuilder().cookieHandler(new CookieManager()).build();
         HttpRequest createRequest = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/games"))
                 .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString("{\"variant\":\"GUESSCHESS\",\"color\":\"WHITE\"}"))
+                .POST(HttpRequest.BodyPublishers.ofString("{\"variant\":\"GUESSMATE\",\"color\":\"WHITE\"}"))
                 .build();
         HttpResponse<String> createResponse = cookieAwareClient.send(createRequest, HttpResponse.BodyHandlers.ofString());
         JsonNode created = objectMapper.readTree(createResponse.body());
@@ -190,7 +190,7 @@ class GameCreationControllerIntegrationTest {
 
     @Test
     void myAccessForAnIdentityNotLinkedToTheGameReturnsNotFound() throws Exception {
-        JsonNode created = post("/api/games", "{\"variant\":\"GUESSCHESS\",\"color\":\"WHITE\"}");
+        JsonNode created = post("/api/games", "{\"variant\":\"GUESSMATE\",\"color\":\"WHITE\"}");
         String gameId = created.get("gameId").asString();
 
         HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/games/" + gameId + "/my-access"))
@@ -224,7 +224,7 @@ class GameCreationControllerIntegrationTest {
 
     @Test
     void historyReturnsOnlyTheInitialBoardWhenNoRoundHasBeenResolvedYet() throws Exception {
-        JsonNode created = post("/api/games", "{\"variant\":\"GUESSCHESS\",\"color\":\"WHITE\"}");
+        JsonNode created = post("/api/games", "{\"variant\":\"GUESSMATE\",\"color\":\"WHITE\"}");
         String gameId = created.get("gameId").asString();
 
         HttpResponse<String> response = getRaw("/api/games/" + gameId + "/history");

@@ -6,7 +6,7 @@
 
 export type Color = 'WHITE' | 'BLACK'
 export type ColorLower = 'white' | 'black'
-export type GameVariant = 'GUESSCHESS' | 'NOGUESSMATE'
+export type GameVariant = 'GUESSCHESS' | 'GUESSMATE'
 export type GameStatus = 'ONGOING' | 'FINISHED'
 export type PieceType = 'PAWN' | 'KNIGHT' | 'BISHOP' | 'ROOK' | 'QUEEN' | 'KING'
 export type PromotionPieceType = Exclude<PieceType, 'PAWN' | 'KING'>
@@ -231,6 +231,8 @@ export interface GameStateMessage {
   mySubmission: MySubmissionMessage
   roundCount: number
   inCheck: boolean
+  /** Un seul coup encore devine correctement par sideToMove declencherait la nulle par "6 guess repetition". */
+  guessRepetitionImminent: boolean
   drawOfferedBy: Color | null
   rematchOfferedBy: Color | null
   rematchGameId: string | null

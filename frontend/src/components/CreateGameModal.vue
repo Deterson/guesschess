@@ -30,7 +30,7 @@ const color = ref<Color | 'RANDOM'>('RANDOM')
  */
 const guessmateOverride = ref<boolean | undefined>(undefined)
 const guessmate = computed({
-  get: () => guessmateOverride.value ?? props.defaultVariant === 'GUESSCHESS',
+  get: () => guessmateOverride.value ?? props.defaultVariant === 'GUESSMATE',
   set: (value: boolean) => {
     guessmateOverride.value = value
   },

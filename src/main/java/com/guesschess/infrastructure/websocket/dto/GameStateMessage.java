@@ -32,7 +32,10 @@ import java.util.List;
  * - correspondance, partie pas encore complete, ou terminee), et serverTimeMs
  * l'horodatage serveur de ce message : le frontend s'en sert pour corriger le decalage
  * avec son horloge locale et faire defiler l'affichage lui-meme, sans jamais faire
- * autorite (voir GameSnapshot).
+ * autorite (voir GameSnapshot). guessRepetitionImminent (voir GameSnapshot,
+ * Game.isGuessRepetitionImminent) indique qu'un seul coup encore devine correctement
+ * par sideToMove declencherait la nulle par "6 guess repetition" - permet au frontend
+ * d'avertir avant coup.
  */
 public record GameStateMessage(
         String gameId,
@@ -48,6 +51,7 @@ public record GameStateMessage(
         MySubmissionMessage mySubmission,
         int roundCount,
         boolean inCheck,
+        boolean guessRepetitionImminent,
         String drawOfferedBy,
         String rematchOfferedBy,
         String rematchGameId,

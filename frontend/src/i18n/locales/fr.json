@@ -10,7 +10,13 @@
     "emptySquareSuffix": "vide"
   },
   "footer": {
-    "piecesCredit": "Pièces d'échecs : Cburnett, CC BY-SA 3.0"
+    "piecesCredit": "Pièces d'échecs : Cburnett, CC BY-SA 3.0",
+    "creditsLink": "Crédits"
+  },
+  "credits": {
+    "creator": "Créateur du site",
+    "inventor": "Créateur du concept",
+    "thanks": "Créé avec Claude Code (Sonnet 5 effort élevé)"
   },
   "header": {
     "play": "Jouer",
@@ -37,6 +43,7 @@
     "resultWinTimeout": "Temps écoulé : victoire {winner}",
     "resultDrawGuessRepetition": "Partie terminée : nulle ({link})",
     "guessRepetitionLinkText": "6 guess repetition",
+    "guessRepetitionWarning": "Si vous bloquez encore le même coup, la règle du {link} s'appliquera.",
     "resultWinGuessmate": "{link} : victoire {winner}",
     "guessmateLinkText": "Guessmate",
     "waitingOpponentToStart": "En attente d'un adversaire",
@@ -160,11 +167,11 @@
     "example2Text": "Les blancs jouent e4, et les noirs devinent e4. La devinette est juste : le coup est annulé, c'est aux noirs de jouer.",
     "example3Title": "Guessmate",
     "example3TitleVariant": "Variante Guessmate",
-    "example3Text": "Si le joueur au trait est en échec et que son adversaire devine correctement son coup, le roi est mat par devinette (« guessmate »), et la partie se termine immédiatement.",
+    "example3Text": "On ne peut pas manger le roi adverse. Si le joueur au trait est en échec et que son adversaire devine correctement son coup, le roi est mat par devinette (« guessmate »), et la partie se termine immédiatement.",
     "example3Caption": "Ici, les blancs en échec tentent de fuir en Rf2 ; les noirs devinent Rf2 : le roi passe en échec et mat.",
     "noGuessmateVariantTitle": "Variante sans Guessmate",
     "endOfGameTitle": "Fin de partie",
-    "endOfGameText": "Le roi doit être mangé (ou maté) pour mettre fin à la partie. Deviner correctement le coup qui pare un échec ne met pas immédiatement fin à la partie, car le roi n'est pas encore mangé ni maté.",
+    "endOfGameText": "Le roi doit être mangé (ou maté) pour mettre fin à la partie. Si un seul coup permet de sortir d'un échec, le joueur mis en échec perd immédiatement la partie.",
     "guessRepetitionTitle": "6 guess repetition",
     "guessRepetitionText": "Si un même coup tenté par chaque camp est deviné correctement trois fois de suite par l'adversaire, sans qu'aucun coup ne soit réellement joué entre-temps, la partie est déclarée nulle. Cette règle évite qu'une paire de coups s'annule indéfiniment sans faire avancer la partie."
   },

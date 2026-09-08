@@ -24,8 +24,9 @@ onMounted(() => {
   <div class="flex min-h-screen flex-col">
     <AppHeader />
     <router-view class="flex-1" />
-    <footer class="py-4 text-center text-xs text-stone-500">
-      {{ t('footer.piecesCredit') }}
+    <footer class="flex flex-col items-center gap-1 py-4 text-center text-xs text-stone-500">
+      <span>{{ t('footer.piecesCredit') }}</span>
+      <router-link to="/credits" class="underline hover:text-stone-300">{{ t('footer.creditsLink') }}</router-link>
     </footer>
   </div>
 </template>

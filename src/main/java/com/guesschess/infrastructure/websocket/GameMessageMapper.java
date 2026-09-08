@@ -97,6 +97,7 @@ public class GameMessageMapper {
                 toMySubmissionMessage(mySubmission),
                 snapshot.roundCount(),
                 snapshot.inCheck(),
+                snapshot.guessRepetitionImminent(),
                 snapshot.drawOfferedBy() == null ? null : snapshot.drawOfferedBy().name(),
                 snapshot.rematchOfferedBy() == null ? null : snapshot.rematchOfferedBy().name(),
                 snapshot.rematchGameId() == null ? null : snapshot.rematchGameId().toString(),

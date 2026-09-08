@@ -25,7 +25,7 @@ class PggnParserTest {
                 [Date "?"]
                 [White "?"]
                 [Black "?"]
-                [Variant "GUESSCHESS"]
+                [Variant "GUESSMATE"]
                 [Result "*"]
                 [Termination "?"]
 
@@ -34,7 +34,7 @@ class PggnParserTest {
 
         PggnGame parsed = PggnParser.parse(text);
 
-        assertEquals("GUESSCHESS", parsed.tags().get("Variant"));
+        assertEquals("GUESSMATE", parsed.tags().get("Variant"));
         assertEquals("*", parsed.tags().get("Result"));
         assertEquals(3, parsed.plies().size());
 

@@ -29,6 +29,7 @@ const WIN_LABELS = computed<Record<Color, string>>(() => ({ WHITE: t('gameStatus
 
 const isGuessRepetitionDraw = computed(() => props.state.result != null && props.state.result.cause === 'DRAW_THREE_GUESS_REPETITION')
 const isGuessmate = computed(() => props.state.result != null && props.state.result.cause === 'CHECK_PARRY_GUESSED')
+const showGuessRepetitionWarning = computed(() => !props.state.result && props.state.guessRepetitionImminent)
 
 const guessmateWinnerLabel = computed(() => {
   const result = props.state.result
@@ -105,6 +106,11 @@ function acknowledge() {
     <p v-else-if="myRole === 'mover'"><strong>{{ t('gameStatusBar.yourTurnToPlay') }}</strong></p>
     <p v-else-if="myRole === 'guesser'"><strong>{{ t('gameStatusBar.yourTurnToGuess') }}</strong></p>
     <p v-else>{{ t('gameStatusBar.sideToMove', { side: TRAIT_LABELS[state.sideToMove] }) }}</p>
+    <i18n-t v-if="showGuessRepetitionWarning" keypath="gameStatusBar.guessRepetitionWarning" tag="p" class="text-xs text-amber-400">
+      <template #link>
+        <router-link to="/how-to-play#six-guess-repetition" class="underline hover:no-underline">{{ t('gameStatusBar.guessRepetitionLinkText') }}</router-link>
+      </template>
+    </i18n-t>
   </div>
 </template>
 

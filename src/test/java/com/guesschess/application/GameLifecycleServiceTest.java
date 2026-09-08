@@ -54,7 +54,7 @@ class GameLifecycleServiceTest {
     void createComputerGameLinksTheOppositeColorToAComputer() {
         PlayerRef human = new PlayerRef.Anonymous(AnonymousId.random());
 
-        CreatedGame created = service.createComputerGame(GameVariant.GUESSCHESS, null, Color.WHITE, human, ComputerLevel.HARD);
+        CreatedGame created = service.createComputerGame(GameVariant.GUESSMATE, null, Color.WHITE, human, ComputerLevel.HARD);
 
         GameAccess access = gameAccessRepository.findByGameId(created.gameId()).orElseThrow();
         assertEquals(human, access.whitePlayer());
@@ -70,7 +70,7 @@ class GameLifecycleServiceTest {
         PlayerRef human = new PlayerRef.Anonymous(AnonymousId.random());
 
         assertThrows(ComputerUnavailableException.class,
-                () -> serviceWithoutEngine.createComputerGame(GameVariant.GUESSCHESS, null, Color.WHITE, human, ComputerLevel.EASY));
+                () -> serviceWithoutEngine.createComputerGame(GameVariant.GUESSMATE, null, Color.WHITE, human, ComputerLevel.EASY));
     }
 
     @Test
@@ -220,7 +220,7 @@ class GameLifecycleServiceTest {
     void creatingAGameWithAChosenColorLinksOnlyThatColor() {
         PlayerRef creator = new PlayerRef.Account(UserId.random());
 
-        CreatedGame game = service.createGame(GameVariant.GUESSCHESS, Color.BLACK, creator);
+        CreatedGame game = service.createGame(GameVariant.GUESSMATE, Color.BLACK, creator);
 
         GameAccess access = gameAccessRepository.findByGameId(game.gameId()).orElseThrow();
         assertEquals(creator, access.playerOf(Color.BLACK));
@@ -229,7 +229,7 @@ class GameLifecycleServiceTest {
 
     @Test
     void joiningClaimsTheOnlyOpenColorAndReportsSuccess() {
-        CreatedGame game = service.createGame(GameVariant.GUESSCHESS, Color.WHITE, new PlayerRef.Anonymous(AnonymousId.random()));
+        CreatedGame game = service.createGame(GameVariant.GUESSMATE, Color.WHITE, new PlayerRef.Anonymous(AnonymousId.random()));
         PlayerRef opponent = new PlayerRef.Anonymous(AnonymousId.random());
 
         JoinResult result = service.joinGame(game.gameId(), opponent);
@@ -244,7 +244,7 @@ class GameLifecycleServiceTest {
 
     @Test
     void joiningAGameThatIsAlreadyFullIsRejected() {
-        CreatedGame game = service.createGame(GameVariant.GUESSCHESS, Color.WHITE, new PlayerRef.Anonymous(AnonymousId.random()));
+        CreatedGame game = service.createGame(GameVariant.GUESSMATE, Color.WHITE, new PlayerRef.Anonymous(AnonymousId.random()));
         service.joinGame(game.gameId(), new PlayerRef.Anonymous(AnonymousId.random()));
         PlayerRef thirdVisitor = new PlayerRef.Account(UserId.random());
 
@@ -260,7 +260,7 @@ class GameLifecycleServiceTest {
 
     @Test
     void findMyAccessRecoversTheTokenAndColorFromIdentityAlone() {
-        CreatedGame game = service.createGame(GameVariant.GUESSCHESS, Color.WHITE, new PlayerRef.Anonymous(AnonymousId.random()));
+        CreatedGame game = service.createGame(GameVariant.GUESSMATE, Color.WHITE, new PlayerRef.Anonymous(AnonymousId.random()));
         PlayerRef requester = new PlayerRef.Anonymous(AnonymousId.random());
         service.joinGame(game.gameId(), requester);
 
@@ -272,7 +272,7 @@ class GameLifecycleServiceTest {
 
     @Test
     void findMyAccessIsEmptyForAnIdentityNotLinkedToEitherColor() {
-        CreatedGame game = service.createGame(GameVariant.GUESSCHESS, Color.WHITE, new PlayerRef.Anonymous(AnonymousId.random()));
+        CreatedGame game = service.createGame(GameVariant.GUESSMATE, Color.WHITE, new PlayerRef.Anonymous(AnonymousId.random()));
         PlayerRef stranger = new PlayerRef.Account(UserId.random());
 
         assertTrue(service.findMyAccess(game.gameId(), stranger).isEmpty());
@@ -280,7 +280,7 @@ class GameLifecycleServiceTest {
 
     @Test
     void findMyAccessWithAnUnresolvedIdentityIsEmpty() {
-        CreatedGame game = service.createGame(GameVariant.GUESSCHESS, Color.WHITE, new PlayerRef.Anonymous(AnonymousId.random()));
+        CreatedGame game = service.createGame(GameVariant.GUESSMATE, Color.WHITE, new PlayerRef.Anonymous(AnonymousId.random()));
 
         assertTrue(service.findMyAccess(game.gameId(), null).isEmpty());
     }
@@ -302,7 +302,7 @@ class GameLifecycleServiceTest {
     @Test
     void listGamesForAccountReportsOngoingWithNoOpponentYet() {
         UserId creator = UserId.random();
-        CreatedGame game = service.createGame(GameVariant.GUESSCHESS, Color.WHITE, new PlayerRef.Account(creator));
+        CreatedGame game = service.createGame(GameVariant.GUESSMATE, Color.WHITE, new PlayerRef.Account(creator));
 
         GameLifecycleService.GameSummary summary = service.listGamesForAccount(creator, 0, 10).get(0);
 
@@ -316,7 +316,7 @@ class GameLifecycleServiceTest {
     void listGamesForAccountReportsWonAndLostFromEachSidesPerspective() {
         UserId whiteAccount = UserId.random();
         UserId blackAccount = UserId.random();
-        CreatedGame game = service.createGame(GameVariant.GUESSCHESS, Color.WHITE, new PlayerRef.Account(whiteAccount));
+        CreatedGame game = service.createGame(GameVariant.GUESSMATE, Color.WHITE, new PlayerRef.Account(whiteAccount));
         service.joinGame(game.gameId(), new PlayerRef.Account(blackAccount));
 
         // Fool's mate : mat en 4 demi-coups, gagne par les noirs.
@@ -340,7 +340,7 @@ class GameLifecycleServiceTest {
      * ainsi creee plutot que du bare service.createGame() (qui ne lie personne).
      */
     private CreatedGame createFullGame(PlayerRef whiteRequester, PlayerRef blackRequester) {
-        CreatedGame game = service.createGame(GameVariant.GUESSCHESS, Color.WHITE, whiteRequester);
+        CreatedGame game = service.createGame(GameVariant.GUESSMATE, Color.WHITE, whiteRequester);
         service.joinGame(game.gameId(), blackRequester);
         return game;
     }
@@ -390,7 +390,7 @@ class GameLifecycleServiceTest {
         PlayerRef whiteRequester = new PlayerRef.Account(UserId.random());
         PlayerRef blackRequester = new PlayerRef.Anonymous(AnonymousId.random());
         TimeControl timeControl = TimeControl.of(5, 2);
-        CreatedGame game = service.createGame(GameVariant.GUESSCHESS, timeControl, Color.WHITE, whiteRequester);
+        CreatedGame game = service.createGame(GameVariant.GUESSMATE, timeControl, Color.WHITE, whiteRequester);
         service.joinGame(game.gameId(), blackRequester);
         service.offerDraw(game.whiteToken(), whiteRequester);
         service.respondToDraw(game.blackToken(), true, blackRequester);

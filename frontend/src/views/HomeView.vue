@@ -69,7 +69,7 @@ async function create(authToken: string | null) {
   creating.value = true
   error.value = null
   try {
-    const variant = noGuessmate.value ? 'NOGUESSMATE' : 'GUESSCHESS'
+    const variant = noGuessmate.value ? 'GUESSCHESS' : 'GUESSMATE'
     const created = computerLevel.value
       ? await createComputerGame(variant, color.value, timeControl.value, computerLevel.value, authToken)
       : await createGame(variant, color.value, timeControl.value, authToken)
@@ -158,7 +158,7 @@ function openMyGames() {
 
     <AuthModal
       :open="showAuthModal"
-      :pending-action="{ type: 'create', variant: noGuessmate ? 'NOGUESSMATE' : 'GUESSCHESS', color, timeControl, computerLevel }"
+      :pending-action="{ type: 'create', variant: noGuessmate ? 'GUESSCHESS' : 'GUESSMATE', color, timeControl, computerLevel }"
       @anonymous="continueAnonymously"
       @close="showAuthModal = false"
     />

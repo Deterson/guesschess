@@ -92,7 +92,7 @@ Jeu d'échecs classique avec une règle additionnelle :
 - **OAuth** (Google/GitHub, etc.) : authentification, en plus ou à la place de comptes email/mot de passe classiques.
 - **Variante "devinette cachée"** (idée, pas encore développée) : le coup deviné ne serait jamais
   révélé à l'adversaire (seul le résultat annulé/non-annulé le serait), contrairement au
-  comportement actuel. S'ajouterait vraisemblablement à `GameVariant` (`GUESSCHESS`/`NOGUESSMATE`
+  comportement actuel. S'ajouterait vraisemblablement à `GameVariant` (`GUESSCHESS`/`GUESSMATE`
   existants), avec un impact à vérifier plus tard sur le format PGGN (qui note aujourd'hui le coup
   deviné entre parenthèses, voir étape 10) et sur l'affichage historique.
 
@@ -125,6 +125,13 @@ Jeu d'échecs classique avec une règle additionnelle :
 17. ⬜ IA « guess-aware » — le choix du coup réel de l'ordinateur doit tenir compte de la mécanique
     de devinette elle-même (pas seulement de l'évaluation d'échecs classique), pour exploiter les
     tactiques propres au guesschess plutôt que de les ignorer. Détail : [`src/CLAUDE.md`](src/CLAUDE.md).
+18. ⬜ Page admin — vue interne pour explorer tous les comptes joueurs et toutes les parties (pas
+    seulement les siennes), réservée à un rôle admin (accès restreint à définir, ex. liste
+    d'emails/logins autorisés). En attendant, lecture directe en base sur le Pi de prod : voir
+    "Consulter la base de prod" dans [`.github/CLAUDE.md`](.github/CLAUDE.md).
+19. ⬜ Backup de la base de données — sauvegarde quotidienne planifiée à 5h du matin, écrite sur le
+    disque dur externe (HDD) du Pi, **et** copiée quelque part en dehors du Raspberry Pi (pour
+    survivre à une panne matérielle ou un vol du Pi lui-même).
 
 ## Liaison compte/session ↔ partie (étapes 6-7)
 

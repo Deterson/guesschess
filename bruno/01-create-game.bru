@@ -44,13 +44,13 @@ body:ws {
     content-type:application/json
     content-length:25
 
-    {"variant":"GUESSCHESS"}
+    {"variant":"GUESSMATE"}
 
   '''
 }
 
 body:ws {
-  name: 4. SEND games.create (noguessmate)
+  name: 4. SEND games.create (guesschess)
   type: text
   content: '''
     SEND
@@ -58,7 +58,7 @@ body:ws {
     content-type:application/json
     content-length:25
 
-    {"variant":"NOGUESSMATE"}
+    {"variant":"GUESSCHESS"}
 
   '''
 }

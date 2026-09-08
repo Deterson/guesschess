@@ -46,7 +46,7 @@ class GameJpaMapperTest {
                 freshState.rematchGameId(),
                 null, null, 0L, 0L, null, null);
         GameEntity legacyEntity = new GameEntity(
-                UUID.randomUUID(), GameVariant.GUESSCHESS, GameStatus.ONGOING,
+                UUID.randomUUID(), GameVariant.GUESSMATE, GameStatus.ONGOING,
                 null, null, Color.WHITE, legacyState, null, Instant.now(), Instant.now());
 
         Game game = mapper.toDomain(legacyEntity);
@@ -78,7 +78,7 @@ class GameJpaMapperTest {
                 "clockRunningFor", "clockRunningSinceEpochMillis"));
         GameStateJson legacyState = converter.convertToEntityAttribute(rawMapper.writeValueAsString(legacyNode));
         GameEntity legacyEntity = new GameEntity(
-                UUID.randomUUID(), GameVariant.GUESSCHESS, GameStatus.ONGOING,
+                UUID.randomUUID(), GameVariant.GUESSMATE, GameStatus.ONGOING,
                 null, null, Color.WHITE, legacyState, null, Instant.now(), Instant.now());
 
         Game game = mapper.toDomain(legacyEntity);

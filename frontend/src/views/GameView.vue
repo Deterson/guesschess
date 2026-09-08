@@ -49,7 +49,37 @@ onUnmounted(() => {
   window.removeEventListener('beforeunload', onBeforeUnload)
   stopTabTitleBlink()
   if (resolvedGuessFlashTimeout) clearTimeout(resolvedGuessFlashTimeout)
+  if (connectionLostTimeout) clearTimeout(connectionLostTimeout)
 })
+
+/**
+ * La bannière "connexion perdue" n'apparaît qu'après un court délai de grâce plutôt
+ * qu'instantanément sur connectionStatus !== 'connected' : un onglet réveillé après
+ * une mise en veille (retour sur téléphone après plusieurs minutes) se reconnecte en
+ * général en une ou deux secondes, et afficher la bannière le temps de ce court
+ * aller-retour serait juste un flash inutile plutôt qu'une vraie coupure à signaler.
+ */
+const CONNECTION_LOST_DELAY_MS = 3000
+const showConnectionLostBanner = ref(false)
+let connectionLostTimeout: ReturnType<typeof setTimeout> | null = null
+watch(
+  connectionStatus,
+  (status) => {
+    if (connectionLostTimeout) {
+      clearTimeout(connectionLostTimeout)
+      connectionLostTimeout = null
+    }
+    if (status === 'connected') {
+      showConnectionLostBanner.value = false
+    } else {
+      connectionLostTimeout = setTimeout(() => {
+        showConnectionLostBanner.value = true
+        connectionLostTimeout = null
+      }, CONNECTION_LOST_DELAY_MS)
+    }
+  },
+  { immediate: true },
+)
 
 const pendingPromotion = ref<{ from: string; to: string; options: PromotionPieceType[] } | null>(null)
 const hoveredGuess = ref(false)
@@ -592,7 +622,7 @@ function onPromotionSelected(promotion: PromotionPieceType) {
               </button>
             </div>
 
-            <div v-if="connectionStatus !== 'connected'" class="mb-4 rounded-lg bg-amber-900/60 px-4 py-3 text-sm text-amber-100">
+            <div v-if="showConnectionLostBanner" class="mb-4 rounded-lg bg-amber-900/60 px-4 py-3 text-sm text-amber-100">
               {{ t('game.connectionLostReconnecting') }}
             </div>
 

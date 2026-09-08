@@ -72,7 +72,7 @@ class GameMementoTest {
     @Test
     void timedGameWithARunningClockSurvivesARoundTrip() {
         TimeControl timeControl = TimeControl.of(5, 3);
-        Game original = Game.newGame(GameId.random(), GameVariant.GUESSCHESS, timeControl);
+        Game original = Game.newGame(GameId.random(), GameVariant.GUESSMATE, timeControl);
         play(original, "e2", "e4"); // round 1, gratuit - fait passer le trait (et la pendule) a BLACK
         original.submitMove(findMove(original.legalMoves(), "e7", "e5")); // round 2 : la pendule tourne pour de vrai
 

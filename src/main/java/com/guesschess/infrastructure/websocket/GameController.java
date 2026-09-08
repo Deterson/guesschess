@@ -92,7 +92,7 @@ public class GameController {
     public CreateGameResponse createGame(@Payload(required = false) CreateGameRequest request,
                                           @Header(value = "simpSessionAttributes", required = false) Map<String, Object> sessionAttributes) {
         GameVariant variant = request == null || request.variant() == null
-                ? GameVariant.GUESSCHESS
+                ? GameVariant.GUESSMATE
                 : GameVariant.valueOf(request.variant());
         PlayerRef requester = WebSocketPlayerIdentity.resolve(sessionAttributes);
         CreatedGame created = requester == null

@@ -217,7 +217,7 @@ class GameGuessingTest {
 
     @Test
     void correctlyGuessingTheEscapeFromCheckLeavesTheKingInCheckAndPassesTheTurn() {
-        Game game = Game.fromPosition(checkWithSingleEscapePosition(), GameVariant.NOGUESSMATE);
+        Game game = Game.fromPosition(checkWithSingleEscapePosition(), GameVariant.GUESSCHESS);
         assertTrue(game.isInCheck());
         assertEquals(List.of(Position.fromAlgebraic("b1")),
                 game.legalMoves().stream().map(Move::to).toList());
@@ -244,7 +244,7 @@ class GameGuessingTest {
 
     @Test
     void guesserCanChooseNotToCaptureTheHangingKing() {
-        Game game = Game.fromPosition(checkWithSingleEscapePosition(), GameVariant.NOGUESSMATE);
+        Game game = Game.fromPosition(checkWithSingleEscapePosition(), GameVariant.GUESSCHESS);
         Move escape = findMove(game.legalMoves(), "a1", "b1");
         game.submitGuess(escape);
         game.submitMove(escape);
@@ -270,7 +270,7 @@ class GameGuessingTest {
 
     @Test
     void freeKingCaptureCanItselfBeGuessedAndCancelled() {
-        Game game = Game.fromPosition(checkWithSingleEscapePosition(), GameVariant.NOGUESSMATE);
+        Game game = Game.fromPosition(checkWithSingleEscapePosition(), GameVariant.GUESSCHESS);
         Move escape = findMove(game.legalMoves(), "a1", "b1");
         game.submitGuess(escape);
         game.submitMove(escape);
@@ -288,7 +288,7 @@ class GameGuessingTest {
 
     @Test
     void guessmateVariantEndsTheGameInstantlyWhenTheCheckEscapeIsGuessedCorrectly() {
-        Game game = Game.fromPosition(checkWithSingleEscapePosition(), GameVariant.GUESSCHESS);
+        Game game = Game.fromPosition(checkWithSingleEscapePosition(), GameVariant.GUESSMATE);
         Move escape = findMove(game.legalMoves(), "a1", "b1");
         game.submitGuess(escape);
 
@@ -304,7 +304,7 @@ class GameGuessingTest {
 
     @Test
     void guessmateVariantBehavesLikeNoGuessmateWhenTheCorrectGuessIsNotAboutParryingCheck() {
-        Game game = Game.newGame(GameVariant.GUESSCHESS);
+        Game game = Game.newGame(GameVariant.GUESSMATE);
         Move e4 = findMove(game.legalMoves(), "e2", "e4");
         game.submitGuess(e4);
 

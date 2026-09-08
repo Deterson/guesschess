@@ -1,18 +1,18 @@
 ne rien implémenter dans ce TODO à moins que cela ait été explicitement demandé
 
-
-
-- Alex a raison, guessmate c'est de la merde. En faire une variante, garder l'autre
-
+- utiliser HeidiSQL
 
 --- BACK
-- garder la possibilité d'en passant si c'est le dernier coup effectif (mon pion avance de 2 et peut être pris en passant, je guess le coup de mon adversaire, il guess mon coup, le plateau est dans le même état qu'avant et mon pion devrait toujours être pris en passant, mais ce n'est pas le cas)
+- Un backup des données (step chéplucombien)
 - réfléchir au volume des données : quelle taille fait une partie dans la db ? imaginons que 10 000 joueurs jouent une partie par jour, combien de Mo par jour ?
 - protéger contre les abus (empêcher de créer 1000000 de parties, empêcher de spammer de coups en mode DDoS)
 - enlever de la verbosité des commentaires dans le back
 - avoir des tests E2E avec Cypress playwright etc
 
 --- FRONT
+- "Parties en live"
+- changelog
+- en no-guessmate, si un échec n'a qu'un coup pour s'en sortir, faire gagner immédiatement la personne qui a mis en échec ?
 - les boutons radio sont moches ("niveau", "votre couleur", "cadence" etc si tu en trouves d'autres), j'aimerais un style généralisé à tout le site, de "button style radio group" ou "segmented control" plutôt que des coches rondes radio moches
 - le chat devrait partir du bas de la div qui est à gauche du board, et la textarea devrait être en bas sans bouger, les messages apparaîtraient en remontant, comme twitch
 - proposer de changer de style (change la couleur des cases, et adapte les couleurs du code couleur des coups joués / devinés sur les parties ET dans le tutoriel)

@@ -10,7 +10,13 @@
     "emptySquareSuffix": "empty"
   },
   "footer": {
-    "piecesCredit": "Chess pieces: Cburnett, CC BY-SA 3.0"
+    "piecesCredit": "Chess pieces: Cburnett, CC BY-SA 3.0",
+    "creditsLink": "Credits"
+  },
+  "credits": {
+    "creator": "Site creator",
+    "inventor": "Concept inventor",
+    "thanks": "Created with Claude Code (Sonnet 5 High effort)"
   },
   "header": {
     "play": "Play",
@@ -37,6 +43,7 @@
     "resultWinTimeout": "Time's up: {winner} win",
     "resultDrawGuessRepetition": "Game over: draw ({link})",
     "guessRepetitionLinkText": "6 guess repetition",
+    "guessRepetitionWarning": "If you block the same move again, the {link} rule will apply.",
     "resultWinGuessmate": "{link}: {winner} win",
     "guessmateLinkText": "Guessmate",
     "waitingOpponentToStart": "Waiting for an opponent.",

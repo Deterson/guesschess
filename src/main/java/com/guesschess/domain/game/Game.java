@@ -34,14 +34,14 @@ import java.util.Optional;
  * passe au devineur sans qu'aucune piece ne bouge ; devinette fausse ou absente ->
  * coup joue normalement.
  *
- * Cas particulier (variante NOGUESSMATE, la regle de base - voir GameVariant) : si le
+ * Cas particulier (variante GUESSCHESS, la regle de base - voir GameVariant) : si le
  * coup annule etait la parade a un echec, le roi reste en echec et le trait passe
  * quand meme au devineur, qui a alors normalement acces au coup capturant ce roi
  * parmi ses coups legaux. C'est un coup comme un autre : rien n'oblige le devineur a
  * le jouer, et lui-meme peut se faire deviner. Si personne ne capture jamais, la
  * regle de repetition finit par forcer la nulle.
  *
- * Variante GUESSCHESS (par defaut) : dans ce meme cas particulier (devinette correcte
+ * Variante GUESSMATE (par defaut) : dans ce meme cas particulier (devinette correcte
  * du coup qui parait un echec), la partie se termine immediatement, victoire du
  * devineur, plutot que de simplement annuler le coup et attendre une capture
  * ulterieure du roi.
@@ -183,7 +183,7 @@ public final class Game {
     }
 
     public static Game newGame() {
-        return newGame(GameId.random(), GameVariant.GUESSCHESS);
+        return newGame(GameId.random(), GameVariant.GUESSMATE);
     }
 
     public static Game newGame(GameVariant variant) {
@@ -191,7 +191,7 @@ public final class Game {
     }
 
     public static Game newGame(GameId id) {
-        return newGame(id, GameVariant.GUESSCHESS);
+        return newGame(id, GameVariant.GUESSMATE);
     }
 
     public static Game newGame(GameId id, GameVariant variant) {
@@ -203,7 +203,7 @@ public final class Game {
     }
 
     public static Game fromPosition(Board board) {
-        return fromPosition(GameId.random(), board, GameVariant.GUESSCHESS);
+        return fromPosition(GameId.random(), board, GameVariant.GUESSMATE);
     }
 
     public static Game fromPosition(Board board, GameVariant variant) {
@@ -211,7 +211,7 @@ public final class Game {
     }
 
     public static Game fromPosition(GameId id, Board board) {
-        return fromPosition(id, board, GameVariant.GUESSCHESS);
+        return fromPosition(id, board, GameVariant.GUESSMATE);
     }
 
     public static Game fromPosition(GameId id, Board board, GameVariant variant) {
@@ -454,6 +454,31 @@ public final class Game {
         return CheckDetector.isInCheck(board, color);
     }
 
+    /**
+     * Vrai quand un unique coup reellement joue puis devine correctement par
+     * sideToMove() suffirait a declencher la nulle par "6 guess repetition" (voir
+     * whiteGuessedMoveStreak/blackGuessedMoveStreak) : son propre compteur est a
+     * GUESS_REPETITION_LIMIT_PER_SIDE - 1 (encore un coup identique devine correctement
+     * l'amenerait au seuil) et celui de l'adversaire a deja atteint le seuil. Sert
+     * uniquement a avertir le frontend avant coup, pas a la resolution elle-meme (voir
+     * resolveGameEnd).
+     */
+    public boolean isGuessRepetitionImminent() {
+        if (status != GameStatus.ONGOING) {
+            return false;
+        }
+        int moverStreak = guessedMoveStreakFor(sideToMove());
+        int opponentStreak = guessedMoveStreakFor(sideToMove().opposite());
+        return moverStreak >= GUESS_REPETITION_LIMIT_PER_SIDE - 1 && opponentStreak >= GUESS_REPETITION_LIMIT_PER_SIDE;
+    }
+
+    private int guessedMoveStreakFor(Color color) {
+        return switch (color) {
+            case WHITE -> whiteGuessedMoveStreak;
+            case BLACK -> blackGuessedMoveStreak;
+        };
+    }
+
     public List<Move> legalMoves() {
         if (status != GameStatus.ONGOING) {
             return List.of();
@@ -622,7 +647,7 @@ public final class Game {
 
         RoundResult roundResult;
         if (guessedCorrectly) {
-            if (variant == GameVariant.GUESSCHESS && moverWasInCheck) {
+            if (variant == GameVariant.GUESSMATE && moverWasInCheck) {
                 finish(GameResult.win(guesser, GameResultCause.CHECK_PARRY_GUESSED));
             } else {
                 cancelRound(mover, actualMove);

@@ -78,9 +78,9 @@
   statique, aucun backend. Réutilise `ChessBoard.vue` en `disabled` avec des positions codées en
   dur. Trois exemples via les props de surbrillance existantes de `ChessBoard` (devinette
   incorrecte, devinette correcte, Guessmate). Depuis le feature flag `guesschess.default-variant`
-  (étape 16), la page s'adapte : si NOGUESSMATE est la variante par défaut, la section Guessmate
+  (étape 16), la page s'adapte : si GUESSCHESS est la variante par défaut, la section Guessmate
   est présentée comme une variante (titre "Variante Guessmate", pas d'encart violet) précédée
-  d'une section "Fin de partie" expliquant la règle par défaut ; si GUESSCHESS (défaut d'origine),
+  d'une section "Fin de partie" expliquant la règle par défaut ; si GUESSMATE (défaut d'origine),
   comportement inchangé (Guessmate présenté comme seule variante, encart violet vers la variante
   sans Guessmate).
 - **Étape 15 — Jouer contre l'ordinateur** : bouton dédié sous "Créer une partie" (`HomeView.vue`),

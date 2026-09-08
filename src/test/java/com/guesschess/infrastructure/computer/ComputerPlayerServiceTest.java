@@ -58,7 +58,7 @@ class ComputerPlayerServiceTest {
         // Humain aux noirs : l'ordinateur (blancs) est au trait des le round 1, donc
         // devra soumettre son propre coup sans attendre aucune action humaine.
         CreatedGame created = gameLifecycleService.createComputerGame(
-                com.guesschess.domain.game.GameVariant.GUESSCHESS, null, Color.BLACK, human, ComputerLevel.EASY);
+                com.guesschess.domain.game.GameVariant.GUESSMATE, null, Color.BLACK, human, ComputerLevel.EASY);
         GameId gameId = created.gameId();
         GameAccess access = gameAccessRepository.findByGameId(gameId).orElseThrow();
 
@@ -86,7 +86,7 @@ class ComputerPlayerServiceTest {
     void computerFallsBackToALegalMoveWhenTheEngineFailsInsteadOfLeavingTheRoundStuck() {
         PlayerRef human = new PlayerRef.Anonymous(new AnonymousId(UUID.randomUUID()));
         CreatedGame created = gameLifecycleService.createComputerGame(
-                com.guesschess.domain.game.GameVariant.GUESSCHESS, null, Color.BLACK, human, ComputerLevel.EASY);
+                com.guesschess.domain.game.GameVariant.GUESSMATE, null, Color.BLACK, human, ComputerLevel.EASY);
         GameId gameId = created.gameId();
         GameAccess access = gameAccessRepository.findByGameId(gameId).orElseThrow();
 
@@ -105,7 +105,7 @@ class ComputerPlayerServiceTest {
     void onRoundStartedDoesNothingForAHumanVsHumanGame() {
         PlayerRef white = new PlayerRef.Anonymous(new AnonymousId(UUID.randomUUID()));
         PlayerRef black = new PlayerRef.Anonymous(new AnonymousId(UUID.randomUUID()));
-        CreatedGame created = gameLifecycleService.createGame(com.guesschess.domain.game.GameVariant.GUESSCHESS, null, Color.WHITE, white);
+        CreatedGame created = gameLifecycleService.createGame(com.guesschess.domain.game.GameVariant.GUESSMATE, null, Color.WHITE, white);
         gameAccessRepository.linkPlayer(created.gameId(), Color.BLACK, black);
 
         computerPlayerService.onRoundStarted(created.gameId());

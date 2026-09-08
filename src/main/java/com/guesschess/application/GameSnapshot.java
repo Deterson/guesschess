@@ -30,7 +30,11 @@ import java.util.List;
  * cet historique sur chaque message d'etat. inCheck indique si sideToMove est
  * actuellement en echec sur board (Game.isInCheck(), toujours false si la partie
  * n'est plus ONGOING) - permet au frontend de surligner le roi concerne sans
- * dupliquer la detection d'echec cote client. Les champs de pendule (etape 12,
+ * dupliquer la detection d'echec cote client. guessRepetitionImminent indique qu'un
+ * seul coup encore devine correctement par sideToMove suffirait a declencher la nulle
+ * par "6 guess repetition" (Game.isGuessRepetitionImminent) - permet au frontend
+ * d'avertir avant coup plutot que de laisser la nulle surprendre. Les champs de
+ * pendule (etape 12,
  * timeControl null = correspondance) portent l'etat brut de l'agregat, jamais un
  * "temps restant a l'instant present" precalcule : le frontend derive lui-meme
  * l'affichage en continu a partir de clockRunningSince et d'un horodatage serveur
@@ -49,6 +53,7 @@ public record GameSnapshot(
         List<Game.PlayedMove> playedMoveHistory,
         int roundCount,
         boolean inCheck,
+        boolean guessRepetitionImminent,
         Color drawOfferedBy,
         Color rematchOfferedBy,
         GameId rematchGameId,
@@ -72,6 +77,7 @@ public record GameSnapshot(
                 game.playedMoveHistory(),
                 game.roundHistory().size(),
                 game.isInCheck(),
+                game.isGuessRepetitionImminent(),
                 game.drawOfferedBy(),
                 game.rematchOfferedBy(),
                 game.rematchGameId(),

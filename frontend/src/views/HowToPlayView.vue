@@ -14,7 +14,7 @@ const { t } = useI18n()
  * defaut (voir CLAUDE.md, "Guessmate presente comme seule variante").
  */
 const defaultVariant = ref<GameVariant>('GUESSCHESS')
-const isGuessmateDefault = computed(() => defaultVariant.value === 'GUESSCHESS')
+const isGuessmateDefault = computed(() => defaultVariant.value === 'GUESSMATE')
 
 onMounted(async () => {
   try {
@@ -80,7 +80,7 @@ const example2Guess = { from: 'e2', to: 'e4' }
 
 // Exemple 3 : Guessmate - les blancs sont en échec, le coup annulé (Rf2) n'est donc
 // jamais réellement joué sur le plateau : le roi reste en échec sur sa case de départ,
-// la partie se termine directement (voir Game.java, cas GUESSCHESS + moverWasInCheck).
+// la partie se termine directement (voir Game.java, cas GUESSMATE + moverWasInCheck).
 const example3Board = withChanges(emptyBoard(), { e1: 'wK', e8: 'bR', g8: 'bK' })
 const example3LastRound: RoundSummaryMessage = {
   mover: 'WHITE',

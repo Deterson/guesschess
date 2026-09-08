@@ -55,3 +55,20 @@ propriétaire — voici ce qu'il faut savoir pour s'y connecter depuis une sessi
   projet ou un autre dossier) sans le redescendre (`down`) ensuite — deux stacks se disputant les
   ports 80/443 ont déjà cassé un déploiement en laissant un conteneur avec une interface réseau
   jamais attachée.
+
+## Consulter la base de prod (comptes, parties)
+
+En attendant la page admin (étape 18), lecture directe via le conteneur Postgres de prod
+(`guesschess-postgres-1`, distinct de `postgres-dev` sur la VM de dev) :
+
+```bash
+ssh -i ~/.ssh/id_ed25519_guesschess_pi deterson@192.168.1.28 \
+  "docker exec guesschess-postgres-1 psql -U guesschess -d guesschess -c \"select login, display_name, email, created_at from users order by created_at desc limit 30;\""
+```
+
+```bash
+ssh -i ~/.ssh/id_ed25519_guesschess_pi deterson@192.168.1.28 \
+  "docker exec guesschess-postgres-1 psql -U guesschess -d guesschess -c \"select g.id, g.status, g.result_winner, g.result_cause, ga.white_player_type, ga.black_player_type, g.updated_at from games g left join game_access ga on ga.game_id = g.id order by g.updated_at desc limit 30;\""
+```
+
+Requête en lecture seule uniquement — ne jamais `UPDATE`/`DELETE` à la main sur cette base.

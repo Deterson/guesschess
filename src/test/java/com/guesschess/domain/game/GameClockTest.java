@@ -199,7 +199,7 @@ class GameClockTest {
     }
 
     private static Game timedGame(int baseMinutes, int incrementSeconds) {
-        return Game.newGame(GameId.random(), GameVariant.GUESSCHESS, TimeControl.of(baseMinutes, incrementSeconds));
+        return Game.newGame(GameId.random(), GameVariant.GUESSMATE, TimeControl.of(baseMinutes, incrementSeconds));
     }
 
     private static Move findMove(List<Move> moves, String from, String to) {
