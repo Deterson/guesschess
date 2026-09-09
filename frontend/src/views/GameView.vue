@@ -146,6 +146,9 @@ watch(
   { immediate: true },
 )
 
+/** Étape 16 : pas de chat contre l'ordinateur (aucun interlocuteur côté adverse). */
+const isVsComputer = computed(() => players.value?.white?.type === 'COMPUTER' || players.value?.black?.type === 'COMPUTER')
+
 const topPlayer = computed(() => {
   const orientation = myColor.value ?? 'white'
   return orientation === 'white' ? players.value?.black ?? null : players.value?.white ?? null
@@ -599,7 +602,7 @@ function onPromotionSelected(promotion: PromotionPieceType) {
           plateau) qui repoussait sinon le chat tout en bas de la colonne au lieu de
           le laisser suivre immediatement le texte de statut.
         -->
-        <div class="contents @min-[67rem]:block @min-[67rem]:col-start-1">
+        <div class="contents @min-[67rem]:flex @min-[67rem]:h-full @min-[67rem]:flex-col @min-[67rem]:col-start-1">
           <div class="order-1 mx-auto w-full max-w-xl @min-[67rem]:order-none @min-[67rem]:mx-0 @min-[67rem]:max-w-none">
             <InviteBanner v-if="showInvite" :game-id="gameId" @dismiss="inviteDismissed = true" />
 
@@ -639,15 +642,11 @@ function onPromotionSelected(promotion: PromotionPieceType) {
             </div>
           </div>
 
-          <div class="order-3 mx-auto w-full max-w-xl @min-[67rem]:order-none @min-[67rem]:mx-0 @min-[67rem]:max-w-none">
+          <div
+            v-if="!isVsComputer"
+            class="order-3 mx-auto w-full max-w-xl @min-[67rem]:order-none @min-[67rem]:mx-0 @min-[67rem]:min-h-0 @min-[67rem]:max-w-none @min-[67rem]:flex-1"
+          >
             <ChatPanel :messages="chatMessages" :can-send="Boolean(myColor) && canAct" @send="gameStore.sendChat" />
-
-            <p v-if="myColor && !authStore.isLoggedIn" class="mt-2 text-center text-xs text-stone-500">
-              <button type="button" class="underline hover:text-stone-400" @click="showLoginModal = true">
-                {{ t('game.anonymousAccessReminderLink') }}
-              </button>
-              {{ t('game.anonymousAccessReminderSuffix') }}
-            </p>
           </div>
         </div>
 
@@ -685,6 +684,13 @@ function onPromotionSelected(promotion: PromotionPieceType) {
             :clock-running="bottomClock.clockRunning"
             :urgent="bottomClock.urgent"
           />
+
+          <p v-if="myColor && !authStore.isLoggedIn" class="-mt-3 text-center text-xs text-stone-500">
+            <button type="button" class="underline hover:text-stone-400" @click="showLoginModal = true">
+              {{ t('game.anonymousAccessReminderLink') }}
+            </button>
+            {{ t('game.anonymousAccessReminderSuffix') }}
+          </p>
 
           <GameStatusBar
             class="w-full"

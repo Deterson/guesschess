@@ -38,10 +38,10 @@ watch(
 </script>
 
 <template>
-  <div class="flex flex-col gap-2 rounded-lg bg-stone-800 px-4 py-3 text-sm">
+  <div class="flex h-full min-h-64 flex-col gap-2 rounded-lg bg-stone-800 px-4 py-3 text-sm">
     <p class="font-semibold text-stone-300">{{ t('chat.title') }}</p>
 
-    <div ref="listEl" class="flex max-h-56 min-h-16 flex-col gap-1 overflow-y-auto text-stone-300">
+    <div ref="listEl" class="flex min-h-0 flex-1 flex-col justify-end gap-1 overflow-y-auto text-stone-300">
       <p v-if="messages.length === 0" class="text-stone-500">{{ t('chat.empty') }}</p>
       <p v-for="(message, index) in messages" :key="index">
         <span
