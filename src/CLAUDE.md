@@ -217,6 +217,13 @@ tout court (échec rapide voulu au boot Spring, pas seulement au moment du login
   Corrigé : `StockfishChessEngine` retente une fois avec un process frais avant d'abandonner, et
   `ComputerPlayerService` retombe sur un coup légal aléatoire si le moteur échoue quand même -
   dégrade la qualité d'un seul coup plutôt que de bloquer la partie.
+  **Piège rencontré (corrigé)** : en variante GUESSCHESS (sans Guessmate), quand l'ordinateur
+  devine (n'est pas au trait) et que son propre roi est resté en échec non résolu suite à une
+  devinette adverse correcte au round précédent (voir `Game.resolveRound`/`applyRealMove`), les
+  coups légaux de l'adversaire incluent une capture de ce roi - Stockfish ne connaît pas cette
+  notion et ne la propose donc jamais comme devinette. `ComputerPlayerService` court-circuite
+  désormais le moteur dans ce cas précis : devine immédiatement ce coup (au hasard s'il y en a
+  plusieurs), sans même interroger `ChessEngine`.
   **Piège rencontré (dev local)** : `.env` sourcé par `source .env` (bash) - un chemin Windows avec
   antislashs (`C:\Users\...`) non quoté se fait manger ses antislashs par bash (`\U`, `\d`... sont
   interpretes comme de l'echappement, silencieusement supprimes), rendant le chemin invalide sans
