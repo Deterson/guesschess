@@ -14,6 +14,7 @@ import com.guesschess.domain.game.GameId;
 import com.guesschess.domain.game.GameStatus;
 import com.guesschess.domain.move.Move;
 import com.guesschess.domain.piece.Color;
+import com.guesschess.domain.piece.PieceType;
 import com.guesschess.infrastructure.websocket.GameBroadcastService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -81,12 +82,14 @@ public class ComputerPlayerService {
         List<Move> legalMoves = snapshot.legalMoves();
 
         Thread.ofVirtual().name("computer-player-" + gameId).start(
-                () -> act(gameId, token, computerIsMover, board, legalMoves, level));
+                () -> act(gameId, token, computerIsMover, computerColor, board, legalMoves, level));
     }
 
-    private void act(GameId gameId, PlayerToken token, boolean computerIsMover, Board board,
-                      List<Move> legalMoves, ComputerLevel level) {
-        Move chosen = chooseMoveOrFallback(gameId, board, legalMoves, level);
+    private void act(GameId gameId, PlayerToken token, boolean computerIsMover, Color computerColor,
+                      Board board, List<Move> legalMoves, ComputerLevel level) {
+        Move chosen = computerIsMover
+                ? chooseMoveOrFallback(gameId, board, legalMoves, level)
+                : guessKingCaptureOrFallback(gameId, computerColor, board, legalMoves, level);
         try {
             MoveIntent intent = chosen.promotionType() == null
                     ? MoveIntent.of(chosen.from(), chosen.to())
@@ -101,6 +104,33 @@ public class ComputerPlayerService {
         } catch (Exception e) {
             log.error("computer player failed to act for game {}", gameId, e);
         }
+    }
+
+    /**
+     * Devinette de l'ordinateur : parmi les coups legaux de l'adversaire au trait
+     * (voir ChessEngine), un coup qui capture le roi de l'ordinateur lui-meme peut
+     * exister - cas du round suivant une devinette adverse correcte alors que
+     * l'ordinateur etait en echec (voir Game.resolveRound/applyRealMove, variante
+     * GUESSCHESS sans Guessmate : le coup reel annule laisse le roi en echec non
+     * resolu, et l'adversaire devient alors joueur au trait avec ce coup de capture
+     * parmi ses coups legaux). Stockfish ne considere jamais ce coup comme LA reponse
+     * a deviner (la capture du roi n'existe pas dans son modele des echecs classiques),
+     * donc sans ce raccourci l'ordinateur ne devine jamais ce coup, meme quand c'est
+     * objectivement la seule devinette qui sauve la partie. Priorite absolue sur
+     * l'evaluation du moteur des qu'un tel coup existe ; hasard si plusieurs pieces
+     * peuvent capturer ce roi.
+     */
+    private Move guessKingCaptureOrFallback(GameId gameId, Color computerColor, Board board,
+                                             List<Move> legalMoves, ComputerLevel level) {
+        List<Move> kingCaptures = legalMoves.stream()
+                .filter(move -> move.isCapture()
+                        && move.capturedPiece().type() == PieceType.KING
+                        && move.capturedPiece().color() == computerColor)
+                .toList();
+        if (!kingCaptures.isEmpty()) {
+            return kingCaptures.get(ThreadLocalRandom.current().nextInt(kingCaptures.size()));
+        }
+        return chooseMoveOrFallback(gameId, board, legalMoves, level);
     }
 
     /**

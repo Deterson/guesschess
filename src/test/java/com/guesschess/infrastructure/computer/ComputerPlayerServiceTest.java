@@ -6,11 +6,19 @@ import com.guesschess.application.GameAccessRepository;
 import com.guesschess.application.GameLifecycleService;
 import com.guesschess.application.GameSnapshot;
 import com.guesschess.application.PlayerRef;
+import com.guesschess.application.PlayerToken;
 import com.guesschess.application.computer.ComputerLevel;
 import com.guesschess.application.computer.FakeChessEngine;
 import com.guesschess.domain.account.AnonymousId;
+import com.guesschess.domain.board.Board;
+import com.guesschess.domain.board.Position;
+import com.guesschess.domain.game.Game;
 import com.guesschess.domain.game.GameId;
+import com.guesschess.domain.game.GameVariant;
+import com.guesschess.domain.move.Move;
 import com.guesschess.domain.piece.Color;
+import com.guesschess.domain.piece.Piece;
+import com.guesschess.domain.piece.PieceType;
 import com.guesschess.infrastructure.persistence.InMemoryGameAccessRepository;
 import com.guesschess.infrastructure.persistence.InMemoryGameRepository;
 import com.guesschess.infrastructure.websocket.GameBroadcastService;
@@ -18,6 +26,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.UUID;
 
 import static org.awaitility.Awaitility.await;
@@ -38,6 +47,7 @@ import static org.mockito.Mockito.verify;
 class ComputerPlayerServiceTest {
 
     private GameAccessRepository gameAccessRepository;
+    private InMemoryGameRepository gameRepository;
     private GameLifecycleService gameLifecycleService;
     private FakeChessEngine chessEngine;
     private GameBroadcastService gameBroadcastService;
@@ -46,8 +56,9 @@ class ComputerPlayerServiceTest {
     @BeforeEach
     void setUp() {
         gameAccessRepository = new InMemoryGameAccessRepository();
+        gameRepository = new InMemoryGameRepository();
         chessEngine = new FakeChessEngine();
-        gameLifecycleService = new GameLifecycleService(new InMemoryGameRepository(), gameAccessRepository, chessEngine);
+        gameLifecycleService = new GameLifecycleService(gameRepository, gameAccessRepository, chessEngine);
         gameBroadcastService = mock(GameBroadcastService.class);
         computerPlayerService = new ComputerPlayerService(gameLifecycleService, gameAccessRepository, chessEngine, gameBroadcastService);
     }
@@ -102,6 +113,47 @@ class ComputerPlayerServiceTest {
     }
 
     @Test
+    void computerImmediatelyGuessesAMoveThatWouldCaptureItsOwnHangingKingInsteadOfAskingTheEngine() {
+        // Roi blanc en a1, en echec par la tour noire (a8), seul coup blanc legal
+        // Ra1-b1 (voir GameGuessingTest.checkWithSingleEscapePosition). Devine
+        // correctement puis annule : le roi blanc reste en echec non resolu, le trait
+        // passe aux noirs, qui ont alors Ra8xa1 parmi leurs coups legaux (voir
+        // GameGuessingTest.correctlyGuessingTheEscapeFromCheckLeavesTheKingInCheckAndPassesTheTurn).
+        GameId gameId = GameId.random();
+        Board position = Board.empty()
+                .withPiece(Position.fromAlgebraic("a1"), Piece.of(PieceType.KING, Color.WHITE))
+                .withPiece(Position.fromAlgebraic("a8"), Piece.of(PieceType.ROOK, Color.BLACK))
+                .withPiece(Position.fromAlgebraic("d3"), Piece.of(PieceType.KNIGHT, Color.BLACK))
+                .withPiece(Position.fromAlgebraic("h8"), Piece.of(PieceType.KING, Color.BLACK));
+        Game game = Game.fromPosition(gameId, position, GameVariant.GUESSCHESS);
+        Move escape = findMove(game.legalMoves(), "a1", "b1");
+        game.submitGuess(escape);
+        game.submitMove(escape);
+        gameRepository.insert(game);
+
+        PlayerToken whiteToken = PlayerToken.random();
+        PlayerToken blackToken = PlayerToken.random();
+        GameAccess access = new GameAccess(gameId, whiteToken, blackToken)
+                .withPlayerLinked(Color.WHITE, new PlayerRef.Computer(ComputerLevel.EASY))
+                .withPlayerLinked(Color.BLACK, new PlayerRef.Anonymous(new AnonymousId(UUID.randomUUID())));
+        gameAccessRepository.save(access);
+
+        // Le moteur choisirait un tout autre coup s'il etait consulte - il ne doit
+        // meme pas etre appele des lors qu'une capture du roi blanc est disponible.
+        Move harmless = findMove(game.legalMoves(), "h8", "h7");
+        Move captureKing = findMove(game.legalMoves(), "a8", "a1");
+        chessEngine.alwaysChoose((board, legalMoves) -> harmless);
+
+        computerPlayerService.onRoundStarted(gameId);
+
+        await().atMost(Duration.ofSeconds(2)).untilAsserted(() -> {
+            var submission = gameLifecycleService.viewGame(gameId, whiteToken).mySubmission();
+            org.junit.jupiter.api.Assertions.assertTrue(submission.submitted());
+            org.junit.jupiter.api.Assertions.assertEquals(captureKing, submission.move());
+        });
+    }
+
+    @Test
     void onRoundStartedDoesNothingForAHumanVsHumanGame() {
         PlayerRef white = new PlayerRef.Anonymous(new AnonymousId(UUID.randomUUID()));
         PlayerRef black = new PlayerRef.Anonymous(new AnonymousId(UUID.randomUUID()));
@@ -111,5 +163,14 @@ class ComputerPlayerServiceTest {
         computerPlayerService.onRoundStarted(created.gameId());
 
         verify(gameBroadcastService, times(0)).broadcast(argThat(snapshot -> snapshot.id().equals(created.gameId())));
+    }
+
+    private static Move findMove(List<Move> moves, String from, String to) {
+        Position fromPos = Position.fromAlgebraic(from);
+        Position toPos = Position.fromAlgebraic(to);
+        return moves.stream()
+                .filter(m -> m.from().equals(fromPos) && m.to().equals(toPos))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("no legal move " + from + "-" + to));
     }
 }
