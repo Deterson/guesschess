@@ -193,5 +193,29 @@
     "connectionLost": "Connexion au serveur perdue. Nouvelle tentative automatique...",
     "connectionLostRetry": "Connexion perdue : réessayez.",
     "sessionExpired": "Votre session a expiré, veuillez vous reconnecter."
+  },
+  "admin": {
+    "title": "Administration",
+    "forbidden": "Accès réservé aux administrateurs.",
+    "users": "Comptes",
+    "games": "Parties",
+    "searchPlaceholder": "Rechercher (login, nom, email)...",
+    "loadMore": "Charger plus",
+    "noResults": "Aucun résultat.",
+    "table": {
+      "login": "Login",
+      "displayName": "Nom",
+      "email": "Email",
+      "createdAt": "Créé le",
+      "id": "Id",
+      "variant": "Variante",
+      "status": "Statut",
+      "result": "Résultat",
+      "white": "Blancs",
+      "black": "Noirs",
+      "updatedAt": "Mis à jour le"
+    },
+    "playerAnonymous": "Anonyme",
+    "playerComputer": "Ordinateur ({level})"
   }
 }

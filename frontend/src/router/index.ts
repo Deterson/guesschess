@@ -10,6 +10,7 @@ import ProfileGamesView from '../views/ProfileGamesView.vue'
 import ProfileSettingsView from '../views/ProfileSettingsView.vue'
 import ProfileAboutView from '../views/ProfileAboutView.vue'
 import PublicProfileView from '../views/PublicProfileView.vue'
+import AdminView from '../views/AdminView.vue'
 import { useAuthStore } from '../stores/auth'
 import { useAccountStore } from '../stores/account'
 import { peek as peekPendingRegistration } from '../services/pendingRegistration'
@@ -51,6 +52,9 @@ const router = createRouter({
       component: PublicProfileView,
       props: (route) => ({ login: route.params.login }),
     },
+    // Etape 18 : pas de lien dans l'UI (voir CLAUDE.md) - requiresAuth suffit a
+    // resoudre le compte connecte, le backend tranche seul qui est admin (403 sinon).
+    { path: '/admin', name: 'admin', component: AdminView, meta: { requiresAuth: true } },
   ],
 })
 

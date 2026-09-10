@@ -193,5 +193,29 @@
     "connectionLost": "Connection to the server lost. Retrying automatically...",
     "connectionLostRetry": "Connection lost: please try again.",
     "sessionExpired": "Your session has expired, please log in again."
+  },
+  "admin": {
+    "title": "Administration",
+    "forbidden": "Restricted to administrators.",
+    "users": "Accounts",
+    "games": "Games",
+    "searchPlaceholder": "Search (login, name, email)...",
+    "loadMore": "Load more",
+    "noResults": "No results.",
+    "table": {
+      "login": "Login",
+      "displayName": "Name",
+      "email": "Email",
+      "createdAt": "Created at",
+      "id": "Id",
+      "variant": "Variant",
+      "status": "Status",
+      "result": "Result",
+      "white": "White",
+      "black": "Black",
+      "updatedAt": "Updated at"
+    },
+    "playerAnonymous": "Anonymous",
+    "playerComputer": "Computer ({level})"
   }
 }

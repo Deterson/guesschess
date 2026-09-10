@@ -60,7 +60,7 @@ class SecurityConfig {
                 .addFilterBefore(anonymousIdentityFilter, OAuth2LoginAuthenticationFilter.class)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/ws/**", "/oauth2/**", "/login/**", "/actuator/health").permitAll()
-                        .requestMatchers("/api/account/**").authenticated()
+                        .requestMatchers("/api/account/**", "/api/admin/**").authenticated()
                         .anyRequest().permitAll())
                 .oauth2Login(oauth2 -> oauth2.successHandler(oAuthLoginSuccessHandler))
                 .oauth2ResourceServer(rs -> rs.jwt(withDefaults()));

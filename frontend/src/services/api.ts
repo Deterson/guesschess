@@ -3,6 +3,8 @@ import { i18n } from '../i18n'
 import type {
   AccountResponse,
   AccountSettingsHttpResponse,
+  AdminGameHttpResponse,
+  AdminUserHttpResponse,
   Color,
   ComputerLevel,
   CompleteRegistrationHttpResponse,
@@ -191,3 +193,10 @@ export const getAccountSettings = (authToken: string) =>
 
 export const updateAccountSettings = (settings: AccountSettingsHttpResponse, authToken: string) =>
   request<AccountSettingsHttpResponse>('/api/account/settings', { method: 'PATCH', body: settings, token: authToken })
+
+/** Page admin (etape 18) - 403 (ApiError) si le compte connecte n'est pas dans ADMIN_EMAILS. */
+export const adminListUsers = (page: number, size: number, q: string, authToken: string) =>
+  request<AdminUserHttpResponse[]>(`/api/admin/users?page=${page}&size=${size}&q=${encodeURIComponent(q)}`, { token: authToken })
+
+export const adminListGames = (page: number, size: number, authToken: string) =>
+  request<AdminGameHttpResponse[]>(`/api/admin/games?page=${page}&size=${size}`, { token: authToken })

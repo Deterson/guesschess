@@ -167,6 +167,34 @@ export interface PublicProfileHttpResponse {
   bio: string
 }
 
+/** GET /api/admin/users (etape 18) - reserve aux administrateurs (ADMIN_EMAILS). */
+export interface AdminUserHttpResponse {
+  id: string
+  login: string | null
+  displayName: string
+  email: string | null
+  createdAt: string
+}
+
+/**
+ * GET /api/admin/games (etape 18). white/blackType vaut 'ACCOUNT'/'ANONYMOUS'/'COMPUTER',
+ * ou null tant que la couleur n'est revendiquee par personne. white/blackLabel porte le
+ * login pour un compte, le niveau pour un ordinateur, null sinon (ANONYMOUS compris).
+ */
+export interface AdminGameHttpResponse {
+  id: string
+  variant: GameVariant
+  status: GameStatus
+  resultWinner: Color | null
+  resultCause: GameResultCause | null
+  whiteLabel: string | null
+  whiteType: 'ACCOUNT' | 'ANONYMOUS' | 'COMPUTER' | null
+  blackLabel: string | null
+  blackType: 'ACCOUNT' | 'ANONYMOUS' | 'COMPUTER' | null
+  createdAt: string
+  updatedAt: string
+}
+
 // ---- WebSocket STOMP (infrastructure/websocket/dto) ----
 
 export interface LegalMoveMessage {

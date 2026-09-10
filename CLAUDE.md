@@ -125,10 +125,12 @@ Jeu d'échecs classique avec une règle additionnelle :
 17. ⬜ IA « guess-aware » — le choix du coup réel de l'ordinateur doit tenir compte de la mécanique
     de devinette elle-même (pas seulement de l'évaluation d'échecs classique), pour exploiter les
     tactiques propres au guesschess plutôt que de les ignorer. Détail : [`src/CLAUDE.md`](src/CLAUDE.md).
-18. ⬜ Page admin — vue interne pour explorer tous les comptes joueurs et toutes les parties (pas
-    seulement les siennes), réservée à un rôle admin (accès restreint à définir, ex. liste
-    d'emails/logins autorisés). En attendant, lecture directe en base sur le Pi de prod : voir
-    "Consulter la base de prod" dans [`.github/CLAUDE.md`](.github/CLAUDE.md).
+18. ✅ Page admin (fait) — `/admin` (frontend, sans lien dans l'UI), lecture seule : liste/recherche
+    des comptes et des parties. Accès restreint via `ADMIN_EMAILS` (liste d'emails, backend
+    renvoie 403 sinon). Détail : [`src/CLAUDE.md`](src/CLAUDE.md). Idée pour plus tard : y afficher
+    le statut du dernier backup (étape 19) via une petite table dédiée plutôt que des logs bruts
+    (le backup tourne hors de l'app, `journalctl` sur le Pi n'est pas lisible depuis l'admin telle
+    quelle) ; actions de modération (suppression de partie, bannissement) si le besoin se présente.
 19. 🟡 Backup de la base de données — dump quotidien vers le disque dur externe du Pi (rétention
     30 jours), installé/rafraîchi automatiquement à chaque déploiement (voir
     [`ops/README.md`](ops/README.md)). Reste manuel une seule fois par machine : montage du disque

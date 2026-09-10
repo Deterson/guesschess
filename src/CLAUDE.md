@@ -101,6 +101,10 @@ tout court (échec rapide voulu au boot Spring, pas seulement au moment du login
   (`/usr/games/stockfish`, paquet Debian). Dev local Windows : binaire officiel (build "universal",
   Sept. 2025) installé à `C:\Users\drde6\tools\stockfish.exe`, positionné dans `.env` (chemin à
   revoir si l'utilisateur change de machine/emplacement, comme pour le JDK/Node ci-dessus).
+- `ADMIN_EMAILS` — (étape 18) **facultatif**, défaut vide (page admin inaccessible). Liste
+  d'emails séparés par des virgules autorisés sur `/api/admin/**` (`AdminAccessService`, comparaison
+  insensible à la casse contre l'email du compte OAuth). Positionné en dev local (`.env`) avec
+  l'email du propriétaire du projet.
 - `DEFAULT_GAME_VARIANT` — **facultatif**, défaut `GUESSCHESS`. Feature flag
   (`guesschess.default-variant`) pour trancher en prod entre variante Guessmate ou
   No-Guessmate par défaut sans rebuild ; lu par `GameCreationController`, exposé en lecture
@@ -270,6 +274,15 @@ tout court (échec rapide voulu au boot Spring, pas seulement au moment du login
     choix du coup avec réfutation parable, non-répétition après parade, non-répétition de
     devinette) avec un `ChessEngine` de test plutôt qu'un vrai Stockfish, pour rester rapide et
     déterministe.
+- **Étape 18 — Page admin** : lecture seule, pas de mutation. `AdminAccessService` verifie
+  l'email du compte (JWT `sub` -> `AccountService.getById`) contre `ADMIN_EMAILS` ; le JWT de
+  session ne porte pas l'email en claim (seulement `displayName`), d'ou ce lookup plutot qu'une
+  lecture directe du token. `AdminUserQueries`/`AdminGameQueries` (package des repos Spring Data
+  concernes, pas le domaine - une recherche paginee tous comptes/parties confondus n'est pas un
+  besoin du domaine) interrogent directement `SpringDataUserJpaRepository`/`SpringDataGameJpaRepository`
+  plutot que de passer par `UserRepository`/`GameRepository` (ports concus pour un acces cible, pas
+  un listing admin). `AdminController` resout le login d'un joueur `ACCOUNT` via `AccountService`
+  (un lookup par compte affiche, volume interne trop faible pour justifier un batch).
 - **Étape 14 — Identifiant unique de compte (login)** : pseudonyme immuable, 3-20 caractères,
   unique insensible à la casse (index `lower(login)`, migration V9), interdit sur
   "Anonymous"/"Anonyme". `login` nullable en SQL pour les comptes créés avant cette étape ; un
