@@ -129,9 +129,12 @@ Jeu d'échecs classique avec une règle additionnelle :
     seulement les siennes), réservée à un rôle admin (accès restreint à définir, ex. liste
     d'emails/logins autorisés). En attendant, lecture directe en base sur le Pi de prod : voir
     "Consulter la base de prod" dans [`.github/CLAUDE.md`](.github/CLAUDE.md).
-19. ⬜ Backup de la base de données — sauvegarde quotidienne planifiée à 5h du matin, écrite sur le
-    disque dur externe (HDD) du Pi, **et** copiée quelque part en dehors du Raspberry Pi (pour
-    survivre à une panne matérielle ou un vol du Pi lui-même).
+19. 🟡 Backup de la base de données — dump quotidien vers le disque dur externe du Pi (rétention
+    30 jours), installé/rafraîchi automatiquement à chaque déploiement (voir
+    [`ops/README.md`](ops/README.md)). Reste manuel une seule fois par machine : montage du disque
+    et une entrée sudoers (mot de passe requis, hors de portée de la CI). Pas encore de copie hors
+    du Pi (survie à une panne/un vol du Pi lui-même) — prévu plus tard, ex. synchro vers un Google
+    Drive via `rclone` (nécessite une autorisation OAuth par navigateur, pas automatisable).
 
 ## Liaison compte/session ↔ partie (étapes 6-7)
 

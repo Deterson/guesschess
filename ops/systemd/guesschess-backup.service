@@ -1,0 +1,11 @@
+[Unit]
+Description=Backup guesschess Postgres database
+After=docker.service
+Requires=docker.service
+RequiresMountsFor=/mnt/backup-hdd
+
+[Service]
+Type=oneshot
+User=deterson
+EnvironmentFile=/opt/guesschess/backup.env
+ExecStart=/opt/guesschess/backup-db.sh

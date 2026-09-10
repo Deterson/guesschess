@@ -37,7 +37,10 @@ propriétaire — voici ce qu'il faut savoir pour s'y connecter depuis une sessi
   demander/taper ce mot de passe**. Un accès sans mot de passe, restreint à une liste précise de
   commandes utiles au déploiement, est déjà configuré via `/etc/sudoers.d/guesschess-deploy`
   (`mkdir`/`chown` sur `/opt/actions-runner`, `apt-get install -y`, `/opt/actions-runner/svc.sh`,
-  `systemctl … actions.runner.*`, `ufw`). Si une commande sudo hors de cette liste devient
+  `systemctl … actions.runner.*`, `ufw`, et depuis l'étape 19 : `tee` vers les deux units
+  `guesschess-backup.*` et `systemctl daemon-reload`/`… guesschess-backup.*`, nécessaires à
+  `ops/install-backup.sh` lancé à chaque déploiement — voir [`../ops/README.md`](../ops/README.md)).
+  Si une commande sudo hors de cette liste devient
   nécessaire, demander à l'utilisateur de l'ajouter lui-même via
   `sudo visudo -f /etc/sudoers.d/guesschess-deploy` (jamais éditer ce fichier directement par un
   autre moyen — une erreur de syntaxe peut bloquer tout `sudo` sur la machine).
@@ -58,8 +61,11 @@ propriétaire — voici ce qu'il faut savoir pour s'y connecter depuis une sessi
 
 ## Consulter la base de prod (comptes, parties)
 
-En attendant la page admin (étape 18), lecture directe via le conteneur Postgres de prod
-(`guesschess-postgres-1`, distinct de `postgres-dev` sur la VM de dev) :
+Page admin (étape 18, `/admin`, sans lien dans l'UI) disponible côté app une fois `ADMIN_EMAILS`
+positionné dans `/opt/guesschess/.env` sur le Pi (pas fait automatiquement - variable non présente
+par défaut, voir "Variables d'environnement" dans [`../src/CLAUDE.md`](../src/CLAUDE.md)). En
+attendant/à défaut, lecture directe via le conteneur Postgres de prod (`guesschess-postgres-1`,
+distinct de `postgres-dev` sur la VM de dev) :
 
 ```bash
 ssh -i ~/.ssh/id_ed25519_guesschess_pi deterson@192.168.1.28 \
@@ -72,3 +78,9 @@ ssh -i ~/.ssh/id_ed25519_guesschess_pi deterson@192.168.1.28 \
 ```
 
 Requête en lecture seule uniquement — ne jamais `UPDATE`/`DELETE` à la main sur cette base.
+
+## Backup de la base (étape 19)
+
+Script + units systemd dans [`../ops/`](../ops/), déployés sur le Pi à `/opt/guesschess/`. Disque
+dédié : `/dev/sdc1` (WD "Elements", NTFS) — pas `/dev/sda1`/`/data`, dont le montage renvoie une
+erreur I/O en écriture. Détail et étapes d'activation restantes : [`../ops/README.md`](../ops/README.md).
