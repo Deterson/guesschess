@@ -81,6 +81,8 @@ Requête en lecture seule uniquement — ne jamais `UPDATE`/`DELETE` à la main 
 
 ## Backup de la base (étape 19)
 
-Script + units systemd dans [`../ops/`](../ops/), déployés sur le Pi à `/opt/guesschess/`. Disque
-dédié : `/dev/sdc1` (WD "Elements", NTFS) — pas `/dev/sda1`/`/data`, dont le montage renvoie une
-erreur I/O en écriture. Détail et étapes d'activation restantes : [`../ops/README.md`](../ops/README.md).
+Script + units systemd dans [`../ops/`](../ops/), déployés sur le Pi à `/opt/guesschess/`. Écrit
+dans `/data` (`/dev/sda1`, WD "Elements" NTFS) — le disque du seedbox, réutilisé volontairement
+(même disque physique que ce qu'on avait un temps pris pour un `/dev/sdc1` séparé - un seul
+disque "Elements" sur ce Pi, juste renommé différemment selon l'ordre de détection USB au boot).
+Détail, pourquoi ce choix, et étapes d'activation restantes : [`../ops/README.md`](../ops/README.md).

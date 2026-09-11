@@ -3,9 +3,9 @@
 # déploiement (voir .github/workflows/deploy.yml), idempotent : ne casse rien si déjà en place,
 # rattrape l'installation si les units systemd ont disparu (nouveau Pi, migration...).
 #
-# Suppose le disque de backup déjà monté à demeure sur l'hôte (mise en place manuelle, une seule
-# fois par machine, voir "1. Monter le disque" dans ops/README.md) - seuls le script, sa config
-# par défaut et le timer systemd sont (ré)installés ici, rien qui touche au montage du disque.
+# Suppose /data (disque du seedbox, réutilisé pour le backup - voir ops/README.md) déjà monté à
+# demeure sur l'hôte - seuls le script, sa config par défaut et le timer systemd sont (ré)installés
+# ici, rien qui touche au montage du disque.
 #
 # Nécessite les entrées sudo NOPASSWD documentées dans .github/CLAUDE.md (tee vers les deux units
 # systemd, systemctl daemon-reload / enable sur guesschess-backup.*) - sans elles ce script échoue
@@ -24,7 +24,7 @@ chmod +x "$install_prefix/backup-db.sh"
 backup_env="$install_prefix/backup.env"
 if [ ! -f "$backup_env" ]; then
     cat > "$backup_env" <<EOF
-BACKUP_DIR=${BACKUP_DIR:-/mnt/backup-hdd/guesschess}
+BACKUP_DIR=${BACKUP_DIR:-/data/guesschess-backups}
 RETENTION_DAYS=${RETENTION_DAYS:-30}
 POSTGRES_CONTAINER=${POSTGRES_CONTAINER:-guesschess-postgres-1}
 POSTGRES_USER=${POSTGRES_USER:-guesschess}

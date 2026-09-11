@@ -1,44 +1,57 @@
 # Backup quotidien de la base (étape 19)
 
-Dump Postgres (`docker exec ... pg_dump`) → disque dur externe monté sur le Pi, avec rétention
-(purge des dumps de plus de 30 jours). Pas encore de copie hors du Pi — prévu plus tard (voir
-[`../CLAUDE.md`](../CLAUDE.md) étape 19, ex. synchro vers Google Drive).
+Dump Postgres (`docker exec ... pg_dump`) → `/data/guesschess-backups` sur le Pi (le disque du
+seedbox, réutilisé — voir plus bas pourquoi), avec rétention (purge des dumps de plus de 30
+jours). Pas encore de copie hors du Pi — prévu plus tard (voir [`../CLAUDE.md`](../CLAUDE.md)
+étape 19, ex. synchro vers Google Drive).
 
 - [`../scripts/backup-db.sh`](../scripts/backup-db.sh) — le script de backup.
 - [`systemd/guesschess-backup.service`](systemd/guesschess-backup.service) et
   [`.timer`](systemd/guesschess-backup.timer) — déclenche à 5h du matin (`Persistent=true`,
-  rattrape le run manqué si la machine était éteinte à 5h). `RequiresMountsFor=/mnt/backup-hdd`
-  empêche le service de tourner (et d'écrire ailleurs par erreur) si le disque n'est pas monté.
+  rattrape le run manqué si la machine était éteinte à 5h). `RequiresMountsFor=/data` empêche le
+  service de tourner (et d'écrire ailleurs par erreur) si le disque n'est pas monté.
 - [`install-backup.sh`](install-backup.sh) — (ré)installe le script, `backup.env` (si absent) et
   les units systemd. **Lancé automatiquement à chaque déploiement**
-  ([`../.github/workflows/deploy.yml`](../.github/workflows/deploy.yml)), idempotent : ne casse
-  rien si déjà en place, rattrape l'installation si les units ont disparu (nouveau Pi...).
+  ([`../.github/workflows/deploy.yml`](../.github/workflows/deploy.yml)), idempotent.
+
+## Pourquoi `/data` (le disque du seedbox) plutôt qu'un disque dédié
+
+Décision assumée : `/data` (`/dev/sda1`, WD "Elements" NTFS, 3.7 To) est le même disque physique
+que celui initialement envisagé comme "dédié" (même UUID `B6682D7B682D3C0D` retrouvé sous deux
+noms `sdX` différents selon l'ordre de détection au boot — il n'y a qu'un seul disque "Elements"
+sur ce Pi). Ce disque sert déjà de stockage au seedbox (jackett/jellyfin/radarr/sonarr/plex/
+transmission/filebrowser) depuis 2 ans sans souci connu jusqu'à un incident ponctuel (disque
+disparu du bus USB, résolu par un reboot) - accepté comme rare plutôt que rédhibitoire.
+
+Implication assumée : tant que la copie hors du Pi (Google Drive, pas encore fait) n'existe pas,
+le backup local partage son support physique avec les données qu'il est censé protéger - la copie
+locale n'est qu'un confort de récupération rapide, pas le filet de sécurité final.
 
 ## Ce qui reste manuel, une seule fois par machine
 
-Deux choses ne peuvent pas être automatisées dans le déploiement (CI non interactif, ne peut pas
-taper de mot de passe) :
+### 1. `/data` monté proprement (fstab, pas juste la crontab root)
 
-### 1. Monter le disque de façon persistante
+`/data` était jusqu'ici monté via une ligne `@reboot mount -t ntfs /dev/sda1 /data` dans la
+crontab de `root` - fonctionne, mais fragile (référence `/dev/sda1` en dur plutôt que l'UUID, pas
+de `nofail`, et un `@reboot` cron peut s'exécuter avant que le noyau ait fini de détecter le
+disque USB). Migration vers une vraie entrée `/etc/fstab` (même comportement de permissions,
+`0777`/`root:root`, pour ne rien casser côté seedbox) :
 
 ```bash
-sudo mkdir -p /mnt/backup-hdd
-echo 'UUID=<uuid-du-disque>  /mnt/backup-hdd  ntfs-3g  defaults,uid=1000,gid=1000,umask=002,windows_names,nofail  0  0' \
+sudo cp /etc/fstab /etc/fstab.bak-$(date +%F)
+echo 'UUID=B6682D7B682D3C0D  /data  ntfs-3g  defaults,uid=0,gid=0,umask=000,windows_names,nofail,x-systemd.device-timeout=30  0  0' \
   | sudo tee -a /etc/fstab
-sudo mount -a
-touch /mnt/backup-hdd/.write-test && rm /mnt/backup-hdd/.write-test && echo OK
+sudo crontab -l -u root | grep -v 'mount -t ntfs /dev/sda1' | sudo crontab -u root -
+sudo systemctl daemon-reload
+findmnt --verify   # vérifie la syntaxe de fstab sans rien monter
 ```
 
-(`lsblk -f` pour trouver l'UUID. `nofail` évite qu'un disque débranché bloque le boot.)
-
-Disque actuellement utilisé : `/dev/sdc1` (WD "Elements", NTFS, UUID `B6682D7B682D3C0D`) —
-`/dev/sda1`/`/data` a été écarté (montage cassé, sans rapport avec ce disque : c'est le stockage
-du seedbox, pas candidat pour ce backup).
+`nofail` + `x-systemd.device-timeout=30` : si le disque est absent au boot, le Pi démarre quand
+même plutôt que d'attendre indéfiniment. Le nouveau montage prend
+effet au prochain remontage (reboot, ou `sudo mount -a` après un `umount` manuel si tu veux tester
+sans attendre) - pas besoin de redémarrer immédiatement pour que ce soit en place.
 
 ### 2. Autoriser les commandes sudo utilisées par `install-backup.sh`
-
-`install-backup.sh` a besoin d'écrire les units systemd et de recharger `systemd` — pas possible
-sans mot de passe avec la configuration sudo actuelle du Pi. Ajouter, une seule fois :
 
 ```bash
 sudo visudo -f /etc/sudoers.d/guesschess-deploy
@@ -59,7 +72,7 @@ Une fois ces deux points faits, tout déploiement suivant installe/rafraîchit l
 ```bash
 sudo systemctl start guesschess-backup.service
 journalctl -u guesschess-backup.service -n 50 --no-pager
-ls -la /mnt/backup-hdd/guesschess
+ls -la /data/guesschess-backups
 ```
 
 `journalctl -u guesschess-backup.service` est l'équivalent du "log d'erreur à consulter" pour ce

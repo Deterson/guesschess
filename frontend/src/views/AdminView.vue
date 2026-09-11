@@ -4,12 +4,17 @@ import { useI18n } from 'vue-i18n'
 import { useAuthStore } from '../stores/auth'
 import { ApiError, adminListGames, adminListUsers } from '../services/api'
 import type { AdminGameHttpResponse, AdminUserHttpResponse } from '../types/api'
+import NotFoundView from './NotFoundView.vue'
 
 /**
  * Etape 18 : page admin en lecture seule, sans point d'entree dans l'UI (accessible en
  * tapant /admin - le backend rejette en 403 si le compte connecte n'est pas dans
  * ADMIN_EMAILS, voir AdminAccessService). Remplace la lecture directe en base par SSH
  * documentee dans .github/CLAUDE.md.
+ *
+ * Page totalement cachee : pas connecte ou pas admin affiche exactement la meme 404
+ * (NotFoundView) qu'une route inexistante, plutot qu'un message "acces refuse" qui
+ * revelerait que la route existe.
  */
 
 const PAGE_SIZE = 30
@@ -32,7 +37,7 @@ const gamesHasMore = ref(true)
 const gamesLoading = ref(false)
 
 function handleError(e: unknown) {
-  if (e instanceof ApiError && e.status === 403) {
+  if (e instanceof ApiError && (e.status === 403 || e.status === 401)) {
     forbidden.value = true
     return
   }
@@ -88,17 +93,22 @@ function playerLabel(label: string | null, type: string | null): string {
 }
 
 onMounted(() => {
+  if (!authStore.isLoggedIn) {
+    forbidden.value = true
+    return
+  }
   loadMoreUsers()
   loadMoreGames()
 })
 </script>
 
 <template>
-  <div class="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-10 px-4 py-8 text-sm text-stone-300">
+  <NotFoundView v-if="forbidden" />
+
+  <div v-else class="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-10 px-4 py-8 text-sm text-stone-300">
     <h1 class="text-xl font-semibold text-stone-100">{{ t('admin.title') }}</h1>
 
-    <p v-if="forbidden" class="text-red-400">{{ t('admin.forbidden') }}</p>
-    <p v-else-if="loadError" class="text-red-400">{{ loadError }}</p>
+    <p v-if="loadError" class="text-red-400">{{ loadError }}</p>
 
     <template v-else>
       <section>

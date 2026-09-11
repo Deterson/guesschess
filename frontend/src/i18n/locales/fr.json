@@ -196,7 +196,6 @@
   },
   "admin": {
     "title": "Administration",
-    "forbidden": "Accès réservé aux administrateurs.",
     "users": "Comptes",
     "games": "Parties",
     "searchPlaceholder": "Rechercher (login, nom, email)...",
@@ -217,5 +216,10 @@
     },
     "playerAnonymous": "Anonyme",
     "playerComputer": "Ordinateur ({level})"
+  },
+  "notFound": {
+    "title": "Page non trouvée",
+    "backHome": "Retour à l'accueil",
+    "randomWikipedia": "Article Wikipédia au hasard ¯\\_(ツ)_/¯"
   }
 }

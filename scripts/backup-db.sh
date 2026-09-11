@@ -7,7 +7,7 @@
 # déploiement, voir .github/workflows/deploy.yml), exécuté par le timer systemd
 # guesschess-backup.timer (voir ops/systemd/). Config attendue dans /opt/guesschess/backup.env
 # (non versionné, comme /opt/guesschess/.env) :
-#   BACKUP_DIR=/mnt/backup-hdd/guesschess
+#   BACKUP_DIR=/data/guesschess-backups
 #   RETENTION_DAYS=30
 #   POSTGRES_CONTAINER=guesschess-postgres-1
 #   POSTGRES_USER=guesschess

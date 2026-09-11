@@ -2,7 +2,7 @@
 Description=Backup guesschess Postgres database
 After=docker.service
 Requires=docker.service
-RequiresMountsFor=/mnt/backup-hdd
+RequiresMountsFor=/data
 
 [Service]
 Type=oneshot

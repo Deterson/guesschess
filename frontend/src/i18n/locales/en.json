@@ -196,7 +196,6 @@
   },
   "admin": {
     "title": "Administration",
-    "forbidden": "Restricted to administrators.",
     "users": "Accounts",
     "games": "Games",
     "searchPlaceholder": "Search (login, name, email)...",
@@ -217,5 +216,10 @@
     },
     "playerAnonymous": "Anonymous",
     "playerComputer": "Computer ({level})"
+  },
+  "notFound": {
+    "title": "Page not found",
+    "backHome": "Take me home",
+    "randomWikipedia": "Random Wikipedia article ¯\\_(ツ)_/¯"
   }
 }
