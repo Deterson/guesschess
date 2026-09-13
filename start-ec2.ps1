@@ -45,7 +45,7 @@ if ($state -eq "running") {
 
     do {
         Start-Sleep -Seconds 5
-        $state = (Get-EC2InstanceStatus -InstanceId $InstanceId -IncludeAllInstance `
+        $state = (Get-EC2InstanceStatus -InstanceId $InstanceId -IncludeAllInstance $true `
                     -ProfileName $ProfileName -Region $Region).InstanceState.Name
         Write-Host "État actuel : $state"
     } while ($state -ne "running")

@@ -3,20 +3,23 @@ ne rien implémenter dans ce TODO à moins que cela ait été explicitement dema
 - utiliser HeidiSQL
 
 --- BACK
+- JUSTE UN DELAI, de x minutes (en secondes), s'il guess pas tant pis
+- pas scroll sur le front, jamais, plutôt ouvrir des panels en cliquant
+
 - quand l'échec n'a plus qu'une manière de se sortir de l'échec, c'est échec et mat
 - JUSTE UN DELAI de X secondes (X = le nombre de minutes de la partie de base) pour le guess, si le temps est écoulé, le guess n'est pas fait
-- Un backup des données (step chéplucombien)
 - réfléchir au volume des données : quelle taille fait une partie dans la db ? imaginons que 10 000 joueurs jouent une partie par jour, combien de Mo par jour ?
 - protéger contre les abus (empêcher de créer 1000000 de parties, empêcher de spammer de coups en mode DDoS)
 - enlever de la verbosité des commentaires dans le back
 - avoir des tests E2E avec Cypress playwright etc
 
 --- FRONT
+- bouton "abandonner", avec une confirmation.
+- quand on devine "e2->e4", le "deviné (raté)" affiche "e2" et pas "e4" (la notation PGN attendue)
+- deviner si le gars est en français ou en anglais
 - quand une parade d'échec est devinée, le roi ne s'affiche plus en rouge pendant le tour de l'adversaire
 - "Parties en live"
 - changelog
-- en no-guessmate, si un échec n'a qu'un coup pour s'en sortir, faire gagner immédiatement la personne qui a mis en échec ?
-- le chat devrait partir du bas de la div qui est à gauche du board, et la textarea devrait être en bas sans bouger, les messages apparaîtraient en remontant, comme twitch
 - proposer de changer de style (change la couleur des cases, et adapte les couleurs du code couleur des coups joués / devinés sur les parties ET dans le tutoriel)
 - enlever toute la verbosité typique d'IA ("vous regardez cette partie en mode spectateur : elle est déjà complète" ou "quelqu'un d'autre s'est connecté avec le lien" on s'en fout, enlever cette infobulle parce que c'est écrit en dessous "Vous observez cette partie")
 - un favicon et un logo + stylé
@@ -24,6 +27,4 @@ ne rien implémenter dans ce TODO à moins que cela ait été explicitement dema
 étapes optionnelles:
 - avoir un mail @guesschess.fr?
 - avoir un environnement de dev, dispo que par moi ?
-- avoir une page admin pour naviguer les données de la bdd
-- un ordinateur qui joue (l'entraîner ? avec des noeuds etc ? ou un stockfish ?)
 - une appli mobile / webapp
