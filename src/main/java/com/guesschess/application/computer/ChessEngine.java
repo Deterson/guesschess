@@ -4,6 +4,7 @@ import com.guesschess.domain.board.Board;
 import com.guesschess.domain.move.Move;
 
 import java.util.List;
+import java.util.Set;
 
 /**
  * Port (etape 15 de la roadmap) vers un moteur d'echecs externe capable de choisir un
@@ -31,7 +32,11 @@ public interface ChessEngine {
      * historique de coups, qui ne peut pas representer les passes de trait de la regle
      * de devinette). legalMoves : coups legaux du joueur au trait dans cette position
      * (GameSnapshot.legalMoves) - le coup retourne en fait toujours partie, deja
-     * enrichi (piece capturee, type de coup...).
+     * enrichi (piece capturee, type de coup...). movesToAvoidIfPossible : coups a ne
+     * pas choisir tant qu'une alternative de qualite comparable existe (typiquement un
+     * coup recemment devine par l'adversaire, voir ComputerPlayerService.BlockedMove) -
+     * indicatif seulement, jamais respecte au prix de jouer un coup nettement pire ou
+     * de rendre un coup force impossible ; peut etre vide (aucune preference).
      */
-    Move chooseMove(Board board, List<Move> legalMoves, ComputerLevel level);
+    Move chooseMove(Board board, List<Move> legalMoves, ComputerLevel level, Set<Move> movesToAvoidIfPossible);
 }

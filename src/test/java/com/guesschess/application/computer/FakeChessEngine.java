@@ -4,6 +4,7 @@ import com.guesschess.domain.board.Board;
 import com.guesschess.domain.move.Move;
 
 import java.util.List;
+import java.util.Set;
 import java.util.function.BiFunction;
 
 /**
@@ -15,6 +16,7 @@ public class FakeChessEngine implements ChessEngine {
 
     private boolean available = true;
     private BiFunction<Board, List<Move>, Move> strategy = (board, legalMoves) -> legalMoves.get(0);
+    private volatile Set<Move> lastMovesToAvoidIfPossible = Set.of();
 
     public void setAvailable(boolean available) {
         this.available = available;
@@ -24,13 +26,24 @@ public class FakeChessEngine implements ChessEngine {
         this.strategy = strategy;
     }
 
+    /**
+     * Dernier movesToAvoidIfPossible recu par chooseMove (voir ComputerPlayerService,
+     * seul appelant en production) - permet aux tests de verifier que le bon ensemble
+     * de coups a eviter a ete transmis, sans avoir a deduire ca indirectement du coup
+     * choisi (la strategie de test ne le consulte pas forcement).
+     */
+    public Set<Move> lastMovesToAvoidIfPossible() {
+        return lastMovesToAvoidIfPossible;
+    }
+
     @Override
     public boolean isAvailable() {
         return available;
     }
 
     @Override
-    public Move chooseMove(Board board, List<Move> legalMoves, ComputerLevel level) {
+    public Move chooseMove(Board board, List<Move> legalMoves, ComputerLevel level, Set<Move> movesToAvoidIfPossible) {
+        this.lastMovesToAvoidIfPossible = movesToAvoidIfPossible;
         return strategy.apply(board, legalMoves);
     }
 }

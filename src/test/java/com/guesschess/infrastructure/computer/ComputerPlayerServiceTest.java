@@ -5,6 +5,7 @@ import com.guesschess.application.GameAccess;
 import com.guesschess.application.GameAccessRepository;
 import com.guesschess.application.GameLifecycleService;
 import com.guesschess.application.GameSnapshot;
+import com.guesschess.application.MoveIntent;
 import com.guesschess.application.PlayerRef;
 import com.guesschess.application.PlayerToken;
 import com.guesschess.application.computer.ComputerLevel;
@@ -151,6 +152,96 @@ class ComputerPlayerServiceTest {
             org.junit.jupiter.api.Assertions.assertTrue(submission.submitted());
             org.junit.jupiter.api.Assertions.assertEquals(captureKing, submission.move());
         });
+    }
+
+    @Test
+    void computerImmediatelyPlaysAMoveThatCapturesTheOpponentsHangingKingInsteadOfAskingTheEngine() {
+        // Meme position/round que computerImmediatelyGuessesAMoveThatWouldCaptureItsOwnHangingKingInsteadOfAskingTheEngine,
+        // mais roles inverses : l'ordinateur est maintenant noir, donc joueur au
+        // trait (pas devineur) pour le round qui suit la devinette correcte - il a
+        // Ra8xa1 parmi ses coups legaux et doit le jouer directement, sans jamais
+        // interroger Stockfish (voir ComputerPlayerService.chooseMoveOrFallback).
+        GameId gameId = GameId.random();
+        Board position = Board.empty()
+                .withPiece(Position.fromAlgebraic("a1"), Piece.of(PieceType.KING, Color.WHITE))
+                .withPiece(Position.fromAlgebraic("a8"), Piece.of(PieceType.ROOK, Color.BLACK))
+                .withPiece(Position.fromAlgebraic("h8"), Piece.of(PieceType.KING, Color.BLACK));
+        Game game = Game.fromPosition(gameId, position, GameVariant.GUESSCHESS);
+        Move escape = findMove(game.legalMoves(), "a1", "b1");
+        game.submitGuess(escape);
+        game.submitMove(escape);
+        gameRepository.insert(game);
+
+        PlayerToken whiteToken = PlayerToken.random();
+        PlayerToken blackToken = PlayerToken.random();
+        GameAccess access = new GameAccess(gameId, whiteToken, blackToken)
+                .withPlayerLinked(Color.WHITE, new PlayerRef.Anonymous(new AnonymousId(UUID.randomUUID())))
+                .withPlayerLinked(Color.BLACK, new PlayerRef.Computer(ComputerLevel.HARD));
+        gameAccessRepository.save(access);
+
+        Move harmless = findMove(game.legalMoves(), "h8", "h7");
+        Move captureKing = findMove(game.legalMoves(), "a8", "a1");
+        chessEngine.alwaysChoose((board, legalMoves) -> harmless);
+
+        computerPlayerService.onRoundStarted(gameId);
+
+        await().atMost(Duration.ofSeconds(2)).untilAsserted(() -> {
+            var submission = gameLifecycleService.viewGame(gameId, blackToken).mySubmission();
+            org.junit.jupiter.api.Assertions.assertTrue(submission.submitted());
+            org.junit.jupiter.api.Assertions.assertEquals(captureKing, submission.move());
+        });
+    }
+
+    @Test
+    void computerAvoidsReplayingAMoveThatWasJustGuessedCorrectlyForItsNextRealMove() {
+        // Ordinateur difficile aux blancs, humain aux noirs, position de depart : les
+        // noirs devinent e2e4 par avance (round 1), forcement correct puisque
+        // l'ordinateur (FakeChessEngine) est configure pour toujours prefere ce coup
+        // s'il est legal - verifie que BlockedMove (ComputerPlayerService) le fait
+        // ensuite figurer dans movesToAvoidIfPossible au prochain coup reel de
+        // l'ordinateur (round 3, apres le round 2 ou les noirs jouent), voir
+        // ComputerPlayerService.movesToAvoidThisTurn.
+        PlayerRef human = new PlayerRef.Anonymous(new AnonymousId(UUID.randomUUID()));
+        CreatedGame created = gameLifecycleService.createComputerGame(
+                GameVariant.GUESSMATE, null, Color.BLACK, human, ComputerLevel.HARD);
+        GameId gameId = created.gameId();
+        GameAccess access = gameAccessRepository.findByGameId(gameId).orElseThrow();
+
+        chessEngine.alwaysChoose((board, legalMoves) -> legalMoves.stream()
+                .filter(m -> m.from().equals(Position.fromAlgebraic("e2")) && m.to().equals(Position.fromAlgebraic("e4")))
+                .findFirst()
+                .orElse(legalMoves.get(0)));
+
+        // Round 1 : les noirs devinent e2e4 par avance.
+        gameLifecycleService.submitGuess(access.blackToken(), MoveIntent.of(
+                Position.fromAlgebraic("e2"), Position.fromAlgebraic("e4")));
+        computerPlayerService.onRoundStarted(gameId);
+
+        // Round 1 resolu (devinette correcte, coup annule) des que l'ordinateur a
+        // soumis son coup puis, en cascade, sa propre devinette pour le round 2 (il
+        // devient devineur - voir onRoundStarted/act) : attendre cette devinette plutot
+        // que juste la resolution du round 1, sinon la soumission des noirs ci-dessous
+        // court-circuiterait la devinette de l'ordinateur.
+        await().atMost(Duration.ofSeconds(2)).untilAsserted(() ->
+                org.junit.jupiter.api.Assertions.assertTrue(
+                        gameLifecycleService.viewGame(gameId, access.whiteToken()).mySubmission().submitted()));
+        org.junit.jupiter.api.Assertions.assertEquals(Color.BLACK, gameLifecycleService.viewGame(gameId).sideToMove());
+
+        // Round 2 : les noirs (humain) jouent un coup reel quelconque, resolvant le
+        // round puisque l'ordinateur a deja devine par avance ci-dessus.
+        Move blackMove = gameLifecycleService.viewGame(gameId).legalMoves().get(0);
+        GameSnapshot afterRound2 = gameLifecycleService.submitMove(access.blackToken(),
+                MoveIntent.of(blackMove.from(), blackMove.to())).orElseThrow();
+        computerPlayerService.onRoundStarted(afterRound2.id());
+
+        // Round 3 : de nouveau au trait, l'ordinateur doit avoir recu e2e4 dans
+        // movesToAvoidIfPossible (encore legal : son round 1 a ete annule, le pion
+        // blanc n'a jamais bouge).
+        await().atMost(Duration.ofSeconds(2)).untilAsserted(() ->
+                org.junit.jupiter.api.Assertions.assertTrue(
+                        gameLifecycleService.viewGame(gameId, access.whiteToken()).mySubmission().submitted()));
+        Move e2e4 = findMove(gameLifecycleService.viewGame(gameId).legalMoves(), "e2", "e4");
+        org.junit.jupiter.api.Assertions.assertTrue(chessEngine.lastMovesToAvoidIfPossible().contains(e2e4));
     }
 
     @Test

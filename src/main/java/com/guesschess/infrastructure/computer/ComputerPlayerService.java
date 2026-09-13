@@ -10,8 +10,10 @@ import com.guesschess.application.PlayerToken;
 import com.guesschess.application.computer.ChessEngine;
 import com.guesschess.application.computer.ComputerLevel;
 import com.guesschess.domain.board.Board;
+import com.guesschess.domain.board.Position;
 import com.guesschess.domain.game.GameId;
 import com.guesschess.domain.game.GameStatus;
+import com.guesschess.domain.game.RoundResult;
 import com.guesschess.domain.move.Move;
 import com.guesschess.domain.piece.Color;
 import com.guesschess.domain.piece.PieceType;
@@ -20,8 +22,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
@@ -61,6 +68,33 @@ public class ComputerPlayerService {
         this.gameBroadcastService = gameBroadcastService;
     }
 
+    /**
+     * Un coup reel de l'ordinateur qui vient d'etre devine (et donc annule, voir
+     * rememberIfOwnMoveWasJustBlocked) reste evite pendant ce nombre de tours suivants
+     * ou l'ordinateur doit a nouveau choisir son propre coup (pas ses tours de
+     * devinette) - constat empirique (niveau difficile uniquement) qu'un adversaire qui
+     * vient de deviner juste a de bonnes chances de retenter la meme devinette si
+     * l'ordinateur rejoue le meme coup, objectivement toujours le meilleur dans une
+     * position autrement inchangee.
+     */
+    private static final int BLOCKED_MOVE_TURNS = 2;
+
+    /** Etat par partie, best-effort (pas persiste) - voir onRoundStarted/act. */
+    private final Map<GameId, List<BlockedMove>> blockedMovesByGame = new ConcurrentHashMap<>();
+
+    /**
+     * Un coup reel de l'ordinateur recemment devine, identifie par origine/destination/
+     * promotion plutot que par egalite complete de Move : la piece capturee (si il y en
+     * a une) depend de la position au moment du coup, qui change d'un tour a l'autre,
+     * alors que c'est bien "le meme coup" du point de vue de la previsibilite qu'on
+     * cherche a eviter.
+     */
+    private record BlockedMove(Position from, Position to, PieceType promotionType, int turnsRemaining) {
+        boolean matches(Move move) {
+            return from.equals(move.from()) && to.equals(move.to()) && promotionType == move.promotionType();
+        }
+    }
+
     public void onRoundStarted(GameId gameId) {
         GameAccess access = gameAccessRepository.findByGameId(gameId).orElse(null);
         if (access == null) {
@@ -73,7 +107,11 @@ public class ComputerPlayerService {
         ComputerLevel level = ((PlayerRef.Computer) access.playerOf(computerColor)).level();
         GameSnapshot snapshot = gameLifecycleService.viewGame(gameId);
         if (snapshot.status() != GameStatus.ONGOING) {
+            blockedMovesByGame.remove(gameId);
             return;
+        }
+        if (level == ComputerLevel.HARD) {
+            rememberIfOwnMoveWasJustBlocked(gameId, computerColor, snapshot.lastRoundResult());
         }
 
         PlayerToken token = computerColor == Color.WHITE ? access.whiteToken() : access.blackToken();
@@ -85,10 +123,55 @@ public class ComputerPlayerService {
                 () -> act(gameId, token, computerIsMover, computerColor, board, legalMoves, level));
     }
 
+    /**
+     * Round juste resolu (celui qui a declenche cet appel, voir GameController/act) :
+     * si l'ordinateur y etait joueur au trait et que sa devinette adverse est correcte,
+     * son coup reel vient d'etre annule - a memoriser pour ne pas le retenter tel quel
+     * dans l'immediat (voir BLOCKED_MOVE_TURNS). lastRoundResult est null pour le tout
+     * premier round d'une partie (rien resolu encore).
+     */
+    private void rememberIfOwnMoveWasJustBlocked(GameId gameId, Color computerColor, RoundResult lastRoundResult) {
+        if (lastRoundResult == null || lastRoundResult.mover() != computerColor || !lastRoundResult.guessedCorrectly()) {
+            return;
+        }
+        Move blocked = lastRoundResult.actualMove();
+        blockedMovesByGame.computeIfAbsent(gameId, id -> new ArrayList<>())
+                .add(new BlockedMove(blocked.from(), blocked.to(), blocked.promotionType(), BLOCKED_MOVE_TURNS));
+    }
+
+    /**
+     * A appeler une fois par tour ou l'ordinateur choisit son propre coup (jamais pour
+     * une devinette, sans rapport avec les coups annules de l'ordinateur lui-meme) :
+     * decompte BLOCKED_MOVE_TURNS pour chaque coup encore surveille et renvoie, parmi
+     * legalMoves, ceux a eviter si une alternative existe (laisse a StockfishChessEngine
+     * le soin de ne pas les exclure si ca viderait la liste - voir
+     * ChessEngine.chooseMove).
+     */
+    private Set<Move> movesToAvoidThisTurn(GameId gameId, List<Move> legalMoves) {
+        List<BlockedMove> current = blockedMovesByGame.get(gameId);
+        if (current == null || current.isEmpty()) {
+            return Set.of();
+        }
+        List<BlockedMove> remaining = new ArrayList<>();
+        Set<Move> toAvoid = new HashSet<>();
+        for (BlockedMove blocked : current) {
+            legalMoves.stream().filter(blocked::matches).forEach(toAvoid::add);
+            if (blocked.turnsRemaining() - 1 > 0) {
+                remaining.add(new BlockedMove(blocked.from(), blocked.to(), blocked.promotionType(), blocked.turnsRemaining() - 1));
+            }
+        }
+        if (remaining.isEmpty()) {
+            blockedMovesByGame.remove(gameId);
+        } else {
+            blockedMovesByGame.put(gameId, remaining);
+        }
+        return toAvoid;
+    }
+
     private void act(GameId gameId, PlayerToken token, boolean computerIsMover, Color computerColor,
                       Board board, List<Move> legalMoves, ComputerLevel level) {
         Move chosen = computerIsMover
-                ? chooseMoveOrFallback(gameId, board, legalMoves, level)
+                ? chooseMoveOrFallback(gameId, board, legalMoves, level, movesToAvoidThisTurn(gameId, legalMoves))
                 : guessKingCaptureOrFallback(gameId, computerColor, board, legalMoves, level);
         try {
             MoveIntent intent = chosen.promotionType() == null
@@ -130,21 +213,34 @@ public class ComputerPlayerService {
         if (!kingCaptures.isEmpty()) {
             return kingCaptures.get(ThreadLocalRandom.current().nextInt(kingCaptures.size()));
         }
-        return chooseMoveOrFallback(gameId, board, legalMoves, level);
+        // Devinette, pas coup propre : BlockedMove ne s'applique jamais ici (voir
+        // movesToAvoidThisTurn).
+        return chooseMoveOrFallback(gameId, board, legalMoves, level, Set.of());
     }
 
     /**
-     * Filet de secours si le moteur echoue malgre la nouvelle tentative deja faite
-     * cote StockfishChessEngine (process/communication toujours indisponible) : un
-     * coup aleatoire parmi les coups legaux plutot que de laisser le round bloque
-     * indefiniment - sans lui, cette exception etait avalee par le catch de act() et
-     * l'ordinateur ne soumettait alors plus jamais rien pour ce round, laissant
-     * l'humain attendre indefiniment (bug rencontre en pratique). Degrade la qualite
-     * de ce seul coup, jamais la progression de la partie.
+     * Court-circuit symetrique de guessKingCaptureOrFallback, cote coup reel cette
+     * fois : le round precedent peut avoir laisse le roi adverse en echec non resolu
+     * (voir plus haut), auquel cas une capture de ce roi figure parmi les coups
+     * legaux de l'ordinateur ici joueur au trait. Sans ce court-circuit, chooseMove
+     * envoyait cette position a Stockfish via son FEN (roi adverse en echec alors
+     * que ce n'est pas son tour - illegal aux yeux d'un moteur d'echecs classique) ;
+     * plausible cause d'un crash natif intermittent du process observe en pratique
+     * (recherche qui explore cette capture puis une position sans roi, jamais prevue
+     * par un moteur classique), plus frequent en difficile (recherche plus profonde,
+     * plus de chances d'atteindre cette branche). Capturer ce roi est de toute facon
+     * objectivement le meilleur coup possible, inutile de consulter le moteur.
      */
-    private Move chooseMoveOrFallback(GameId gameId, Board board, List<Move> legalMoves, ComputerLevel level) {
+    private Move chooseMoveOrFallback(GameId gameId, Board board, List<Move> legalMoves, ComputerLevel level,
+                                       Set<Move> movesToAvoidIfPossible) {
+        List<Move> kingCaptures = legalMoves.stream()
+                .filter(move -> move.isCapture() && move.capturedPiece().type() == PieceType.KING)
+                .toList();
+        if (!kingCaptures.isEmpty()) {
+            return kingCaptures.get(ThreadLocalRandom.current().nextInt(kingCaptures.size()));
+        }
         try {
-            return chessEngine.chooseMove(board, legalMoves, level);
+            return chessEngine.chooseMove(board, legalMoves, level, movesToAvoidIfPossible);
         } catch (Exception e) {
             log.error("computer player engine failed for game {}, falling back to a random legal move", gameId, e);
             return legalMoves.get(ThreadLocalRandom.current().nextInt(legalMoves.size()));

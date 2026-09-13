@@ -199,7 +199,25 @@ tout court (échec rapide voulu au boot Spring, pas seulement au moment du login
   `position startpos moves ...` (notation UCI longue), jamais de FEN. Niveaux : `UCI_LimitStrength`+
   `UCI_Elo` (facile ≈ 1320 + choix aléatoire pondéré parmi le top-3 MultiPV pour descendre sous le
   plancher natif de l'engin ; moyen ≈ 1500 ; difficile = pleine puissance), `movetime` borné (300-
-  1500ms) pour limiter le coût CPU. Un seul et même appel (`chooseMove`) sert à jouer son propre coup
+  1500ms) pour limiter le coût CPU.
+  **Difficile rendu imprévisible** : jouer systématiquement le coup objectivement optimal le rend
+  trop facile à deviner (annulation + perte du trait pour l'ordinateur, pire que jouer un coup
+  légèrement plus faible mais non deviné) — corrigé en demandant aussi du MultiPV (5 lignes) en
+  difficile, avec une stratégie différente du facile (`pickAvoidingObviousBest` vs
+  `pickByRankWeight`, `StockfishChessEngine`) : coup PV1 nettement meilleur que PV2 (écart de score
+  au-delà de `GAP_THRESHOLD_CP`, ex. seule pièce capable de reprendre) → jouer au hasard parmi les
+  *autres* candidats plutôt que le coup évident ; coups tous proches (ex. roi en échec avec peu de
+  coups légaux) → jouer au hasard parmi eux plutôt que toujours le premier. Un mat forcé reste
+  toujours joué sans exception (le manquer coûte plus qu'une devinette réussie). Prépare le terrain
+  pour l'IA guess-aware de l'étape 17 sans l'anticiper entièrement.
+  **Mémoire de coups bloqués** (difficile uniquement) : quand la devinette adverse annule le coup
+  réel de l'ordinateur, ce coup (origine/destination/promotion, pas égalité complète de `Move` — la
+  pièce capturée dépend de la position) est évité pendant ses 2 prochains tours de coup réel
+  (`ComputerPlayerService.BlockedMove`/`movesToAvoidThisTurn`, jamais pour ses tours de devinette,
+  état en mémoire non persisté). `ChessEngine.chooseMove` a gagné un paramètre
+  `movesToAvoidIfPossible` pour ça — indicatif seulement, `StockfishChessEngine` l'ignore plutôt que
+  de vider la liste de candidats MultiPV ou de forcer un coup nettement pire.
+  Un seul et même appel (`chooseMove`) sert à jouer son propre coup
   ET à deviner celui de l'adversaire (même question posée au moteur) - voir `ComputerPlayerService`,
   qui détermine ce rôle via `Game.sideToMove()` et déclenche l'action sur un thread virtuel à chaque
   début de round (création de partie, ou résolution du round précédent - jamais de polling).
