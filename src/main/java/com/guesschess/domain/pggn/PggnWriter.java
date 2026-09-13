@@ -41,8 +41,10 @@ public final class PggnWriter {
     public static PggnGame toPggnGame(Game game, Map<String, String> headerOverrides) {
         List<Game.RoundContext> contexts = game.roundHistoryWithPositions();
         List<PggnPly> plies = new ArrayList<>(contexts.size());
+        boolean fastMateResult = game.isFastMateResult();
         for (int i = 0; i < contexts.size(); i++) {
-            plies.add(toPly((i / 2) + 1, contexts.get(i)));
+            boolean isFastMateEndingRound = fastMateResult && i == contexts.size() - 1;
+            plies.add(toPly((i / 2) + 1, contexts.get(i), isFastMateEndingRound));
         }
         return new PggnGame(tags(game, headerOverrides), plies);
     }
@@ -88,12 +90,28 @@ public final class PggnWriter {
     }
 
     public static PggnPly toPly(int moveNumber, Game.RoundContext context) {
+        return toPly(moveNumber, context, false);
+    }
+
+    /**
+     * @param isFastMateEndingRound vrai uniquement pour le dernier round d'une partie
+     *                              terminee par fast_mate (Game.isFastMateResult(),
+     *                              variante GUESSCHESS) - ce coup laisse l'adversaire
+     *                              avec un seul coup legal en echec sans le capturer
+     *                              lui-meme, donc SanGenerator calcule "+" (l'adversaire
+     *                              a techniquement un coup) plutot que "#" ; on corrige
+     *                              ici puisque la partie s'arrete bel et bien la.
+     */
+    public static PggnPly toPly(int moveNumber, Game.RoundContext context, boolean isFastMateEndingRound) {
         RoundResult round = context.round();
         Move guessedMove = round.guessedMove();
 
         String realSan = round.movePlayed()
                 ? SanGenerator.toSan(context.boardBefore(), round.actualMove(), context.boardAfter())
                 : null;
+        if (isFastMateEndingRound && realSan != null && realSan.endsWith("+")) {
+            realSan = realSan.substring(0, realSan.length() - 1) + "#";
+        }
 
         String guessedSan = null;
         if (guessedMove != null) {

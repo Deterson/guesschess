@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { ApiError, adminListGames, adminListUsers } from '../services/api'
 import type { AdminGameHttpResponse, AdminUserHttpResponse } from '../types/api'
@@ -21,6 +22,16 @@ const PAGE_SIZE = 30
 
 const { t } = useI18n()
 const authStore = useAuthStore()
+const router = useRouter()
+
+function goToUser(login: string | null) {
+  if (!login) return
+  router.push({ name: 'public-profile', params: { login } })
+}
+
+function goToGame(gameId: string) {
+  router.push({ name: 'game', params: { gameId } })
+}
 
 const forbidden = ref(false)
 const loadError = ref<string | null>(null)
@@ -130,7 +141,13 @@ onMounted(() => {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="u in users" :key="u.id" class="border-t border-stone-800">
+              <tr
+                v-for="u in users"
+                :key="u.id"
+                class="border-t border-stone-800"
+                :class="u.login ? 'cursor-pointer hover:bg-stone-800/50' : ''"
+                @click="goToUser(u.login)"
+              >
                 <td class="px-3 py-1.5">{{ u.login ? `@${u.login}` : '—' }}</td>
                 <td class="px-3 py-1.5">{{ u.displayName }}</td>
                 <td class="px-3 py-1.5">{{ u.email ?? '—' }}</td>
@@ -166,7 +183,12 @@ onMounted(() => {
               </tr>
             </thead>
             <tbody>
-              <tr v-for="g in games" :key="g.id" class="border-t border-stone-800">
+              <tr
+                v-for="g in games"
+                :key="g.id"
+                class="cursor-pointer border-t border-stone-800 hover:bg-stone-800/50"
+                @click="goToGame(g.id)"
+              >
                 <td class="px-3 py-1.5 font-mono text-xs text-stone-500">{{ g.id.slice(0, 8) }}</td>
                 <td class="px-3 py-1.5">{{ g.variant }}</td>
                 <td class="px-3 py-1.5">{{ g.status }}</td>

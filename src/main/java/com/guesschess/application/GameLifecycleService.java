@@ -249,16 +249,18 @@ public class GameLifecycleService {
      * avant le premier round (ou le plateau courant si aucun round n'a encore ete
      * resolu) ; rounds porte, pour chaque round (y compris annules), le plateau
      * avant/apres (Game.roundHistoryWithPositions) necessaire au frontend pour
-     * naviguer dans l'historique et afficher la devinette en fantome.
+     * naviguer dans l'historique et afficher la devinette en fantome. fastMateResult
+     * (Game.isFastMateResult()) permet a PggnWriter.toPly de reconnaitre le dernier
+     * round quand il termine la partie sans coup +/# calculable classiquement.
      */
-    public record GameHistorySnapshot(Board initialBoard, List<Game.RoundContext> rounds) {
+    public record GameHistorySnapshot(Board initialBoard, List<Game.RoundContext> rounds, boolean fastMateResult) {
     }
 
     public GameHistorySnapshot gameHistory(GameId id) {
         return gameRepository.withGame(id, game -> {
             List<Game.RoundContext> contexts = game.roundHistoryWithPositions();
             Board initial = contexts.isEmpty() ? game.board() : contexts.get(0).boardBefore();
-            return new GameHistorySnapshot(initial, contexts);
+            return new GameHistorySnapshot(initial, contexts, game.isFastMateResult());
         });
     }
 

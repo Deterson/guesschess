@@ -267,7 +267,8 @@ class GameCreationController {
             for (int i = 0; i < snapshot.rounds().size(); i++) {
                 Game.RoundContext context = snapshot.rounds().get(i);
                 RoundResult round = context.round();
-                PggnPly ply = PggnWriter.toPly((i / 2) + 1, context);
+                boolean isFastMateEndingRound = snapshot.fastMateResult() && i == snapshot.rounds().size() - 1;
+                PggnPly ply = PggnWriter.toPly((i / 2) + 1, context, isFastMateEndingRound);
                 rounds.add(new GameHistoryEntryHttpResponse(
                         ply.moveNumber(), round.mover().name(), round.guesser().name(),
                         round.actualMove().from().toAlgebraic(), round.actualMove().to().toAlgebraic(), ply.realSan(),

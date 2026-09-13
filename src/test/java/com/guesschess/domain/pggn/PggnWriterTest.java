@@ -79,6 +79,24 @@ class PggnWriterTest {
     }
 
     @Test
+    void fastMateShowsAMateSuffixOnTheRealMoveInsteadOfACheckSuffix() {
+        Board board = Board.empty()
+                .withPiece(Position.fromAlgebraic("h1"), Piece.of(PieceType.KING, Color.WHITE))
+                .withPiece(Position.fromAlgebraic("h4"), Piece.of(PieceType.ROOK, Color.WHITE))
+                .withPiece(Position.fromAlgebraic("a8"), Piece.of(PieceType.KING, Color.BLACK))
+                .withPiece(Position.fromAlgebraic("b7"), Piece.of(PieceType.PAWN, Color.BLACK));
+        Game game = Game.fromPosition(board, GameVariant.GUESSCHESS);
+
+        submitRound(game, "h4", "a4", null, null);
+
+        String pggn = PggnWriter.write(game);
+
+        assertTrue(pggn.contains("1. Ra4#"), pggn);
+        assertTrue(pggn.contains("[Result \"1-0\"]"), pggn);
+        assertTrue(pggn.contains("[Termination \"" + GameResultCause.KING_CAPTURED + "\"]"), pggn);
+    }
+
+    @Test
     void headersDefaultToPlaceholdersAndReflectVariantAndOngoingResult() {
         Game game = Game.newGame(GameVariant.GUESSMATE);
 

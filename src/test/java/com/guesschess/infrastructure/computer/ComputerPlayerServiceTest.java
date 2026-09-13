@@ -115,8 +115,10 @@ class ComputerPlayerServiceTest {
 
     @Test
     void computerImmediatelyGuessesAMoveThatWouldCaptureItsOwnHangingKingInsteadOfAskingTheEngine() {
-        // Roi blanc en a1, en echec par la tour noire (a8), seul coup blanc legal
-        // Ra1-b1 (voir GameGuessingTest.checkWithSingleEscapePosition). Devine
+        // Roi blanc en a1, en echec par la tour noire (a8), deux coups blancs legaux
+        // (Ra1-b1/b2 - voir GameGuessingTest.checkWithMultipleEscapesPosition, expres
+        // choisie plutot que la position a un seul coup pour ne pas declencher
+        // fast_mate ici, qui terminerait la partie avant meme ce round). Devine
         // correctement puis annule : le roi blanc reste en echec non resolu, le trait
         // passe aux noirs, qui ont alors Ra8xa1 parmi leurs coups legaux (voir
         // GameGuessingTest.correctlyGuessingTheEscapeFromCheckLeavesTheKingInCheckAndPassesTheTurn).
@@ -124,7 +126,6 @@ class ComputerPlayerServiceTest {
         Board position = Board.empty()
                 .withPiece(Position.fromAlgebraic("a1"), Piece.of(PieceType.KING, Color.WHITE))
                 .withPiece(Position.fromAlgebraic("a8"), Piece.of(PieceType.ROOK, Color.BLACK))
-                .withPiece(Position.fromAlgebraic("d3"), Piece.of(PieceType.KNIGHT, Color.BLACK))
                 .withPiece(Position.fromAlgebraic("h8"), Piece.of(PieceType.KING, Color.BLACK));
         Game game = Game.fromPosition(gameId, position, GameVariant.GUESSCHESS);
         Move escape = findMove(game.legalMoves(), "a1", "b1");

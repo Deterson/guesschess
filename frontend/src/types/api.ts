@@ -208,9 +208,11 @@ export interface MoveHistoryEntry {
   san: string
 }
 
+/** fastMate : voir ResultMessage.java - vrai uniquement pour KING_CAPTURED via fast_mate. */
 export interface ResultMessage {
   winner: Color | null
   cause: GameResultCause
+  fastMate: boolean
 }
 
 /** Round deja resolu : reveler la devinette est le comportement voulu (cf. RoundSummaryMessage.java). */

@@ -39,7 +39,14 @@ import java.util.Optional;
  * quand meme au devineur, qui a alors normalement acces au coup capturant ce roi
  * parmi ses coups legaux. C'est un coup comme un autre : rien n'oblige le devineur a
  * le jouer, et lui-meme peut se faire deviner. Si personne ne capture jamais, la
- * regle de repetition finit par forcer la nulle.
+ * regle de repetition finit par forcer la nulle. Exception ("fast_mate", voir
+ * FAST_MATE_ENABLED, applyFastMateIfApplicable) : des qu'un joueur se retrouve au
+ * trait en echec avec un seul coup legal, la partie se termine immediatement en sa
+ * faveur (cause KING_CAPTURED, comme how-to-play "endOfGameText2") - inutile de faire
+ * deviner l'adversaire, ce coup est le seul possible - sauf si l'adversaire n'a de
+ * toute facon pas assez de materiel pour forcer le mat (DRAW_INSUFFICIENT_MATERIAL a
+ * la place). Verifie au debut de chaque round (jamais pendant un round deja entame),
+ * donc avant meme que ce joueur ait soumis quoi que ce soit.
  *
  * Variante GUESSMATE (par defaut) : dans ce meme cas particulier (devinette correcte
  * du coup qui parait un echec), la partie se termine immediatement, victoire du
@@ -51,6 +58,16 @@ public final class Game {
     private static final int FIFTY_MOVE_HALFMOVE_LIMIT = 100;
     private static final int REPETITION_LIMIT = 3;
     private static final int GUESS_REPETITION_LIMIT_PER_SIDE = 3;
+
+    /**
+     * Feature flag "fast_mate" : desactivable en repassant cette constante a false (commit +
+     * push, pas de variable d'environnement - voir applyFastMateIfApplicable). Quand actif, en
+     * variante GUESSCHESS, des qu'un joueur se retrouve au trait en echec avec un seul coup
+     * legal, la partie se termine immediatement (cause KING_CAPTURED, comme une vraie capture
+     * de roi) sans meme attendre qu'un coup ou une devinette soit soumis pour ce round : ce
+     * coup est forcement le seul possible, inutile de faire deviner l'adversaire.
+     */
+    private static final boolean FAST_MATE_ENABLED = true;
 
     /**
      * Origine d'une entree de positionHistory : MOVE pour un coup reellement joue
@@ -149,6 +166,7 @@ public final class Game {
         this.timeControl = timeControl;
         this.whiteMillisRemaining = timeControl == null ? 0 : timeControl.baseMillis();
         this.blackMillisRemaining = timeControl == null ? 0 : timeControl.baseMillis();
+        applyFastMateIfApplicable();
     }
 
     private Game(GameId id, GameVariant variant, Board board, List<PositionRecord> positionHistory, List<RoundResult> roundHistory,
@@ -254,6 +272,25 @@ public final class Game {
 
     public GameResult result() {
         return result;
+    }
+
+    /**
+     * Vrai si la partie s'est terminee via fast_mate (voir FAST_MATE_ENABLED,
+     * applyFastMateIfApplicable) plutot que par une vraie capture de roi jouee - les
+     * deux partagent la meme cause KING_CAPTURED (persistee et cote base identique
+     * dans les deux cas, voir CLAUDE.md), donc jamais stocke separement : redecouvert
+     * a la demande a partir du dernier round pour informer l'affichage cote frontend
+     * ("roi capture (un seul coup possible)" plutot que le texte generique).
+     */
+    public boolean isFastMateResult() {
+        if (status != GameStatus.FINISHED || result == null || result.cause() != GameResultCause.KING_CAPTURED) {
+            return false;
+        }
+        if (roundHistory.isEmpty()) {
+            return true;
+        }
+        Move lastMove = roundHistory.get(roundHistory.size() - 1).actualMove();
+        return !(lastMove.isCapture() && lastMove.capturedPiece().type() == PieceType.KING);
     }
 
     public Color drawOfferedBy() {
@@ -404,10 +441,10 @@ public final class Game {
 
     /**
      * Chaque round de roundHistory associe a son plateau juste avant (toujours
-     * disponible) et juste apres (nullable). boardAfter est absent dans le seul cas
-     * ou aucune entree n'a ete ajoutee a positionHistory pour ce round : le round
-     * terminal Guessmate (devinette correcte d'un coup qui parait un echec, partie
-     * terminee immediatement sans jamais appeler applyRealMove ni cancelRound - voir
+     * disponible) et juste apres (nullable). boardAfter est absent quand aucune
+     * entree n'a ete ajoutee a positionHistory pour ce round : round terminal
+     * Guessmate, ou terminal fast_mate (voir FAST_MATE_ENABLED) - partie terminee
+     * immediatement sans jamais appeler applyRealMove ni cancelRound (voir
      * resolveRound). Utilise par le PGGN (etape 10 de la roadmap), qui a besoin du
      * "avant" pour tout round (coup reel et/ou devine) mais du "apres" seulement pour
      * calculer le suffixe echec/mat d'un coup reellement joue.
@@ -712,6 +749,11 @@ public final class Game {
     }
 
     private void resolveGameEnd() {
+        applyFastMateIfApplicable();
+        if (status != GameStatus.ONGOING) {
+            return;
+        }
+
         Color nextToMove = board.sideToMove();
         boolean nextHasLegalMoves = MoveGenerator.hasAnyLegalMove(board, nextToMove);
 
@@ -737,6 +779,36 @@ public final class Game {
         }
         if (MaterialEvaluator.isInsufficientMaterial(board)) {
             finish(GameResult.draw(GameResultCause.DRAW_INSUFFICIENT_MATERIAL));
+        }
+    }
+
+    /**
+     * Feature "fast_mate" (voir FAST_MATE_ENABLED) : le joueur au trait n'a qu'un seul coup
+     * legal pour sortir d'un echec, donc la devinette adverse est forcement juste (rien
+     * d'autre a proposer) - inutile de faire jouer ce round, la partie se termine tout de
+     * suite avec la meme cause qu'une capture de roi. Appele au debut de chaque round
+     * (resolveGameEnd) et a la construction (cas d'une position de depart deja dans cet
+     * etat), jamais pendant un round en cours.
+     */
+    private void applyFastMateIfApplicable() {
+        if (!FAST_MATE_ENABLED || variant != GameVariant.GUESSCHESS) {
+            return;
+        }
+        Color toMove = board.sideToMove();
+        if (!CheckDetector.isInCheck(board, toMove)) {
+            return;
+        }
+        if (MoveGenerator.generateLegalMoves(board, toMove).size() != 1) {
+            return;
+        }
+        // Materiel insuffisant pour mater (voir CLAUDE.md/how-to-play, "endOfGameText2") :
+        // meme force a jouer ce coup, l'adversaire ne pourrait de toute facon jamais forcer
+        // le mat par la suite - nulle plutot que victoire, comme resolveGameEnd le ferait
+        // pour n'importe quelle autre position.
+        if (MaterialEvaluator.isInsufficientMaterial(board)) {
+            finish(GameResult.draw(GameResultCause.DRAW_INSUFFICIENT_MATERIAL));
+        } else {
+            finish(GameResult.win(toMove.opposite(), GameResultCause.KING_CAPTURED));
         }
     }
 

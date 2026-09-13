@@ -217,9 +217,9 @@ class GameGuessingTest {
 
     @Test
     void correctlyGuessingTheEscapeFromCheckLeavesTheKingInCheckAndPassesTheTurn() {
-        Game game = Game.fromPosition(checkWithSingleEscapePosition(), GameVariant.GUESSCHESS);
+        Game game = Game.fromPosition(checkWithMultipleEscapesPosition(), GameVariant.GUESSCHESS);
         assertTrue(game.isInCheck());
-        assertEquals(List.of(Position.fromAlgebraic("b1")),
+        assertEquals(List.of(Position.fromAlgebraic("b1"), Position.fromAlgebraic("b2")),
                 game.legalMoves().stream().map(Move::to).toList());
 
         Move escape = findMove(game.legalMoves(), "a1", "b1");
@@ -244,7 +244,7 @@ class GameGuessingTest {
 
     @Test
     void guesserCanChooseNotToCaptureTheHangingKing() {
-        Game game = Game.fromPosition(checkWithSingleEscapePosition(), GameVariant.GUESSCHESS);
+        Game game = Game.fromPosition(checkWithMultipleEscapesPosition(), GameVariant.GUESSCHESS);
         Move escape = findMove(game.legalMoves(), "a1", "b1");
         game.submitGuess(escape);
         game.submitMove(escape);
@@ -270,7 +270,7 @@ class GameGuessingTest {
 
     @Test
     void freeKingCaptureCanItselfBeGuessedAndCancelled() {
-        Game game = Game.fromPosition(checkWithSingleEscapePosition(), GameVariant.GUESSCHESS);
+        Game game = Game.fromPosition(checkWithMultipleEscapesPosition(), GameVariant.GUESSCHESS);
         Move escape = findMove(game.legalMoves(), "a1", "b1");
         game.submitGuess(escape);
         game.submitMove(escape);
@@ -316,6 +316,54 @@ class GameGuessingTest {
         assertEquals(Color.BLACK, game.sideToMove());
     }
 
+    @Test
+    void fastMateEndsTheGameInstantlyInGuesschessAsSoonAsTheOnlyEscapeFromCheckArises() {
+        Game game = Game.fromPosition(checkWithSingleEscapePosition(), GameVariant.GUESSCHESS);
+
+        assertEquals(GameStatus.FINISHED, game.status());
+        assertEquals(GameResultCause.KING_CAPTURED, game.result().cause());
+        assertEquals(Color.BLACK, game.result().winner());
+        assertEquals(Piece.of(PieceType.KING, Color.WHITE), game.board().pieceAt(Position.fromAlgebraic("a1")));
+    }
+
+    @Test
+    void fastMateEndsTheGameInstantlyAssoonAsARealMoveLeavesTheOpponentWithOnlyOneEscapeFromCheck() {
+        Game game = Game.fromPosition(aboutToDeliverSingleEscapeCheckPosition(), GameVariant.GUESSCHESS);
+        assertFalse(game.isInCheck(Color.BLACK));
+        Move deliverCheck = findMove(game.legalMoves(), "h4", "a4");
+
+        game.submitGuess(null);
+        RoundResult result = game.submitMove(deliverCheck).orElseThrow();
+
+        assertTrue(result.movePlayed());
+        assertEquals(GameStatus.FINISHED, game.status());
+        assertEquals(GameResultCause.KING_CAPTURED, game.result().cause());
+        assertEquals(Color.WHITE, game.result().winner());
+    }
+
+    @Test
+    void fastMateDeclaresADrawInsteadOfAWinWhenTheWinningSideHasInsufficientMatingMaterial() {
+        Game game = Game.fromPosition(knightCheckWithSingleEscapeAndInsufficientMaterialPosition(), GameVariant.GUESSCHESS);
+
+        assertEquals(GameStatus.FINISHED, game.status());
+        assertTrue(game.result().isDraw());
+        assertEquals(GameResultCause.DRAW_INSUFFICIENT_MATERIAL, game.result().cause());
+    }
+
+    @Test
+    void fastMateDoesNotTriggerInGuesschessWhenSeveralEscapesFromCheckExist() {
+        Game game = Game.fromPosition(checkWithMultipleEscapesPosition(), GameVariant.GUESSCHESS);
+        Move escape = findMove(game.legalMoves(), "a1", "b1");
+        game.submitGuess(escape);
+
+        RoundResult result = game.submitMove(escape).orElseThrow();
+
+        assertFalse(result.movePlayed());
+        assertTrue(result.guessedCorrectly());
+        assertEquals(GameStatus.ONGOING, game.status());
+        assertTrue(game.isInCheck(Color.WHITE));
+    }
+
     /**
      * Roi blanc en a1, en echec par la tour noire (colonne a), avec b2 tenu par le
      * cavalier noir : le seul coup legal blanc est Ra1-b1.
@@ -326,6 +374,48 @@ class GameGuessingTest {
                 .withPiece(Position.fromAlgebraic("a8"), Piece.of(PieceType.ROOK, Color.BLACK))
                 .withPiece(Position.fromAlgebraic("d3"), Piece.of(PieceType.KNIGHT, Color.BLACK))
                 .withPiece(Position.fromAlgebraic("h8"), Piece.of(PieceType.KING, Color.BLACK));
+    }
+
+    /**
+     * Blancs au trait (aucun echec) : la tour h4 n'est pas encore sur la colonne a. Une
+     * fois jouee en a4, elle met le roi noir en echec le long de cette colonne, avec
+     * b7 (pion noir) bloquant l'autre case adjacente : Rb8 devient le seul coup legal
+     * noir - utilise pour verifier que fast_mate se declenche des l'application de ce
+     * coup reel, sans attendre la moindre soumission du camp mis en echec.
+     */
+    private static Board aboutToDeliverSingleEscapeCheckPosition() {
+        return Board.empty()
+                .withPiece(Position.fromAlgebraic("h1"), Piece.of(PieceType.KING, Color.WHITE))
+                .withPiece(Position.fromAlgebraic("h4"), Piece.of(PieceType.ROOK, Color.WHITE))
+                .withPiece(Position.fromAlgebraic("a8"), Piece.of(PieceType.KING, Color.BLACK))
+                .withPiece(Position.fromAlgebraic("b7"), Piece.of(PieceType.PAWN, Color.BLACK));
+    }
+
+    /**
+     * Meme echec que checkWithSingleEscapePosition, mais sans le cavalier tenant b2 :
+     * le roi blanc a deux coups legaux (Ra1-b1 et Ra1-b2), donc une devinette juste
+     * n'est plus forcement la seule possible (pas de fast_mate).
+     */
+    private static Board checkWithMultipleEscapesPosition() {
+        return Board.empty()
+                .withPiece(Position.fromAlgebraic("a1"), Piece.of(PieceType.KING, Color.WHITE))
+                .withPiece(Position.fromAlgebraic("a8"), Piece.of(PieceType.ROOK, Color.BLACK))
+                .withPiece(Position.fromAlgebraic("h8"), Piece.of(PieceType.KING, Color.BLACK));
+    }
+
+    /**
+     * Roi blanc g6 + cavalier f7 (echec au roi noir h8) contre seul roi noir : materiel
+     * insuffisant pour mater (roi+cavalier contre roi, voir MaterialEvaluator), et le
+     * roi blanc g6 couvre g7/h7 - Rg8 est le seul coup legal noir. Utilise pour verifier
+     * que fast_mate declare la nulle plutot qu'une victoire dans ce cas (voir
+     * how-to-play, endOfGameText2).
+     */
+    private static Board knightCheckWithSingleEscapeAndInsufficientMaterialPosition() {
+        return Board.empty()
+                .withPiece(Position.fromAlgebraic("g6"), Piece.of(PieceType.KING, Color.WHITE))
+                .withPiece(Position.fromAlgebraic("f7"), Piece.of(PieceType.KNIGHT, Color.WHITE))
+                .withPiece(Position.fromAlgebraic("h8"), Piece.of(PieceType.KING, Color.BLACK))
+                .withSideToMove(Color.BLACK);
     }
 
     /**

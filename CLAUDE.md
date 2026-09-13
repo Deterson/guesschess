@@ -18,6 +18,13 @@ Jeu d'échecs classique avec une règle additionnelle :
   - **Devinette correcte** → le coup réel est annulé, le tour passe au devineur (c'est lui qui joue au tour suivant).
   - **Devinette incorrecte** → le coup réel est joué normalement, tour normal.
 - **Cas particulier** : si le joueur au trait est en échec et que l'adversaire devine correctement son coup, le roi est capturé et la partie se termine immédiatement (au lieu de simplement annuler le coup).
+- **"fast_mate"** (variante GUESSCHESS uniquement, GUESSMATE couvre déjà ce cas) : dès qu'un joueur
+  se retrouve au trait en échec avec un seul coup légal, la partie se termine immédiatement en
+  faveur de l'adversaire (cause `KING_CAPTURED` comme une vraie capture) — sans même attendre un
+  coup ou une devinette pour ce round, puisque ce coup est forcément le seul possible. Vérifié au
+  début de chaque round (jamais en cours de round). Activé/désactivé via une constante dans
+  `Game.java` (`FAST_MATE_ENABLED`), pas une variable d'environnement — volontairement, pour rester
+  désactivable par un simple commit+push plutôt qu'un changement à faire sur le Pi.
 
 ## Stack technique
 

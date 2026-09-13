@@ -33,8 +33,12 @@ import java.util.List;
  * dupliquer la detection d'echec cote client. guessRepetitionImminent indique qu'un
  * seul coup encore devine correctement par sideToMove suffirait a declencher la nulle
  * par "6 guess repetition" (Game.isGuessRepetitionImminent) - permet au frontend
- * d'avertir avant coup plutot que de laisser la nulle surprendre. Les champs de
- * pendule (etape 12,
+ * d'avertir avant coup plutot que de laisser la nulle surprendre. fastMateResult
+ * (Game.isFastMateResult()) distingue, uniquement pour l'affichage cote frontend, une
+ * fin de partie KING_CAPTURED via fast_mate (variante GUESSCHESS, un seul coup legal
+ * en echec) d'une vraie capture de roi jouee - la cause persistee reste identique
+ * dans les deux cas (voir CLAUDE.md), ce booleen est toujours redecouvert a la
+ * demande, jamais stocke. Les champs de pendule (etape 12,
  * timeControl null = correspondance) portent l'etat brut de l'agregat, jamais un
  * "temps restant a l'instant present" precalcule : le frontend derive lui-meme
  * l'affichage en continu a partir de clockRunningSince et d'un horodatage serveur
@@ -54,6 +58,7 @@ public record GameSnapshot(
         int roundCount,
         boolean inCheck,
         boolean guessRepetitionImminent,
+        boolean fastMateResult,
         Color drawOfferedBy,
         Color rematchOfferedBy,
         GameId rematchGameId,
@@ -78,6 +83,7 @@ public record GameSnapshot(
                 game.roundHistory().size(),
                 game.isInCheck(),
                 game.isGuessRepetitionImminent(),
+                game.isFastMateResult(),
                 game.drawOfferedBy(),
                 game.rematchOfferedBy(),
                 game.rematchGameId(),

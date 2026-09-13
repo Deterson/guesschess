@@ -29,6 +29,8 @@ const WIN_LABELS = computed<Record<Color, string>>(() => ({ WHITE: t('gameStatus
 
 const isGuessRepetitionDraw = computed(() => props.state.result != null && props.state.result.cause === 'DRAW_THREE_GUESS_REPETITION')
 const isGuessmate = computed(() => props.state.result != null && props.state.result.cause === 'CHECK_PARRY_GUESSED')
+/** fast_mate (voir CLAUDE.md) : KING_CAPTURED via un seul coup légal, jamais une autre cause persistée - voir ResultMessage.java. */
+const isFastMateKingCaptured = computed(() => props.state.result != null && props.state.result.cause === 'KING_CAPTURED' && props.state.result.fastMate)
 const showGuessRepetitionWarning = computed(() => !props.state.result && props.state.guessRepetitionImminent)
 
 const guessmateWinnerLabel = computed(() => {
@@ -37,12 +39,27 @@ const guessmateWinnerLabel = computed(() => {
   return WIN_LABELS.value[result.winner]
 })
 
+/**
+ * Échec et mat / roi capturé : cause seule, sans "partie terminée" ni nom du
+ * gagnant - le fond vert/rouge de la bannière (resultBgClass) l'indique déjà
+ * pour les joueurs. Timeout et les autres causes gardent le nom du gagnant,
+ * n'ayant pas de couleur dédiée pour le remplacer.
+ */
 const resultText = computed(() => {
   const result = props.state.result
-  if (!result || isGuessRepetitionDraw.value || isGuessmate.value) return null
+  if (!result || isGuessRepetitionDraw.value || isGuessmate.value || isFastMateKingCaptured.value) return null
   if (!result.winner) return t('gameStatusBar.resultDraw')
-  const key = result.cause === 'TIMEOUT' ? 'gameStatusBar.resultWinTimeout' : 'gameStatusBar.resultWin'
-  return t(key, { winner: WIN_LABELS.value[result.winner] })
+  const winner = WIN_LABELS.value[result.winner]
+  switch (result.cause) {
+    case 'TIMEOUT':
+      return t('gameStatusBar.resultWinTimeout', { winner })
+    case 'CHECKMATE':
+      return t('gameStatusBar.resultWinCheckmate')
+    case 'KING_CAPTURED':
+      return t('gameStatusBar.resultWinKingCaptured')
+    default:
+      return t('gameStatusBar.resultWin', { winner })
+  }
 })
 
 const resultBgClass = computed(() => {
@@ -100,6 +117,9 @@ function acknowledge() {
       </template>
       <template #winner>{{ guessmateWinnerLabel }}</template>
     </i18n-t>
+    <p v-else-if="isFastMateKingCaptured" class="font-semibold text-black">
+      <router-link to="/how-to-play#fast-mate-rule" class="text-black underline hover:no-underline">{{ t('gameStatusBar.resultWinFastMate') }}</router-link>
+    </p>
     <p v-else-if="resultText" class="font-semibold text-black">{{ resultText }}</p>
     <p v-else-if="myColor && !state.full" class="text-stone-400">{{ t('gameStatusBar.waitingOpponentToStart') }}</p>
     <p v-else-if="pendingSubmission" class="text-stone-400">{{ t('gameStatusBar.waitingOpponentSubmission') }}</p>

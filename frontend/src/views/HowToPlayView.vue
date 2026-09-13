@@ -1,11 +1,33 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute } from 'vue-router'
 import ChessBoard from '../components/ChessBoard.vue'
 import { getDefaultVariant } from '../services/api'
 import type { Board, BoardCell, GameVariant, PieceCode, RoundSummaryMessage } from '../types/api'
 
 const { t } = useI18n()
+const route = useRoute()
+
+/**
+ * Flash temporaire (voir CLAUDE.md, fast_mate) sur endOfGameText2 quand on arrive via
+ * le lien de la bannière de fin de partie (/how-to-play#fast-mate-rule) - le scroll
+ * jusqu'à l'ancre est déjà géré par router/index.ts (scrollBehavior), ceci n'ajoute
+ * que la mise en évidence visuelle qui s'estompe ensuite (transition CSS plutôt que
+ * ré-basculer la classe, voir template).
+ */
+const highlightFastMateRule = ref(false)
+watch(
+  () => route.hash,
+  (hash) => {
+    if (hash !== '#fast-mate-rule') return
+    highlightFastMateRule.value = true
+    setTimeout(() => {
+      highlightFastMateRule.value = false
+    }, 2500)
+  },
+  { immediate: true },
+)
 
 /**
  * Etape 16 : feature flag backend (guesschess.default-variant) - quand la variante par
@@ -110,13 +132,6 @@ const example3Guess = { from: 'e1', to: 'f2' }
       `sticky` interne pour rester visible pendant le défilement sans déborder sous le
       dernier exemple.
     -->
-    <aside class="mb-8 min-[1560px]:absolute min-[1560px]:top-0 min-[1560px]:right-full min-[1560px]:mr-8 min-[1560px]:mb-0 min-[1560px]:h-full min-[1560px]:w-75">
-      <div class="rounded-lg bg-stone-800 px-4 py-3 text-sm text-stone-300 min-[1560px]:sticky min-[1560px]:top-8">
-        <p class="mb-2 font-semibold text-stone-200">{{ t('howToPlay.pggnTitle') }}</p>
-        <p class="text-stone-400">{{ t('howToPlay.pggnText') }}</p>
-      </div>
-    </aside>
-
     <div class="flex flex-col gap-10">
       <div class="flex flex-col gap-3 text-center">
         <h1 class="text-3xl font-bold">{{ t('howToPlay.title') }}</h1>
@@ -140,6 +155,28 @@ const example3Guess = { from: 'e1', to: 'f2' }
           </li>
         </ul>
       </div>
+
+      <!--
+        L'encart PGGN ne doit jamais déplacer la colonne centrale (toujours centrée sur
+        l'écran, indépendamment de sa présence) : à partir de l'écran assez large pour
+        accueillir les deux sans chevauchement, il sort donc du flux (absolute, ancré au
+        conteneur `relative` racine malgré son imbrication ici) et s'accroche par son bord
+        droit à la gauche de la colonne (right-full), pour ne grandir que vers la gauche si
+        son contenu en a besoin. Le seuil (min-[1560px]) est calculé pour que la colonne
+        (max-w-4xl = 896px) laisse, de chaque côté, au moins la largeur de l'encart
+        (w-75 = 300px) + sa marge (mr-8 = 32px) ; en dessous, l'encart reste dans le flux
+        normal, sous la légende des plateaux (mobile compris) plutôt qu'en haut de la page.
+        `h-full` sur cet encart lui donne la même hauteur que la colonne centrale (qui
+        définit la hauteur du conteneur relatif), ce qui laisse de la place au `sticky`
+        interne pour rester visible pendant le défilement sans déborder sous le dernier
+        exemple.
+      -->
+      <aside class="min-[1560px]:absolute min-[1560px]:top-0 min-[1560px]:right-full min-[1560px]:mr-8 min-[1560px]:h-full min-[1560px]:w-75">
+        <div class="rounded-lg bg-stone-800 px-4 py-3 text-sm text-stone-300 min-[1560px]:sticky min-[1560px]:top-8">
+          <p class="mb-2 font-semibold text-stone-200">{{ t('howToPlay.pggnTitle') }}</p>
+          <p class="text-stone-400">{{ t('howToPlay.pggnText') }}</p>
+        </div>
+      </aside>
 
       <section class="flex flex-col gap-4">
         <div class="text-center">
@@ -166,7 +203,14 @@ const example3Guess = { from: 'e1', to: 'f2' }
       <section v-if="!isGuessmateDefault" class="flex flex-col gap-4">
         <div class="text-center">
           <h2 class="text-xl font-semibold">{{ t('howToPlay.endOfGameTitle') }}</h2>
-          <p class="mt-1 text-sm text-stone-400">{{ t('howToPlay.endOfGameText') }}</p>
+          <p class="mt-1 text-sm text-stone-400">{{ t('howToPlay.endOfGameText1') }}</p>
+          <p
+            id="fast-mate-rule"
+            class="mt-1 scroll-mt-8 rounded text-sm font-bold text-stone-400 transition-colors duration-700"
+            :class="highlightFastMateRule ? 'bg-amber-400/30 text-white' : ''"
+          >
+            {{ t('howToPlay.endOfGameText2') }}
+          </p>
         </div>
       </section>
 

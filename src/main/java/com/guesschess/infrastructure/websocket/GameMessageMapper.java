@@ -89,7 +89,7 @@ public class GameMessageMapper {
                 toBoardCells(snapshot.board()),
                 snapshot.sideToMove().name(),
                 snapshot.status().name(),
-                toResultMessage(snapshot.result()),
+                toResultMessage(snapshot.result(), snapshot.fastMateResult()),
                 toRoundSummaryMessage(snapshot.lastRoundResult()),
                 toLegalMoveMessages(snapshot.legalMoves()),
                 toMoveHistoryEntries(snapshot.playedMoveHistory()),
@@ -119,11 +119,11 @@ public class GameMessageMapper {
         return MoveIntent.promotingTo(fromPosition, toPosition, PieceType.valueOf(promotion));
     }
 
-    private ResultMessage toResultMessage(GameResult result) {
+    private ResultMessage toResultMessage(GameResult result, boolean fastMateResult) {
         if (result == null) {
             return null;
         }
-        return new ResultMessage(result.winner() == null ? null : result.winner().name(), result.cause().name());
+        return new ResultMessage(result.winner() == null ? null : result.winner().name(), result.cause().name(), fastMateResult);
     }
 
     private RoundSummaryMessage toRoundSummaryMessage(RoundResult roundResult) {
