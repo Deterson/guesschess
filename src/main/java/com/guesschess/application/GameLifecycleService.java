@@ -265,12 +265,11 @@ public class GameLifecycleService {
     }
 
     /**
-     * Variante (correction du bug de rechargement de page) qui identifie le
-     * demandeur par jeton pour joindre a l'etat public sa propre soumission en
-     * attente pour le round en cours - jamais celle de l'adversaire, jamais pour un
-     * spectateur (token null, invalide, ou d'une autre partie degrade silencieusement
-     * vers PendingSubmission.NONE plutot que d'echouer : consulter une partie n'a
-     * jamais necessite de jeton valide).
+     * Variante qui identifie le demandeur par jeton pour joindre a l'etat public sa
+     * propre soumission en attente pour le round en cours - jamais celle de
+     * l'adversaire, jamais pour un spectateur (token null, invalide, ou d'une autre
+     * partie degrade silencieusement vers PendingSubmission.NONE plutot que
+     * d'echouer : consulter une partie n'a jamais necessite de jeton valide).
      */
     public GameView viewGame(GameId id, PlayerToken token) {
         return gameRepository.withGame(id, game -> {

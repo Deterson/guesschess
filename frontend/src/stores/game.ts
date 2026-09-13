@@ -40,9 +40,8 @@ export const useGameStore = defineStore('game', () => {
   /**
    * Dérivé directement de la présence d'un jeton : celui-ci n'arrive jamais dans les
    * mains de ce store autrement que déjà vérifié (par /my-access ou /join, tous deux
-   * côté serveur) - contrairement à l'ancien modèle où un jeton pouvait transiter par
-   * une URL sans garantie que son porteur soit le bon. NotYourColorException reste un
-   * filet de sécurité serveur (jeton forgé) plutôt qu'un cas normal.
+   * côté serveur). NotYourColorException reste un filet de sécurité serveur (jeton
+   * forgé) plutôt qu'un cas normal.
    */
   const canAct = ref(false)
   /**
@@ -262,10 +261,7 @@ export const useGameStore = defineStore('game', () => {
    * Reflète, après (re)connexion (typiquement un rechargement de page), ma propre
    * soumission déjà enregistrée côté serveur pour le round en cours - jamais celle de
    * l'adversaire, le serveur ne l'envoie de toute façon jamais (voir
-   * MySubmissionMessage.java). Sans ça, pendingSubmission repartait toujours à false
-   * après un rechargement alors qu'un coup pouvait déjà être enregistré : le joueur
-   * pouvait alors retenter un coup que le serveur bloquerait (IllegalStateException,
-   * "a move has already been submitted for this round").
+   * MySubmissionMessage.java).
    */
   function applyMySubmission(mySubmission: MySubmissionMessage) {
     pendingSubmission.value = mySubmission.submitted

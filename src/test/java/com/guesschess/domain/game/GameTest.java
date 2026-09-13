@@ -192,9 +192,9 @@ class GameTest {
         Game game = Game.fromPosition(board);
 
         // a guessed round is cancelled - no piece actually moves - so the position
-        // (knights home) keeps recurring, but only via GUESS-origin entries. Two
-        // round-trips (4 correct guesses) would have hit the old, buggy 3-occurrence
-        // count (initial + after trip 1 + after trip 2) if guesses were counted.
+        // (knights home) keeps recurring, but only via GUESS-origin entries, which must
+        // not count toward threefold repetition. Two round-trips (4 correct guesses)
+        // would reach 3 occurrences (initial + after trip 1 + after trip 2) if they did.
         for (int i = 0; i < 2; i++) {
             guessCorrectly(game, "b1", "c3");
             guessCorrectly(game, "b8", "c6");

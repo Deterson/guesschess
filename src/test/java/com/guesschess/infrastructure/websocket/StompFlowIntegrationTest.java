@@ -210,11 +210,11 @@ class StompFlowIntegrationTest {
     }
 
     /**
-     * Reproduit le bug de rechargement de page : le mover soumet son coup, une
-     * "nouvelle session" (autre connexion, comme un onglet rafraichi) revoit l'etat
-     * avec son propre jeton - elle doit retrouver son coup en attente (pour ne pas
-     * retenter une soumission que le serveur bloquerait), alors qu'une session sans
-     * jeton (spectateur) ou avec le jeton de l'adversaire ne doit jamais l'obtenir.
+     * Le mover soumet son coup, puis une "nouvelle session" (autre connexion, comme un
+     * onglet rafraichi) revoit l'etat avec son propre jeton : elle doit retrouver son
+     * coup en attente (pour ne pas retenter une soumission que le serveur bloquerait),
+     * alors qu'une session sans jeton (spectateur) ou avec le jeton de l'adversaire ne
+     * doit jamais l'obtenir.
      */
     @Test
     void viewAfterReconnectExposesMyOwnPendingMoveButNeverToTheOpponentOrASpectator() throws Exception {

@@ -58,13 +58,12 @@ class GameJpaMapperTest {
      * Regression (etape 12) : une partie persistee avant l'ajout de la pendule n'a
      * AUCUNE des cles de cadence dans son JSON (pas juste des valeurs null comme dans
      * le test ci-dessus, qui construit le record directement en Java sans jamais
-     * passer par Jackson) - deserialiser whiteMillisRemaining/blackMillisRemaining
-     * comme des `long` primitifs faisait planter (MismatchedInputException :
-     * "Cannot map `null` into type `long`") des qu'un vrai joueur rouvrait une partie
-     * anonyme terminee avant cette etape. Corrige en les rendant `Long` (nullable,
-     * meme traitement que timeControlBaseMillis) - ce test passe par le vrai
-     * GameStateJsonConverter plutot que de construire GameStateJson en Java, pour ne
-     * pas manquer une regression de ce type une seconde fois.
+     * passer par Jackson). whiteMillisRemaining/blackMillisRemaining doivent donc
+     * rester `Long` (nullable, meme traitement que timeControlBaseMillis) et non
+     * `long` primitif, qui ferait planter la deserialisation d'une cle absente. Ce
+     * test passe par le vrai GameStateJsonConverter plutot que de construire
+     * GameStateJson en Java, seul moyen de reproduire une cle reellement absente du
+     * JSON.
      */
     @Test
     void toDomainDefaultsClockFieldsForAGameJsonPersistedBeforeTimers() {

@@ -33,9 +33,9 @@ import static org.springframework.security.config.Customizer.withDefaults;
  * defaut de Spring Security) : OAuthLoginSuccessHandler (etape 8, fusion identite
  * anonyme -> compte) lit l'attribut pose par AnonymousIdentityFilter de facon
  * synchrone DANS le traitement d'OAuth2LoginAuthenticationFilter, avant que la chaine
- * ne continue - le placer seulement avant UsernamePasswordAuthenticationFilter le
- * faisait executer trop tard sur cette requete precise (attribut encore absent,
- * IllegalArgumentException a la connexion).
+ * ne continue - le placer seulement avant UsernamePasswordAuthenticationFilter
+ * l'executerait trop tard sur cette requete precise, l'attribut n'etant pas encore
+ * pose.
  */
 @Configuration
 @EnableWebSecurity

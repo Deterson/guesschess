@@ -87,18 +87,19 @@ const example1LastRound: RoundSummaryMessage = {
 }
 const example1Guess = { from: 'e2', to: 'e4' }
 
-// Exemple 2 : devinette correcte - le coup (e4) est annulé, le pion reste sur place.
-const example2Board = START_BOARD
+// Exemple 2 : suite chronologique de l'exemple 1 (Cf3 déjà joué) - devinette correcte,
+// le coup des noirs (e5) est annulé, le pion reste sur place.
+const example2Board = example1Board
 const example2LastRound: RoundSummaryMessage = {
-  mover: 'WHITE',
-  guesser: 'BLACK',
-  actualFrom: 'e2',
-  actualTo: 'e4',
-  guessedFrom: 'e2',
-  guessedTo: 'e4',
+  mover: 'BLACK',
+  guesser: 'WHITE',
+  actualFrom: 'e7',
+  actualTo: 'e5',
+  guessedFrom: 'e7',
+  guessedTo: 'e5',
   guessedCorrectly: true,
 }
-const example2Guess = { from: 'e2', to: 'e4' }
+const example2Guess = { from: 'e7', to: 'e5' }
 
 // Exemple 3 : Guessmate - les blancs sont en échec, le coup annulé (Rf2) n'est donc
 // jamais réellement joué sur le plateau : le roi reste en échec sur sa case de départ,
@@ -196,7 +197,7 @@ const example3Guess = { from: 'e1', to: 'f2' }
         </div>
         <div class="mx-auto w-full max-w-sm">
           <ChessBoard :board="example2Board" :last-round="example2LastRound" :hover-guess="example2Guess" disabled />
-          <p class="mt-2 text-center font-mono text-sm text-stone-400">(e4)</p>
+          <p class="mt-2 text-center font-mono text-sm text-stone-400">(e5)</p>
         </div>
       </section>
 

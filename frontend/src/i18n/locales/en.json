@@ -167,7 +167,7 @@
     "example1Title": "Incorrect guess",
     "example1Text": "White played Nf3, while Black guessed e4. The guess is wrong: White's move is played normally, the game continues. It's now Black's turn to move.",
     "example2Title": "Correct guess",
-    "example2Text": "White played e4, and Black guessed e4. The guess is right: the move is cancelled and it's Black's turn to move.",
+    "example2Text": "Next move: Black played e5, and White guessed e5. The guess is right: the move is cancelled and it's still Black's turn to move.",
     "example3Title": "Guessmate",
     "example3TitleVariant": "Guessmate variant",
     "example3Text": "If the player to move is in check and their opponent correctly guesses their move, the move is cancelled and the king is mated. This case is called \"Guessmate\".",

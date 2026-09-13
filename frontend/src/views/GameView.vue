@@ -111,18 +111,13 @@ const showLoginModal = ref(false)
  * gameId (création ou acceptation d'invitation, juste avant la navigation vers cette
  * page), on le réutilise directement plutôt que de refaire l'aller-retour : le
  * redécouvrir via /my-access dépendrait de la propagation immédiate du cookie anonyme
- * qu'on vient tout juste de poser, pas garantie au tout premier appel d'un navigateur -
- * c'était la cause d'un bug où le créateur se voyait à tort proposer de "rejoindre" sa
- * propre partie, et en cliquant, revendiquait la seule couleur qui devait rester
- * ouverte pour l'adversaire.
+ * qu'on vient tout juste de poser, pas garantie au tout premier appel d'un navigateur.
  *
  * Tout échec de /my-access AUTRE qu'un GAME_NOT_FOUND confirmé dégrade en spectateur
  * (jamais un blocage) : identité pas liée (NO_ACCESS), mais aussi tout hoquet
  * réseau/CORS ou erreur inattendue - regarder une partie n'a jamais nécessité de
  * résoudre une identité (viewGame côté serveur n'a aucun contrôle d'accès), donc rater
- * CETTE résolution ne doit jamais empêcher la simple lecture. C'était la cause d'un bug
- * où un spectateur pouvait se voir bloqué avec "impossible de retrouver votre accès"
- * alors que la partie était parfaitement consultable.
+ * CETTE résolution ne doit jamais empêcher la simple lecture.
  */
 watch(
   () => props.gameId,
@@ -136,12 +131,8 @@ watch(
       const found = await myAccess(gameId, authStore.token)
       gameStore.joinGame({ gameId, token: found.token, color: found.color.toLowerCase() as 'white' | 'black' })
     } catch (e) {
-      // GAME_NOT_FOUND (confirmé par le serveur : rien à regarder) bloque vraiment.
-      // Tout le reste - NO_ACCESS (identité non liée), un hoquet réseau/CORS, une
-      // erreur inattendue - dégrade en spectateur plutôt que de bloquer : consulter
-      // une partie n'a jamais nécessité de résoudre une identité (viewGame côté
-      // serveur ne vérifie aucun jeton), donc un échec de CETTE résolution ne doit
-      // jamais empêcher la simple lecture.
+      // Seul GAME_NOT_FOUND (confirmé par le serveur) bloque vraiment - voir le
+      // commentaire du watch ci-dessus.
       if (e instanceof ApiError && e.code === 'GAME_NOT_FOUND') {
         accessDenied.value = true
       } else {
@@ -236,8 +227,7 @@ function squareToIndices(square: string): [number, number] {
  * Deplace une piece sur une copie du plateau - utilise uniquement pour l'apercu client
  * (survol de la devinette) d'un coup non encore/jamais reellement joue, jamais pour le
  * plateau reel qui vient toujours du serveur. Fait aussi suivre la tour en cas de
- * roque (roi qui se deplace de deux cases horizontalement) : sans ca, seul le roi
- * bougeait dans l'apercu (bug corrige).
+ * roque (roi qui se deplace de deux cases horizontalement).
  */
 function applyMoveToBoard(board: Board, from: string, to: string): Board {
   const [fFile, fRank] = squareToIndices(from)
