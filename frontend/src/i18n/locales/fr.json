@@ -107,7 +107,6 @@
     "missed": "raté"
   },
   "game": {
-    "backHome": "← Accueil",
     "accessDenied": "Impossible de retrouver votre accès à cette partie.",
     "spectatorGeneric": "Vous regardez cette partie en spectateur.",
     "joinButton": "Rejoindre cette partie",
@@ -115,6 +114,7 @@
     "connectionLostReconnecting": "Connexion perdue, reconnexion en cours…",
     "tabTitleYourTurnToPlay": "À vous de jouer",
     "tabTitleYourTurnToGuess": "À vous de deviner",
+    "resign": "Abandonner",
     "offerDraw": "Proposer la nulle",
     "acceptDraw": "Accepter la nulle",
     "opponentOffersDraw": "Votre adversaire propose la nulle",

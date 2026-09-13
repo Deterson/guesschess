@@ -84,6 +84,12 @@ watch(
 const pendingPromotion = ref<{ from: string; to: string; options: PromotionPieceType[] } | null>(null)
 const hoveredGuess = ref(false)
 const inviteDismissed = ref(false)
+
+/** Onglet ouvert dans le panneau mobile (<67rem) - voir layout dédié dans le template. */
+const mobilePanel = ref<'history' | 'chat' | null>(null)
+function toggleMobilePanel(panel: 'history' | 'chat') {
+  mobilePanel.value = mobilePanel.value === panel ? null : panel
+}
 /**
  * Dérivé de l'état plutôt que d'un flag "vient d'être créée" à usage unique
  * (sessionStorage) : reste correct après un rechargement de page (le créateur voit
@@ -579,9 +585,9 @@ function onPromotionSelected(promotion: PromotionPieceType) {
 </script>
 
 <template>
-  <div class="@container mx-auto flex w-full max-w-7xl flex-col items-center gap-4 px-4 py-8">
-    <router-link to="/" class="self-start text-sm text-stone-400 hover:text-stone-200">{{ t('game.backHome') }}</router-link>
-
+  <div
+    class="@container mx-auto flex w-full max-w-7xl flex-col items-center gap-4 px-4 py-8 max-[67rem]:h-full max-[67rem]:min-h-0 max-[67rem]:gap-0 max-[67rem]:overflow-hidden max-[67rem]:px-2 max-[67rem]:py-2"
+  >
     <div v-if="accessDenied" class="text-stone-400">
       {{ t('game.accessDenied') }}
       <router-link to="/" class="text-emerald-500 hover:text-emerald-400">{{ t('common.backToHome') }}</router-link>
@@ -590,7 +596,8 @@ function onPromotionSelected(promotion: PromotionPieceType) {
     <div v-else-if="!state" class="text-stone-400">{{ t('common.connecting') }}</div>
 
     <template v-else>
-      <div class="grid w-full grid-cols-1 items-start gap-6 @min-[67rem]:grid-cols-[minmax(0,1fr)_36rem_minmax(0,1fr)]">
+      <!-- Layout desktop (>=67rem) : historique/chat visibles en colonnes, inchangé. -->
+      <div class="hidden w-full grid-cols-1 items-start gap-6 @min-[67rem]:grid @min-[67rem]:grid-cols-[minmax(0,1fr)_36rem_minmax(0,1fr)]">
         <!--
           "contents" en etroit desimbrique ce wrapper : statut et chat redeviennent
           des items de grille independants (au meme titre que board/historique),
@@ -705,7 +712,7 @@ function onPromotionSelected(promotion: PromotionPieceType) {
         <div class="order-4 mx-auto w-full max-w-xl @min-[67rem]:order-none @min-[67rem]:col-start-3 @min-[67rem]:mx-0 @min-[67rem]:max-w-none">
           <MoveHistoryList :rounds="historyRounds" :history-index="historyIndex" @select="onHistorySelect" />
 
-          <div v-if="myColor && canAct" class="mt-2 flex flex-col items-center">
+          <div v-if="myColor && canAct && state.full" class="mt-2 flex flex-col items-center">
             <p v-if="drawOfferedByOpponent" class="mb-1 text-xs text-stone-400">{{ t('game.opponentOffersDraw') }}</p>
             <button
               type="button"
@@ -730,6 +737,195 @@ function onPromotionSelected(promotion: PromotionPieceType) {
               {{ rematchOfferedByOpponent ? t('game.acceptRematch') : t('game.offerRematch') }}
             </button>
           </div>
+        </div>
+      </div>
+
+      <!--
+        Layout mobile (<67rem) : page à hauteur fixe, sans scroll de page (voir App.vue
+        qui borne la hauteur et masque le footer sur cette route). Glisser le doigt sur
+        le plateau ne doit jamais pouvoir être interprété comme un scroll de page.
+        Historique et chat ne sont plus affichés en continu : un onglet en bas les ouvre
+        dans un panneau qui prend l'espace flexible restant (lui peut défiler en
+        interne), à la manière d'un intercalaire de classeur.
+      -->
+      <div class="flex h-full min-h-0 w-full flex-col @min-[67rem]:hidden">
+        <div class="w-full shrink-0">
+          <InviteBanner v-if="showInvite" :game-id="gameId" @dismiss="inviteDismissed = true" />
+
+          <div v-if="myColor && !canAct" class="mb-2 rounded-lg bg-stone-800 px-4 py-3 text-sm text-stone-300">
+            {{ t('game.spectatorGeneric') }}
+          </div>
+          <div v-else-if="!myColor && state.full" class="mb-2 rounded-lg bg-stone-800 px-4 py-3 text-sm text-stone-300">
+            {{ t('game.spectatorGeneric') }}
+          </div>
+          <div v-else-if="!myColor" class="mb-2 space-y-2 rounded-lg bg-stone-800 px-4 py-3 text-sm text-stone-300">
+            <p>{{ t('game.spectatorGeneric') }}</p>
+            <p v-if="joinError" class="text-red-400">{{ joinError }}</p>
+            <button
+              type="button"
+              class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold hover:bg-emerald-500 disabled:opacity-50"
+              :disabled="joining"
+              @click="startJoin"
+            >
+              {{ joining ? t('common.connecting') : t('game.joinButton') }}
+            </button>
+          </div>
+
+          <div v-if="showConnectionLostBanner" class="mb-2 rounded-lg bg-amber-900/60 px-4 py-3 text-sm text-amber-100">
+            {{ t('game.connectionLostReconnecting') }}
+          </div>
+
+          <div v-if="error" class="mb-2 rounded-lg bg-red-900/60 px-4 py-3 text-sm">
+            {{ error.message }}
+            <button type="button" class="ml-2 text-red-300 hover:text-red-100" @click="gameStore.dismissError()">✕</button>
+          </div>
+        </div>
+
+        <PlayerLabel
+          class="w-full shrink-0"
+          :color="topPlayerColor"
+          :info="topPlayer"
+          :clock-ms="topClock.clockMs"
+          :clock-running="topClock.clockRunning"
+          :urgent="topClock.urgent"
+        />
+
+        <div class="mx-auto min-h-0 max-w-full flex-1 aspect-square">
+          <ChessBoard
+            class="h-full"
+            :board="hoverGuessBoard ?? displayBoard ?? state.board"
+            :legal-moves="state.legalMoves"
+            :orientation="myColor ?? 'white'"
+            :disabled="boardDisabled"
+            :last-round="displayLastRound"
+            :pending-move="pendingMove"
+            :hover-guess="hoverGuessSquares"
+            :ghost-move="displayGhost"
+            :resolved-guess-flash="displayResolvedGuessFlash"
+            :checked-color="checkedColor"
+            :awaiting-guess="awaitingGuessMine"
+            :turn-indicator="historyIndex === null ? turnIndicator : null"
+            @choose-move="onChooseMove"
+          />
+        </div>
+
+        <PlayerLabel
+          class="w-full shrink-0"
+          :color="bottomPlayerColor"
+          :info="bottomPlayer"
+          :clock-ms="bottomClock.clockMs"
+          :clock-running="bottomClock.clockRunning"
+          :urgent="bottomClock.urgent"
+        />
+
+        <p v-if="myColor && !authStore.isLoggedIn" class="shrink-0 py-1 text-center text-xs text-stone-500">
+          <button type="button" class="underline hover:text-stone-400" @click="showLoginModal = true">
+            {{ t('game.anonymousAccessReminderLink') }}
+          </button>
+          {{ t('game.anonymousAccessReminderSuffix') }}
+        </p>
+
+        <!-- Infobulles fusionnées : devinette (1/3) + statut (2/3), ou statut seul si pas de round. -->
+        <div class="flex w-full shrink-0 items-stretch gap-2">
+          <div v-if="state.lastRound" class="w-1/3">
+            <RoundResultBanner :round="state.lastRound" :my-color="myColor" @hover="hoveredGuess = $event" />
+          </div>
+          <div :class="state.lastRound ? 'w-2/3' : 'w-full'">
+            <GameStatusBar
+              :state="state"
+              :my-color="myColor"
+              :my-role="myRole"
+              :pending-submission="pendingSubmission"
+              :awaiting-guess="awaitingGuessMine"
+            />
+          </div>
+        </div>
+
+        <template v-if="myColor && canAct && state.full">
+          <div v-if="state.status !== 'FINISHED'" class="flex shrink-0 flex-col items-center gap-1 pb-2">
+            <p v-if="drawOfferedByOpponent" class="text-xs text-stone-400">{{ t('game.opponentOffersDraw') }}</p>
+            <div class="flex items-center gap-3">
+              <button
+                type="button"
+                class="flex h-11 w-11 items-center justify-center rounded-lg bg-stone-800 text-stone-300 hover:bg-stone-700"
+                :aria-label="t('game.resign')"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5" aria-hidden="true">
+                  <line x1="5" y1="3" x2="5" y2="21" />
+                  <path d="M5 4h13l-3.5 4.5L18 13H5" />
+                </svg>
+              </button>
+              <button
+                type="button"
+                class="flex h-11 w-11 items-center justify-center rounded-lg disabled:opacity-50"
+                :class="drawOfferedByOpponent ? 'bg-violet-700 hover:bg-violet-600' : 'bg-stone-800 hover:bg-stone-700'"
+                :disabled="drawOfferedByMe"
+                :aria-label="drawOfferedByOpponent ? t('game.acceptDraw') : t('game.offerDraw')"
+                @click="onDrawButtonClick"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5" aria-hidden="true">
+                  <g transform="rotate(-22 12 12)"><rect x="2" y="10" width="10" height="4" rx="2" /></g>
+                  <g transform="rotate(22 12 12)"><rect x="12" y="10" width="10" height="4" rx="2" /></g>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div v-else class="flex shrink-0 flex-col items-center gap-1 pb-2">
+            <p v-if="rematchOfferedByOpponent" class="text-xs text-stone-400">{{ t('game.opponentOffersRematch') }}</p>
+            <button
+              type="button"
+              class="rounded-lg px-4 py-2 text-sm disabled:opacity-50"
+              :class="rematchOfferedByOpponent ? 'bg-violet-700 hover:bg-violet-600' : 'bg-stone-700 hover:bg-stone-600'"
+              :disabled="rematchOfferedByMe || !opponentConnected"
+              @click="onRematchButtonClick"
+            >
+              {{ rematchOfferedByOpponent ? t('game.acceptRematch') : t('game.offerRematch') }}
+            </button>
+          </div>
+        </template>
+
+        <div
+          class="w-full"
+          :class="mobilePanel ? 'min-h-0 flex-1 overflow-y-auto' : 'h-0 shrink-0 overflow-hidden'"
+        >
+          <MoveHistoryList v-if="mobilePanel === 'history'" :rounds="historyRounds" :history-index="historyIndex" @select="onHistorySelect" />
+          <ChatPanel
+            v-if="mobilePanel === 'chat' && !isVsComputer"
+            class="h-full"
+            :messages="chatMessages"
+            :can-send="Boolean(myColor) && canAct"
+            @send="gameStore.sendChat"
+          />
+        </div>
+
+        <div class="flex shrink-0 border-t border-stone-800">
+          <button
+            type="button"
+            class="flex flex-1 items-center justify-center py-3"
+            :class="mobilePanel === 'history' ? 'bg-stone-800 text-emerald-400' : 'text-stone-400'"
+            :aria-label="t('moveHistory.title')"
+            :aria-pressed="mobilePanel === 'history'"
+            @click="toggleMobilePanel('history')"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 7v5l3.5 2" />
+            </svg>
+          </button>
+          <button
+            v-if="!isVsComputer"
+            type="button"
+            class="flex flex-1 items-center justify-center border-l border-stone-800 py-3"
+            :class="mobilePanel === 'chat' ? 'bg-stone-800 text-emerald-400' : 'text-stone-400'"
+            :aria-label="t('chat.title')"
+            :aria-pressed="mobilePanel === 'chat'"
+            @click="toggleMobilePanel('chat')"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6" aria-hidden="true">
+              <path d="M4 5h16v11H8l-4 4V5z" />
+            </svg>
+          </button>
         </div>
       </div>
 

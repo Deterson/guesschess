@@ -107,7 +107,6 @@
     "missed": "missed"
   },
   "game": {
-    "backHome": "← Home",
     "accessDenied": "Could not find your access to this game.",
     "spectatorGeneric": "You are watching this game as a spectator.",
     "joinButton": "Join this game",
@@ -115,6 +114,7 @@
     "connectionLostReconnecting": "Connection lost, reconnecting…",
     "tabTitleYourTurnToPlay": "Your turn to play",
     "tabTitleYourTurnToGuess": "Your turn to guess",
+    "resign": "Resign",
     "offerDraw": "Offer draw",
     "acceptDraw": "Accept draw",
     "opponentOffersDraw": "Your opponent offers a draw",
