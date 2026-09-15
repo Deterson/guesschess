@@ -293,6 +293,55 @@ class ComputerPlayerServiceTest {
     }
 
     @Test
+    void computerAvoidsRepeatingItsLastGuessOnItsNextGuessingRound() {
+        // Ordinateur difficile aux noirs (devineur des le round 1, l'humain aux blancs
+        // etant au trait), configure pour toujours deviner e2e4 quand ce coup est legal
+        // parmi les coups a deviner (round 1 et round 3, ou les blancs sont a chaque
+        // fois au trait) - verifie que guessesToAvoidThisTurn (ComputerPlayerService,
+        // etape 17 strategie 3) fait figurer ce meme coup dans movesToAvoidIfPossible au
+        // round 3, sa devinette suivante.
+        PlayerRef human = new PlayerRef.Anonymous(new AnonymousId(UUID.randomUUID()));
+        CreatedGame created = gameLifecycleService.createComputerGame(
+                GameVariant.GUESSMATE, null, Color.WHITE, human, ComputerLevel.HARD);
+        GameId gameId = created.gameId();
+        GameAccess access = gameAccessRepository.findByGameId(gameId).orElseThrow();
+
+        chessEngine.alwaysChoose((board, legalMoves) -> legalMoves.stream()
+                .filter(m -> m.from().equals(Position.fromAlgebraic("e2")) && m.to().equals(Position.fromAlgebraic("e4")))
+                .findFirst()
+                .orElse(legalMoves.get(0)));
+
+        // Round 1 : l'ordinateur (noir) devine e2e4 par avance ; les blancs jouent
+        // Ng1-f3 a la place, la devinette est fausse - le coup reel est joue normalement.
+        computerPlayerService.onRoundStarted(gameId);
+        await().atMost(Duration.ofSeconds(2)).untilAsserted(() ->
+                org.junit.jupiter.api.Assertions.assertTrue(
+                        gameLifecycleService.viewGame(gameId, access.blackToken()).mySubmission().submitted()));
+        GameSnapshot afterRound1 = gameLifecycleService.submitMove(access.whiteToken(),
+                MoveIntent.of(Position.fromAlgebraic("g1"), Position.fromAlgebraic("f3"))).orElseThrow();
+        computerPlayerService.onRoundStarted(afterRound1.id());
+
+        // Round 2 : l'ordinateur (noir) est maintenant au trait (coup reel, pas une
+        // devinette - guessesToAvoidThisTurn ne s'applique pas ici). Les blancs devinent
+        // volontairement a tort (pas de devinette) pour resoudre le round normalement.
+        await().atMost(Duration.ofSeconds(2)).untilAsserted(() ->
+                org.junit.jupiter.api.Assertions.assertTrue(
+                        gameLifecycleService.viewGame(gameId, access.blackToken()).mySubmission().submitted()));
+        GameSnapshot afterRound2 = gameLifecycleService.submitGuess(access.whiteToken(), null).orElseThrow();
+        org.junit.jupiter.api.Assertions.assertEquals(Color.WHITE, afterRound2.sideToMove());
+
+        // Round 3 : les blancs sont de nouveau au trait, l'ordinateur (noir) devine de
+        // nouveau par avance - e2e4 est toujours legal (le pion blanc n'a pas bouge),
+        // donc de nouveau la devinette preferee par FakeChessEngine si rien ne l'evite.
+        computerPlayerService.onRoundStarted(afterRound2.id());
+        await().atMost(Duration.ofSeconds(2)).untilAsserted(() ->
+                org.junit.jupiter.api.Assertions.assertTrue(
+                        gameLifecycleService.viewGame(gameId, access.blackToken()).mySubmission().submitted()));
+        Move e2e4 = findMove(gameLifecycleService.viewGame(gameId).legalMoves(), "e2", "e4");
+        org.junit.jupiter.api.Assertions.assertTrue(chessEngine.lastMovesToAvoidIfPossible().contains(e2e4));
+    }
+
+    @Test
     void onRoundStartedDoesNothingForAHumanVsHumanGame() {
         PlayerRef white = new PlayerRef.Anonymous(new AnonymousId(UUID.randomUUID()));
         PlayerRef black = new PlayerRef.Anonymous(new AnonymousId(UUID.randomUUID()));

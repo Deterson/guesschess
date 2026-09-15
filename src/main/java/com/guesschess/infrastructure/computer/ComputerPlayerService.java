@@ -35,6 +35,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.stream.Collectors;
 
 /**
  * Fait jouer/deviner l'ordinateur (etape 15 de la roadmap) : declenchee a chaque debut
@@ -84,8 +85,22 @@ public class ComputerPlayerService {
      */
     private static final int BLOCKED_MOVE_TURNS = 2;
 
+    /**
+     * Etape 17, strategie 3 ("varier la devinette") : la derniere devinette de ce joueur
+     * ordinateur reste evitee (si une alternative existe) pour son tour de devinette
+     * suivant - "deux fois d'affilee" dans l'enonce de la strategie, donc une memoire
+     * d'un seul coup (pas de compte a rebours comme BLOCKED_MOVE_TURNS, qui repond a un
+     * besoin different : laisser le temps a l'adversaire d'oublier un coup reel annule).
+     * Reutilise le record BlockedMove tel quel (memes champs identifiants) plutot que
+     * d'en creer un second identique.
+     */
+    private static final int GUESS_REPETITION_AVOID_TURNS = 1;
+
     /** Etat par partie, best-effort (pas persiste) - voir onRoundStarted/act. */
     private final Map<GameId, List<BlockedMove>> blockedMovesByGame = new ConcurrentHashMap<>();
+
+    /** Etat par partie, best-effort (pas persiste) - voir act/guessesToAvoidThisTurn. */
+    private final Map<GameId, BlockedMove> lastGuessByGame = new ConcurrentHashMap<>();
 
     /**
      * Un coup reel de l'ordinateur recemment devine, identifie par origine/destination/
@@ -113,6 +128,7 @@ public class ComputerPlayerService {
         GameSnapshot snapshot = gameLifecycleService.viewGame(gameId);
         if (snapshot.status() != GameStatus.ONGOING) {
             blockedMovesByGame.remove(gameId);
+            lastGuessByGame.remove(gameId);
             return;
         }
         if (level == ComputerLevel.HARD) {
@@ -179,6 +195,9 @@ public class ComputerPlayerService {
         Move chosen = computerIsMover
                 ? chooseMoveOrFallback(gameId, board, legalMoves, level, variant, movesToAvoidThisTurn(gameId, legalMoves))
                 : guessKingCaptureOrFallback(gameId, computerColor, board, legalMoves, level, variant);
+        if (!computerIsMover && level == ComputerLevel.HARD) {
+            rememberGuess(gameId, chosen);
+        }
         try {
             MoveIntent intent = chosen.promotionType() == null
                     ? MoveIntent.of(chosen.from(), chosen.to())
@@ -219,11 +238,39 @@ public class ComputerPlayerService {
         if (!kingCaptures.isEmpty()) {
             return kingCaptures.get(ThreadLocalRandom.current().nextInt(kingCaptures.size()));
         }
-        // Devinette, pas coup propre : BlockedMove ne s'applique jamais ici (voir
-        // movesToAvoidThisTurn). findFastMateMoves s'applique quand meme tel quel : un
-        // adversaire rationnel qui a acces a un coup qui nous mettrait en fast_mate va le
-        // jouer, c'est donc aussi la devinette la plus plausible (voir findFastMateMoves).
-        return chooseMoveOrFallback(gameId, board, legalMoves, level, variant, Set.of());
+        // Devinette, pas coup propre : BlockedMove (coups reels annules) ne s'applique
+        // jamais ici, voir movesToAvoidThisTurn - guessesToAvoidThisTurn est son
+        // equivalent cote devinette (strategie 3). findFastMateMoves s'applique quand
+        // meme tel quel : un adversaire rationnel qui a acces a un coup qui nous
+        // mettrait en fast_mate va le jouer, c'est donc aussi la devinette la plus
+        // plausible (voir findFastMateMoves).
+        Set<Move> toAvoid = level == ComputerLevel.HARD ? guessesToAvoidThisTurn(gameId, legalMoves) : Set.of();
+        return chooseMoveOrFallback(gameId, board, legalMoves, level, variant, toAvoid);
+    }
+
+    /**
+     * Etape 17, strategie 3 : memorise la devinette qui vient d'etre soumise, pour
+     * l'eviter (si possible) au prochain tour de devinette de ce joueur ordinateur -
+     * voir guessesToAvoidThisTurn. Uniquement pour les devinettes (jamais pour un coup
+     * reel, voir act), niveau difficile uniquement comme les autres strategies
+     * guess-aware.
+     */
+    private void rememberGuess(GameId gameId, Move guess) {
+        lastGuessByGame.put(gameId, new BlockedMove(guess.from(), guess.to(), guess.promotionType(), GUESS_REPETITION_AVOID_TURNS));
+    }
+
+    /**
+     * Symetrique de movesToAvoidThisTurn, cote devinette : renvoie la derniere devinette
+     * de ce joueur ordinateur (si elle existe encore parmi legalMoves) et l'oublie
+     * aussitot - GUESS_REPETITION_AVOID_TURNS vaut 1 ("deux fois d'affilee"), donc rien
+     * a decompter au-dela d'un seul tour, contrairement a movesToAvoidThisTurn.
+     */
+    private Set<Move> guessesToAvoidThisTurn(GameId gameId, List<Move> legalMoves) {
+        BlockedMove last = lastGuessByGame.remove(gameId);
+        if (last == null) {
+            return Set.of();
+        }
+        return legalMoves.stream().filter(last::matches).collect(Collectors.toSet());
     }
 
     /**

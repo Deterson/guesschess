@@ -20,6 +20,11 @@
   - Utilisateur SSH de la VM : `ubuntu` (groupe `docker`, `docker ps`/`docker run` fonctionnent
     sans `sudo`). Alias configuré dans `~/.ssh/config` du poste de dev : `ssh guesschess-vm`
     suffit.
+  - **Session Claude Code distante (conteneur cloud)** : pas d'accès à cette VM (sortant limité au
+    HTTPS via proxy, SSH/Postgres bloqués même vers l'IP fixe) - utiliser à la place
+    `docker-compose.yml` (Postgres local jetable, déjà à la racine) avec `SPRING_DATASOURCE_URL`
+    surchargée en variable d'environnement plutôt que de toucher `application.properties`, qui
+    pointe en dur sur la VM.
 - **Tests Maven qui nécessitent Java 25** : le `JAVA_HOME` par défaut de la machine de dev pointe
   vers un JDK 8 (`mvnw -v` le confirme), ce qui fait échouer la compilation de tout le code
   utilisant `record`/pattern matching avec des erreurs trompeuses ("class, interface, or enum
@@ -259,47 +264,56 @@ tout court (échec rapide voulu au boot Spring, pas seulement au moment du login
   interpretes comme de l'echappement, silencieusement supprimes), rendant le chemin invalide sans
   aucune erreur visible (juste `isAvailable()` qui renvoie false). Utiliser des slashs (`C:/Users/...`)
   dans `.env`, qui fonctionnent aussi bien pour Java/NIO sous Windows.
-- **Étape 17 (planifiée) — IA « guess-aware »** : constat de départ, `ComputerPlayerService` pose
-  aujourd'hui la même question à `ChessEngine.chooseMove` pour jouer et pour deviner ("meilleur
-  coup pour cette position ?") — aucune des deux décisions ne modélise le fait qu'une devinette
-  correcte *annule* le coup réel plutôt que de le laisser se jouer. Résultat concret : l'engin
-  élague tout sacrifice sur une pièce protégée par un seul défenseur (ex. dame qui prend une pièce
-  défendue une fois), alors qu'en guesschess ce sacrifice est sain si (a) l'adversaire ne devine
-  pas la prise et (b) la reprise qui suit est ensuite facilement devinable donc annulable — deux
-  conditions que l'évaluation d'échecs classique ne voit pas.
-  - **Architecture envisagée** : nouveau domain/application service (ex.
-    `application/computer/GuessAwareMoveSelector`) au-dessus du port `ChessEngine` existant plutôt
-    que dans `StockfishChessEngine` — garder l'échange UCI pur d'un côté, la stratégie guesschess
-    de l'autre. `ChessEngine` reste l'oracle d'évaluation (position + coup candidat → score), pas
-    de moteur d'échecs maison.
-  - **Perf** : une décision guess-aware a besoin de plusieurs évaluations par coup (candidat,
-    réponse probable de l'adversaire, confiance dans cette réponse) là où `chooseMove` n'en fait
-    qu'une, alors que `StockfishChessEngine` relance un process par appel aujourd'hui (voir
-    ci-dessus) — passer à une session UCI persistante par partie (process gardé ouvert entre les
-    rounds, plusieurs `position`/`go` dessus) avant ou en même temps que cette étape, pas après.
-  - **Stratégie 1 — ignorer une réfutation parable** : pour chaque coup réel candidat, chercher la
-    meilleure réponse adverse sur la position résultante et estimer si elle est "évidente" (seule
-    pièce capable de reprendre, ou net écart de score avec la 2e meilleure réponse via MultiPV). Si
-    oui, ne pas compter cette réfutation à sa pleine valeur dans le calcul du coup candidat — le
-    pire cas réel (l'ordinateur devine et annule cette réponse le round suivant) est bien meilleur
-    que ce qu'un minimax classique suppose. Seuil de confiance approximatif au début (écart
-    MultiPV), affinable plus tard.
-  - **Stratégie 2 — varier après une parade** : si le dernier coup réel de l'ordinateur vient
-    d'être deviné/annulé, ne pas se contenter de rejouer le même coup au round suivant — préférer,
-    à qualité proche, un autre candidat du top MultiPV. Particulièrement sensible en ouverture (peu
-    de coups sensés, donc plus facile à deviner une deuxième fois de suite). Nécessite de garder
-    une trace courte ("dernier coup réel annulé pour ce joueur ordinateur") plutôt que de la
-    déduire de l'historique complet à chaque décision.
-  - **Stratégie 3 — varier la devinette elle-même** : symétrique de la stratégie 2 côté devineur.
-    Éviter de deviner deux fois d'affilée le même coup adverse, surtout en ouverture (peu de coups
-    sensés → plus vite lu par l'adversaire s'il devine que l'ordinateur devine toujours pareil) —
-    sauf si ce coup reste très nettement le meilleur (net écart de score via MultiPV), auquel cas le
-    deviner à nouveau reste correct. Même trace courte que la stratégie 2 ("dernière devinette de
-    ce joueur ordinateur"), réutilisable des deux côtés.
-  - **Tests** : logique du nouveau service testable unitairement (confiance dans une réfutation,
-    choix du coup avec réfutation parable, non-répétition après parade, non-répétition de
-    devinette) avec un `ChessEngine` de test plutôt qu'un vrai Stockfish, pour rester rapide et
-    déterministe.
+- **Étape 17 (en cours) — IA « guess-aware »** : constat de départ, `ComputerPlayerService` pose la
+  même question à `ChessEngine.chooseMove` pour jouer et pour deviner ("meilleur coup pour cette
+  position ?") — aucune des deux décisions ne modélise le fait qu'une devinette correcte *annule*
+  le coup réel plutôt que de le laisser se jouer. Décision (après une note de conception dédiée,
+  forker Stockfish envisagé puis écarté - le travail réel est dans une pénalité de prévisibilité au
+  milieu d'une recherche, pas dans la génération de coups/l'évaluation déjà couvertes côté Java) :
+  moteur maison plutôt que Stockfish-comme-oracle, qui remplace `StockfishChessEngine` en
+  implémentant directement le port `ChessEngine`.
+  - **Moteur** : `domain/rules/PositionEvaluator` (éval statique pure - matériel, tables
+    positionnelles standard, mobilité, aux côtés de `MaterialEvaluator`/`CheckDetector`) +
+    `application/computer/NegamaxSearch` (negamax + alpha-bêta ; chaque coup racine avec sa propre
+    fenêtre complète, pas de coupe entre coups racine, pour un score exact et comparable par
+    candidat - nécessaire à la couche guess-aware). `application/computer/MinimaxChessEngine`
+    implémente `ChessEngine` par-dessus. ~300-400ms à profondeur 4 depuis la position de départ, en
+    Java pur, sur un thread virtuel - largement dans le budget d'un appel Stockfish existant.
+  - **Sélection du moteur** : propriété `guesschess.engine` (`GUESSCHESS_ENGINE`), `minimax` par
+    défaut (`@ConditionalOnProperty` sur les deux implémentations) ou `stockfish` - gardé
+    sélectionnable explicitement plutôt que retiré, décision volontaire (voir plus bas).
+  - **Niveaux** : profondeur par `ComputerLevel` (facile 2, moyen 3, difficile 4) remplace
+    `UCI_LimitStrength`/`UCI_Elo`. Facile affaibli par le même `pickByRankWeight` (aléatoire pondéré
+    parmi le top 3) que `StockfishChessEngine`.
+  - **Stratégie 1 — ignorer une réfutation parable** (`MinimaxChessEngine.
+    pickPreferringGuessableRefutation`, difficile uniquement) : parmi les coups candidats déjà
+    proches du meilleur coup classique (`GAP_THRESHOLD_CP` = 150, même convention que
+    `StockfishChessEngine`), préfère celui qui expose une réponse adverse nettement meilleure que
+    ses alternatives (`exposesGuessableRefutation`, recherche auxiliaire à profondeur fixe
+    `REFUTATION_CHECK_DEPTH` = 2, indépendante du niveau) - le pire cas réel (devinée puis annulée)
+    vaut mieux que ce qu'un minimax classique suppose. Un mat force adverse n'est jamais mis de
+    côté de cette façon. Appliquée identiquement côté coup réel et côté devinette (même appel
+    `chooseMove` pour les deux, `ChessEngine` ne distingue pas les rôles) - sans effet indésirable
+    côté devinette, les candidats considérés étant déjà proches du meilleur.
+  - **Stratégie 2 — varier après une parade** : déjà couverte par le `BlockedMove`/
+    `movesToAvoidThisTurn` existant (étape 15, difficile uniquement) - rien de nouveau à écrire,
+    `MinimaxChessEngine` honore `movesToAvoidIfPossible` comme `StockfishChessEngine`.
+  - **Stratégie 3 — varier la devinette** (`ComputerPlayerService.lastGuessByGame`/
+    `rememberGuess`/`guessesToAvoidThisTurn`, difficile uniquement) : symétrique de `BlockedMove`
+    côté devinette plutôt que côté coup réel - mémoire d'un seul coup (pas de compte à rebours,
+    "deux fois d'affilée" dans l'énoncé), réutilise le même canal `movesToAvoidIfPossible`.
+  - **Tests** : `PositionEvaluatorTest`, `NegamaxSearchTest` (mat en 1, non-braderie de la dame,
+    capture de matériel gratuit), `MinimaxChessEngineTest` (dont un test direct de
+    `pickPreferringGuessableRefutation`/`exposesGuessableRefutation`, méthodes package-private
+    exprès pour ça), `ComputerPlayerServiceTest` (non-répétition de devinette). Aucun ne démarre de
+    process externe. Validé aussi de bout en bout (backend + frontend réels,
+    `guesschess.engine=minimax`, partie contre l'ordinateur jouée).
+  - **Défaut basculé sur `minimax`** (choix explicite de l'utilisateur, pas automatique à la suite
+    de l'implémentation) - `StockfishChessEngine`/`STOCKFISH_PATH`/le paquet `stockfish` du
+    Dockerfile sont gardés tels quels plutôt que retirés (dernière étape du plan de migration
+    d'origine, volontairement pas faite) : `guesschess.engine=stockfish` reste un retour en arrière
+    possible sans toucher au code, le temps de calibrer `GAP_THRESHOLD_CP`/`REFUTATION_CHECK_DEPTH`
+    par l'expérience réelle.
 - **Étape 18 — Page admin** : lecture seule, pas de mutation. `AdminAccessService` verifie
   l'email du compte (JWT `sub` -> `AccountService.getById`) contre `ADMIN_EMAILS` ; le JWT de
   session ne porte pas l'email en claim (seulement `displayName`), d'ou ce lookup plutot qu'une
