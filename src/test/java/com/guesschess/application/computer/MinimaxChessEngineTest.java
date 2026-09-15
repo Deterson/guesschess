@@ -108,6 +108,57 @@ class MinimaxChessEngineTest {
         assertEquals(kingShuffleLeavingQueenHanging, chosen);
     }
 
+    /**
+     * Etat degenere propre a guesschess (round annule qui laisse un roi en echec non
+     * resolu, voir CLAUDE.md/ComputerPlayerService) : les noirs ont Ra8xa1 parmi leurs
+     * coups legaux, mais pas seulement - ce n'est donc pas un coup force. Capturer le roi
+     * blanc ici n'est jamais "gratuit" (le mover n'est pas lui-meme en echec) : un humain
+     * qui connait la regle la devine quasi systematiquement, ce qui l'annule sans rien
+     * lui avoir coute - le moteur ne doit donc jamais la choisir tant qu'une alternative
+     * existe, malgre son score classique toujours le plus haut possible.
+     */
+    @Test
+    void neverChoosesAnAvoidableKingCapture() {
+        Board board = Board.empty()
+                .withPiece(Position.fromAlgebraic("a1"), Piece.of(PieceType.KING, Color.WHITE))
+                .withPiece(Position.fromAlgebraic("a8"), Piece.of(PieceType.ROOK, Color.BLACK))
+                .withPiece(Position.fromAlgebraic("h8"), Piece.of(PieceType.KING, Color.BLACK))
+                .withSideToMove(Color.BLACK);
+        List<Move> legalMoves = MoveGenerator.generateLegalMoves(board, board.sideToMove());
+        Move kingCapture = legalMoves.stream()
+                .filter(m -> m.isCapture() && m.capturedPiece().type() == PieceType.KING)
+                .findFirst().orElseThrow();
+
+        for (ComputerLevel level : ComputerLevel.values()) {
+            Move chosen = engine.chooseMove(board, legalMoves, level, Set.of());
+            assertTrue(!chosen.equals(kingCapture), level + " should not have captured the king: " + chosen);
+        }
+    }
+
+    /**
+     * Deux rois seuls, adjacents (blanc b2, noir a1) : degenere, jamais atteignable en
+     * jeu normal, mais le seul coup legal des noirs est Kxb2 (a2 et b1, les deux autres
+     * cases voisines de a1, restent attaquees par le roi blanc lui-meme). Contrairement
+     * a neverChoosesAnAvoidableKingCapture, ce coup DOIT etre choisi : aucune alternative
+     * n'existe, donc aucune previsibilite a eviter.
+     */
+    @Test
+    void stillChoosesAKingCaptureWhenItIsTheOnlyLegalMove() {
+        Board board = Board.empty()
+                .withPiece(Position.fromAlgebraic("b2"), Piece.of(PieceType.KING, Color.WHITE))
+                .withPiece(Position.fromAlgebraic("a1"), Piece.of(PieceType.KING, Color.BLACK))
+                .withSideToMove(Color.BLACK);
+        List<Move> legalMoves = MoveGenerator.generateLegalMoves(board, board.sideToMove());
+        assertEquals(1, legalMoves.size());
+        Move kingCapture = legalMoves.get(0);
+        assertTrue(kingCapture.isCapture() && kingCapture.capturedPiece().type() == PieceType.KING);
+
+        for (ComputerLevel level : ComputerLevel.values()) {
+            Move chosen = engine.chooseMove(board, legalMoves, level, Set.of());
+            assertEquals(kingCapture, chosen, level + " should have captured the king (forced)");
+        }
+    }
+
     /** Dame blanche d5, tour noire d8 pouvant la prendre si elle reste sur la colonne d. */
     private static Board queenEitherHangsOrRetreatsPosition() {
         return Board.empty()

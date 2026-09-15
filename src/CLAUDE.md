@@ -302,6 +302,20 @@ tout court (échec rapide voulu au boot Spring, pas seulement au moment du login
     côté de cette façon. Appliquée identiquement côté coup réel et côté devinette (même appel
     `chooseMove` pour les deux, `ChessEngine` ne distingue pas les rôles) - sans effet indésirable
     côté devinette, les candidats considérés étant déjà proches du meilleur.
+  - **Capture de roi évitable (piège rencontré, corrigé)** : le court-circuit hérité de
+    l'étape 15 (`ComputerPlayerService.chooseMoveOrFallback`, roi adverse en échec non
+    résolu capturable) jouait systématiquement cette capture dès qu'elle était légale -
+    correct pour Stockfish (raison d'être d'origine : coup "objectivement" le meilleur),
+    mais oubliait qu'en guesschess ce coup n'est jamais gratuit tant qu'il n'est pas forcé
+    : le mover n'est pas lui-même en échec, donc une devinette adverse correcte l'annule
+    juste normalement (`Game.resolveRound`) plutôt que de déclencher une issue immédiate -
+    un humain qui connaît la règle la devine donc quasi systématiquement. Corrigé à deux
+    niveaux : `ComputerPlayerService` ne joue plus cette capture que si c'est l'unique
+    coup légal (sinon exclue des candidats, y compris pour `findFastMateMoves` - sinon
+    même risque de plateau sans roi que `NegamaxSearch` ci-dessus) ;
+    `MinimaxChessEngine.excludeKingCaptureUnlessForced` fait de même en interne, car
+    `NegamaxSearch` régénère ses propres coups depuis `board` et retrouverait sinon cette
+    capture malgré la liste restreinte transmise par l'appelant.
   - **Stratégie 2 — varier après une parade** : déjà couverte par le `BlockedMove`/
     `movesToAvoidThisTurn` existant (étape 15, difficile uniquement) - rien de nouveau à écrire,
     `MinimaxChessEngine` honore `movesToAvoidIfPossible` comme `StockfishChessEngine`.

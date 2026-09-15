@@ -158,12 +158,17 @@ class ComputerPlayerServiceTest {
     }
 
     @Test
-    void computerImmediatelyPlaysAMoveThatCapturesTheOpponentsHangingKingInsteadOfAskingTheEngine() {
+    void computerNeverCapturesTheOpponentsHangingKingWhenAnAlternativeMoveExists() {
         // Meme position/round que computerImmediatelyGuessesAMoveThatWouldCaptureItsOwnHangingKingInsteadOfAskingTheEngine,
-        // mais roles inverses : l'ordinateur est maintenant noir, donc joueur au
-        // trait (pas devineur) pour le round qui suit la devinette correcte - il a
-        // Ra8xa1 parmi ses coups legaux et doit le jouer directement, sans jamais
-        // interroger Stockfish (voir ComputerPlayerService.chooseMoveOrFallback).
+        // mais roles inverses : l'ordinateur est maintenant noir, donc joueur au trait
+        // (pas devineur) pour le round qui suit la devinette correcte - il a Ra8xa1
+        // parmi ses coups legaux, mais ce n'est pas un coup force (le roi noir a aussi
+        // des coups). Cote coup reel, ce n'est jamais "gratuit" : l'ordinateur (mover)
+        // n'est pas lui-meme en echec, donc une devinette adverse correcte annule juste
+        // normalement le coup plutot que de declencher une issue immediate - un humain
+        // qui connait la regle la devine donc quasi systematiquement. L'ordinateur doit
+        // consulter le moteur pour un autre coup plutot que de jouer cette capture
+        // previsible (voir ComputerPlayerService.chooseMoveOrFallback, etape 17).
         GameId gameId = GameId.random();
         Board position = Board.empty()
                 .withPiece(Position.fromAlgebraic("a1"), Piece.of(PieceType.KING, Color.WHITE))
@@ -183,7 +188,6 @@ class ComputerPlayerServiceTest {
         gameAccessRepository.save(access);
 
         Move harmless = findMove(game.legalMoves(), "h8", "h7");
-        Move captureKing = findMove(game.legalMoves(), "a8", "a1");
         chessEngine.alwaysChoose((board, legalMoves) -> harmless);
 
         computerPlayerService.onRoundStarted(gameId);
@@ -191,9 +195,17 @@ class ComputerPlayerServiceTest {
         await().atMost(Duration.ofSeconds(2)).untilAsserted(() -> {
             var submission = gameLifecycleService.viewGame(gameId, blackToken).mySubmission();
             org.junit.jupiter.api.Assertions.assertTrue(submission.submitted());
-            org.junit.jupiter.api.Assertions.assertEquals(captureKing, submission.move());
+            org.junit.jupiter.api.Assertions.assertEquals(harmless, submission.move());
         });
     }
+
+    // Le cas "capture de roi forcee (seul coup legal), donc jouee directement sans
+    // consulter le moteur" est couvert au niveau MinimaxChessEngineTest plutot qu'ici :
+    // toute position ou le seul coup legal restant est une capture de roi via le roi lui-
+    // meme met aussi mecaniquement ce roi en echec (adjacence mutuelle), ce qui declenche
+    // fast_mate (Game.applyFastMateIfApplicable) des la resolution du round precedent -
+    // la partie se termine alors avant meme que ComputerPlayerService n'ait a agir pour
+    // ce round, rendant ce chemin difficile a atteindre via un scenario de partie reel.
 
     @Test
     void computerPlaysAMoveThatTriggersFastMateEvenIfTheEngineWouldHavePickedSomethingElse() {
