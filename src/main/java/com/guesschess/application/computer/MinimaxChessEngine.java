@@ -4,6 +4,7 @@ import com.guesschess.application.computer.NegamaxSearch.ScoredMove;
 import com.guesschess.domain.board.Board;
 import com.guesschess.domain.move.Move;
 import com.guesschess.domain.piece.Color;
+import com.guesschess.domain.piece.PieceType;
 import com.guesschess.domain.rules.MoveGenerator;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -55,13 +56,37 @@ public class MinimaxChessEngine implements ChessEngine {
         }
         int depth = EngineSettings.forLevel(level).depth();
         List<ScoredMove> scored = NegamaxSearch.searchRoot(board, depth);
-        List<ScoredMove> preferred = excludeIfAlternativeExists(scored, movesToAvoidIfPossible);
+        List<ScoredMove> withoutAvoidableKingCapture = excludeKingCaptureUnlessForced(scored);
+        List<ScoredMove> preferred = excludeIfAlternativeExists(withoutAvoidableKingCapture, movesToAvoidIfPossible);
         Move chosen = switch (level) {
             case EASY -> pickByRankWeight(preferred);
             case MEDIUM -> preferred.get(0).move();
             case HARD -> pickPreferringGuessableRefutation(board, preferred);
         };
         return resolveAgainstLegalMoves(chosen, legalMoves);
+    }
+
+    /**
+     * Une capture du roi adverse n'est un coup "gratuit" que si c'est le seul coup legal
+     * disponible (voir ComputerPlayerService.chooseMoveOrFallback, meme raisonnement) -
+     * sinon quasi certaine d'etre devinee : le mover n'est pas lui-meme en echec, donc une
+     * devinette correcte l'annule juste normalement (Game.resolveRound) plutot que de
+     * declencher une issue immediate, rendant le trait au devineur sans rien lui avoir
+     * coute. Exclue des candidats des qu'une alternative existe, quel que soit son score
+     * classique (toujours le plus haut possible, NegamaxSearch.KING_CAPTURE_SCORE) -
+     * sinon systematiquement choisie malgre sa previsibilite. NegamaxSearch regenerant
+     * ses propres coups depuis board (voir searchRoot), cette exclusion doit se faire ici
+     * et pas seulement cote appelant (ComputerPlayerService) pour etre effective.
+     */
+    private static List<ScoredMove> excludeKingCaptureUnlessForced(List<ScoredMove> scored) {
+        List<ScoredMove> withoutKingCapture = scored.stream()
+                .filter(sm -> !isKingCapture(sm.move()))
+                .toList();
+        return withoutKingCapture.isEmpty() ? scored : withoutKingCapture;
+    }
+
+    private static boolean isKingCapture(Move move) {
+        return move.isCapture() && move.capturedPiece().type() == PieceType.KING;
     }
 
     /**

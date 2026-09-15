@@ -274,37 +274,41 @@ public class ComputerPlayerService {
     }
 
     /**
-     * Court-circuit symetrique de guessKingCaptureOrFallback, cote coup reel cette
-     * fois : le round precedent peut avoir laisse le roi adverse en echec non resolu
-     * (voir plus haut), auquel cas une capture de ce roi figure parmi les coups
-     * legaux de l'ordinateur ici joueur au trait. Sans ce court-circuit, chooseMove
-     * envoyait cette position a Stockfish via son FEN (roi adverse en echec alors
-     * que ce n'est pas son tour - illegal aux yeux d'un moteur d'echecs classique) ;
-     * plausible cause d'un crash natif intermittent du process observe en pratique
-     * (recherche qui explore cette capture puis une position sans roi, jamais prevue
-     * par un moteur classique), plus frequent en difficile (recherche plus profonde,
-     * plus de chances d'atteindre cette branche). Capturer ce roi est de toute facon
-     * objectivement le meilleur coup possible, inutile de consulter le moteur.
+     * Cote coup reel : le round precedent peut avoir laisse le roi adverse en echec non
+     * resolu (voir plus haut), auquel cas une capture de ce roi figure parmi les coups
+     * legaux de l'ordinateur ici joueur au trait. Jouee UNIQUEMENT si c'est le seul coup
+     * legal disponible (coup force) - sinon exclue des candidats plutot que privilegiee.
+     * Cote coup reel, contrairement a guessKingCaptureOrFallback, ce coup n'est jamais
+     * "gratuit" : le mover (l'ordinateur) n'est pas en echec, donc une devinette adverse
+     * correcte ne declenche jamais la regle GUESSMATE d'issue immediate
+     * (Game.resolveRound, moverWasInCheck) - elle annule juste normalement le coup,
+     * rendant le trait au devineur sans rien lui avoir coute. Un humain qui connait la
+     * regle devine donc cette capture quasi systematiquement des qu'elle est possible,
+     * ce qui en fait un coup tres previsible (donc a eviter, voir etape 17) plutot
+     * qu'"objectivement le meilleur" tant qu'une alternative existe.
      */
     private Move chooseMoveOrFallback(GameId gameId, Board board, List<Move> legalMoves, ComputerLevel level,
                                        GameVariant variant, Set<Move> movesToAvoidIfPossible) {
         List<Move> kingCaptures = legalMoves.stream()
                 .filter(move -> move.isCapture() && move.capturedPiece().type() == PieceType.KING)
                 .toList();
-        if (!kingCaptures.isEmpty()) {
+        if (kingCaptures.size() == legalMoves.size()) {
             return kingCaptures.get(ThreadLocalRandom.current().nextInt(kingCaptures.size()));
         }
+        List<Move> candidateMoves = kingCaptures.isEmpty()
+                ? legalMoves
+                : legalMoves.stream().filter(move -> !kingCaptures.contains(move)).toList();
         if (variant == GameVariant.GUESSCHESS && Game.isFastMateEnabled()) {
-            List<Move> fastMateMoves = findFastMateMoves(board, legalMoves);
+            List<Move> fastMateMoves = findFastMateMoves(board, candidateMoves);
             if (!fastMateMoves.isEmpty()) {
                 return fastMateMoves.get(ThreadLocalRandom.current().nextInt(fastMateMoves.size()));
             }
         }
         try {
-            return chessEngine.chooseMove(board, legalMoves, level, movesToAvoidIfPossible);
+            return chessEngine.chooseMove(board, candidateMoves, level, movesToAvoidIfPossible);
         } catch (Exception e) {
             log.error("computer player engine failed for game {}, falling back to a random legal move", gameId, e);
-            return legalMoves.get(ThreadLocalRandom.current().nextInt(legalMoves.size()));
+            return candidateMoves.get(ThreadLocalRandom.current().nextInt(candidateMoves.size()));
         }
     }
 
