@@ -129,7 +129,7 @@ Jeu d'échecs classique avec une règle additionnelle :
     (backend) et [`frontend/CLAUDE.md`](frontend/CLAUDE.md) (frontend).
 16. ⬜ Ajouter du son — un son pour le coup joué, un pour le coup deviné (résolution du round), un
     pour la fin de partie (victoire/nulle/défaite).
-17. ⬜ IA « guess-aware » — le choix du coup réel de l'ordinateur doit tenir compte de la mécanique
+17. ✅ IA « guess-aware » — le choix du coup réel de l'ordinateur doit tenir compte de la mécanique
     de devinette elle-même (pas seulement de l'évaluation d'échecs classique), pour exploiter les
     tactiques propres au guesschess plutôt que de les ignorer. Détail : [`src/CLAUDE.md`](src/CLAUDE.md).
 18. ✅ Page admin (fait) — `/admin` (frontend, sans lien dans l'UI), lecture seule : liste/recherche
