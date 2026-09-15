@@ -304,6 +304,10 @@ export const useGameStore = defineStore('game', () => {
     publish(`/app/games/${gameId.value}/draw-response`, { token: token.value, accept })
   }
 
+  function resign() {
+    publish(`/app/games/${gameId.value}/resign`, { token: token.value })
+  }
+
   /**
    * Un seul et meme appel sert a proposer ET a accepter la revanche : si l'adversaire
    * a deja appele ce meme endpoint, ce second appel complete la paire cote serveur et
@@ -338,6 +342,7 @@ export const useGameStore = defineStore('game', () => {
     sendChat,
     offerDraw,
     respondToDraw,
+    resign,
     offerRematch,
     dismissError,
   }

@@ -11,12 +11,17 @@ import com.guesschess.application.computer.ChessEngine;
 import com.guesschess.application.computer.ComputerLevel;
 import com.guesschess.domain.board.Board;
 import com.guesschess.domain.board.Position;
+import com.guesschess.domain.game.Game;
 import com.guesschess.domain.game.GameId;
 import com.guesschess.domain.game.GameStatus;
+import com.guesschess.domain.game.GameVariant;
 import com.guesschess.domain.game.RoundResult;
 import com.guesschess.domain.move.Move;
 import com.guesschess.domain.piece.Color;
 import com.guesschess.domain.piece.PieceType;
+import com.guesschess.domain.rules.CheckDetector;
+import com.guesschess.domain.rules.MaterialEvaluator;
+import com.guesschess.domain.rules.MoveGenerator;
 import com.guesschess.infrastructure.websocket.GameBroadcastService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -118,9 +123,10 @@ public class ComputerPlayerService {
         boolean computerIsMover = snapshot.sideToMove() == computerColor;
         Board board = snapshot.board();
         List<Move> legalMoves = snapshot.legalMoves();
+        GameVariant variant = snapshot.variant();
 
         Thread.ofVirtual().name("computer-player-" + gameId).start(
-                () -> act(gameId, token, computerIsMover, computerColor, board, legalMoves, level));
+                () -> act(gameId, token, computerIsMover, computerColor, board, legalMoves, level, variant));
     }
 
     /**
@@ -169,10 +175,10 @@ public class ComputerPlayerService {
     }
 
     private void act(GameId gameId, PlayerToken token, boolean computerIsMover, Color computerColor,
-                      Board board, List<Move> legalMoves, ComputerLevel level) {
+                      Board board, List<Move> legalMoves, ComputerLevel level, GameVariant variant) {
         Move chosen = computerIsMover
-                ? chooseMoveOrFallback(gameId, board, legalMoves, level, movesToAvoidThisTurn(gameId, legalMoves))
-                : guessKingCaptureOrFallback(gameId, computerColor, board, legalMoves, level);
+                ? chooseMoveOrFallback(gameId, board, legalMoves, level, variant, movesToAvoidThisTurn(gameId, legalMoves))
+                : guessKingCaptureOrFallback(gameId, computerColor, board, legalMoves, level, variant);
         try {
             MoveIntent intent = chosen.promotionType() == null
                     ? MoveIntent.of(chosen.from(), chosen.to())
@@ -204,7 +210,7 @@ public class ComputerPlayerService {
      * peuvent capturer ce roi.
      */
     private Move guessKingCaptureOrFallback(GameId gameId, Color computerColor, Board board,
-                                             List<Move> legalMoves, ComputerLevel level) {
+                                             List<Move> legalMoves, ComputerLevel level, GameVariant variant) {
         List<Move> kingCaptures = legalMoves.stream()
                 .filter(move -> move.isCapture()
                         && move.capturedPiece().type() == PieceType.KING
@@ -214,8 +220,10 @@ public class ComputerPlayerService {
             return kingCaptures.get(ThreadLocalRandom.current().nextInt(kingCaptures.size()));
         }
         // Devinette, pas coup propre : BlockedMove ne s'applique jamais ici (voir
-        // movesToAvoidThisTurn).
-        return chooseMoveOrFallback(gameId, board, legalMoves, level, Set.of());
+        // movesToAvoidThisTurn). findFastMateMoves s'applique quand meme tel quel : un
+        // adversaire rationnel qui a acces a un coup qui nous mettrait en fast_mate va le
+        // jouer, c'est donc aussi la devinette la plus plausible (voir findFastMateMoves).
+        return chooseMoveOrFallback(gameId, board, legalMoves, level, variant, Set.of());
     }
 
     /**
@@ -232,12 +240,18 @@ public class ComputerPlayerService {
      * objectivement le meilleur coup possible, inutile de consulter le moteur.
      */
     private Move chooseMoveOrFallback(GameId gameId, Board board, List<Move> legalMoves, ComputerLevel level,
-                                       Set<Move> movesToAvoidIfPossible) {
+                                       GameVariant variant, Set<Move> movesToAvoidIfPossible) {
         List<Move> kingCaptures = legalMoves.stream()
                 .filter(move -> move.isCapture() && move.capturedPiece().type() == PieceType.KING)
                 .toList();
         if (!kingCaptures.isEmpty()) {
             return kingCaptures.get(ThreadLocalRandom.current().nextInt(kingCaptures.size()));
+        }
+        if (variant == GameVariant.GUESSCHESS && Game.isFastMateEnabled()) {
+            List<Move> fastMateMoves = findFastMateMoves(board, legalMoves);
+            if (!fastMateMoves.isEmpty()) {
+                return fastMateMoves.get(ThreadLocalRandom.current().nextInt(fastMateMoves.size()));
+            }
         }
         try {
             return chessEngine.chooseMove(board, legalMoves, level, movesToAvoidIfPossible);
@@ -245,6 +259,34 @@ public class ComputerPlayerService {
             log.error("computer player engine failed for game {}, falling back to a random legal move", gameId, e);
             return legalMoves.get(ThreadLocalRandom.current().nextInt(legalMoves.size()));
         }
+    }
+
+    /**
+     * Parmi legalMoves, ceux qui declenchent un fast_mate (voir Game.applyFastMateIfApplicable) :
+     * apres le coup, l'adversaire se retrouve au trait en echec avec un seul coup legal et
+     * assez de materiel en face pour forcer le mat - victoire immediate (KING_CAPTURED) des la
+     * resolution du round suivant, que ce coup soit lui-meme devine ou non (fast_mate ne depend
+     * que de la position resultante, pas de si CE coup-ci a ete devine). Stockfish ne modelise
+     * pas cette regle maison : un coup qui echec-et-mate en un mais que son evaluation classique
+     * ne distingue pas nettement d'un coup "juste bon" (ex. le mat lui-meme sacrifie du materiel)
+     * peut donc etre ecarte par le moteur alors qu'il gagne la partie sur-le-champ - d'ou cette
+     * recherche manuelle, prioritaire sur l'appel au moteur. Reutilise tel quel pour deviner
+     * (voir guessKingCaptureOrFallback) : legalMoves/board y representent alors les coups de
+     * l'adversaire, et un adversaire rationnel qui a acces a un fast_mate va le jouer - donc
+     * aussi la devinette la plus plausible dans ce cas.
+     */
+    private List<Move> findFastMateMoves(Board board, List<Move> legalMoves) {
+        List<Move> fastMateMoves = new ArrayList<>();
+        for (Move move : legalMoves) {
+            Board after = board.applyMove(move);
+            Color responder = after.sideToMove();
+            if (CheckDetector.isInCheck(after, responder)
+                    && MoveGenerator.generateLegalMoves(after, responder).size() == 1
+                    && !MaterialEvaluator.isInsufficientMaterial(after)) {
+                fastMateMoves.add(move);
+            }
+        }
+        return fastMateMoves;
     }
 
     private Color computerColorOf(GameAccess access) {

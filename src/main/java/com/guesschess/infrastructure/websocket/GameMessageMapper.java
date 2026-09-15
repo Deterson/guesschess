@@ -90,13 +90,13 @@ public class GameMessageMapper {
                 snapshot.sideToMove().name(),
                 snapshot.status().name(),
                 toResultMessage(snapshot.result(), snapshot.fastMateResult()),
-                toRoundSummaryMessage(snapshot.lastRoundResult()),
+                toRoundSummaryMessage(snapshot.lastRoundResult(), snapshot.lastRoundBoardBefore()),
                 toLegalMoveMessages(snapshot.legalMoves()),
                 toMoveHistoryEntries(snapshot.playedMoveHistory()),
                 full,
                 toMySubmissionMessage(mySubmission),
                 snapshot.roundCount(),
-                snapshot.inCheck(),
+                snapshot.checkedColor() == null ? null : snapshot.checkedColor().name(),
                 snapshot.guessRepetitionImminent(),
                 snapshot.drawOfferedBy() == null ? null : snapshot.drawOfferedBy().name(),
                 snapshot.rematchOfferedBy() == null ? null : snapshot.rematchOfferedBy().name(),
@@ -126,17 +126,19 @@ public class GameMessageMapper {
         return new ResultMessage(result.winner() == null ? null : result.winner().name(), result.cause().name(), fastMateResult);
     }
 
-    private RoundSummaryMessage toRoundSummaryMessage(RoundResult roundResult) {
+    private RoundSummaryMessage toRoundSummaryMessage(RoundResult roundResult, Board boardBeforeRound) {
         if (roundResult == null) {
             return null;
         }
+        Move guessedMove = roundResult.guessedMove();
         return new RoundSummaryMessage(
                 roundResult.mover().name(),
                 roundResult.guesser().name(),
                 roundResult.actualMove().from().toAlgebraic(),
                 roundResult.actualMove().to().toAlgebraic(),
-                roundResult.guessedMove() == null ? null : roundResult.guessedMove().from().toAlgebraic(),
-                roundResult.guessedMove() == null ? null : roundResult.guessedMove().to().toAlgebraic(),
+                guessedMove == null ? null : guessedMove.from().toAlgebraic(),
+                guessedMove == null ? null : guessedMove.to().toAlgebraic(),
+                guessedMove == null ? null : SanGenerator.toSanCore(boardBeforeRound, guessedMove),
                 roundResult.guessedCorrectly()
         );
     }

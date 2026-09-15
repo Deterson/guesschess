@@ -217,6 +217,14 @@ tout court (échec rapide voulu au boot Spring, pas seulement au moment du login
   état en mémoire non persisté). `ChessEngine.chooseMove` a gagné un paramètre
   `movesToAvoidIfPossible` pour ça — indicatif seulement, `StockfishChessEngine` l'ignore plutôt que
   de vider la liste de candidats MultiPV ou de forcer un coup nettement pire.
+  **Recherche active de fast_mate** (tous niveaux, variante GUESSCHESS) : Stockfish ne modélise pas
+  la règle maison fast_mate (voir `Game.FAST_MATE_ENABLED`/`isFastMateEnabled`) — un coup qui met
+  l'adversaire échec avec une seule case de fuite gagne pourtant la partie sur-le-champ dès la
+  résolution du round suivant, que son évaluation classique le distingue ou non d'un coup "juste
+  bon". `ComputerPlayerService.findFastMateMoves` simule chaque coup légal candidat
+  (`Board.applyMove`) et cherche cette condition manuellement, prioritaire sur l'appel au moteur —
+  même méthode réutilisée côté devinette (`guessKingCaptureOrFallback`), un adversaire rationnel
+  avec un fast_mate à disposition étant aussi la devinette la plus plausible.
   Un seul et même appel (`chooseMove`) sert à jouer son propre coup
   ET à deviner celui de l'adversaire (même question posée au moteur) - voir `ComputerPlayerService`,
   qui détermine ce rôle via `Game.sideToMove()` et déclenche l'action sur un thread virtuel à chaque

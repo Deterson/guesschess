@@ -406,20 +406,70 @@ function onSquarePointerCancel(event: PointerEvent) {
   --square-light: #fef3c7;
 }
 
+/*
+ * --turn-halo-c1/c2 enregistrées via @property (syntax <color>) : une simple
+ * keyframe sur "background" (deux radial-gradient différents) ne s'interpole
+ * jamais en douceur (le navigateur bascule net entre les deux à mi-course,
+ * "clignote" plutôt que de respirer) - un <color> déclaré via @property est en
+ * revanche animable en continu par le navigateur. Le gradient lui-même reste une
+ * seule déclaration statique qui consomme ces deux variables.
+ */
+@property --turn-halo-c1 {
+  syntax: '<color>';
+  inherits: false;
+  initial-value: rgba(255, 255, 255, 0.9);
+}
+
+@property --turn-halo-c2 {
+  syntax: '<color>';
+  inherits: false;
+  initial-value: rgba(255, 255, 255, 0.35);
+}
+
 /* Halo blanc "à qui de jouer" : émane du bord haut ou bas du plateau (selon
    l'orientation), pour se repérer d'un coup d'œil sans lire le statut. Element
    dédié positionné hors du plateau (plutôt qu'un drop-shadow sur .chess-board)
    pour rester strictement d'un seul côté - un drop-shadow décalé déborde aussi
-   légèrement du côté opposé dès que son flou dépasse son décalage. */
+   légèrement du côté opposé dès que son flou dépasse son décalage. Respire
+   légèrement blanc -> violet -> blanc, synchronisé (même --breathe-duration) sur
+   la bannière de statut (GameStatusBar.animate-breathe) pour un rendu cohérent. */
 .turn-halo {
-  background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.35) 45%, rgba(255, 255, 255, 0) 75%);
   filter: blur(6px);
+  background: radial-gradient(ellipse at center, var(--turn-halo-c1) 0%, var(--turn-halo-c2) 45%, transparent 75%);
+  animation: turn-halo-breathe var(--breathe-duration) ease-in-out infinite;
+}
+
+@keyframes turn-halo-breathe {
+  0%,
+  50%,
+  100% {
+    --turn-halo-c1: rgba(255, 255, 255, 0.9);
+    --turn-halo-c2: rgba(255, 255, 255, 0.35);
+  }
+  80% {
+    --turn-halo-c1: rgba(167, 139, 250, 0.9);
+    --turn-halo-c2: rgba(167, 139, 250, 0.35);
+  }
 }
 
 /* Mode jour : le halo blanc se fond dans le fond quasi-blanc - inversé en halo
-   sombre pour rester visible, même principe que le reste du thème jour/nuit. */
-:global(html.day) .turn-halo {
-  background: radial-gradient(ellipse at center, rgba(15, 23, 42, 0.45) 0%, rgba(15, 23, 42, 0.18) 45%, rgba(15, 23, 42, 0) 75%);
+   sombre pour rester visible, même principe que le reste du thème jour/nuit
+   (respire vers le même violet que la nuit, plus lisible sur fond clair). */
+:global(html.day .turn-halo) {
+  animation-name: turn-halo-breathe-day;
+}
+
+@keyframes turn-halo-breathe-day {
+  0%,
+  50%,
+  100% {
+    --turn-halo-c1: rgba(15, 23, 42, 0.45);
+    --turn-halo-c2: rgba(15, 23, 42, 0.18);
+  }
+  80% {
+    --turn-halo-c1: rgba(124, 58, 237, 0.45);
+    --turn-halo-c2: rgba(124, 58, 237, 0.18);
+  }
 }
 
 @keyframes guess-flash-fade-ring {

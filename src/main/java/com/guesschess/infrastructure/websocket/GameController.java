@@ -27,6 +27,7 @@ import com.guesschess.infrastructure.websocket.dto.DrawResponseRequest;
 import com.guesschess.infrastructure.websocket.dto.ErrorMessage;
 import com.guesschess.infrastructure.websocket.dto.GameStateMessage;
 import com.guesschess.infrastructure.websocket.dto.RematchOfferRequest;
+import com.guesschess.infrastructure.websocket.dto.ResignRequest;
 import com.guesschess.infrastructure.websocket.dto.SubmitChatMessageRequest;
 import com.guesschess.infrastructure.websocket.dto.SubmitGuessRequest;
 import com.guesschess.infrastructure.websocket.dto.SubmitMoveRequest;
@@ -201,6 +202,18 @@ public class GameController {
                                @Header(value = "simpSessionAttributes", required = false) Map<String, Object> sessionAttributes) {
         PlayerRef requester = WebSocketPlayerIdentity.resolve(sessionAttributes);
         GameSnapshot resolved = gameLifecycleService.respondToDraw(PlayerToken.fromString(request.token()), request.accept(), requester);
+        gameBroadcastService.broadcast(resolved);
+    }
+
+    /**
+     * Abandon unilateral - valable a tout moment comme l'offre de nulle, mais sans
+     * reponse a attendre : toujours resolu et diffuse immediatement.
+     */
+    @MessageMapping("/games/{gameId}/resign")
+    public void resign(@DestinationVariable String gameId, @Payload ResignRequest request,
+                        @Header(value = "simpSessionAttributes", required = false) Map<String, Object> sessionAttributes) {
+        PlayerRef requester = WebSocketPlayerIdentity.resolve(sessionAttributes);
+        GameSnapshot resolved = gameLifecycleService.resign(PlayerToken.fromString(request.token()), requester);
         gameBroadcastService.broadcast(resolved);
     }
 

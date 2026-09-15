@@ -375,6 +375,25 @@ class GameTest {
     }
 
     @Test
+    void resigningEndsTheGameInAWinForTheOtherColor() {
+        Game game = Game.newGame();
+
+        game.resign(Color.WHITE);
+
+        assertEquals(GameStatus.FINISHED, game.status());
+        assertEquals(GameResultCause.RESIGNATION, game.result().cause());
+        assertEquals(Color.BLACK, game.result().winner());
+    }
+
+    @Test
+    void cannotResignAfterTheGameIsAlreadyFinished() {
+        Game game = Game.newGame();
+        game.resign(Color.WHITE);
+
+        assertThrows(IllegalStateException.class, () -> game.resign(Color.BLACK));
+    }
+
+    @Test
     void offerRematchIsRejectedWhileTheGameIsStillOngoing() {
         Game game = Game.newGame();
 

@@ -20,9 +20,9 @@ const emit = defineEmits<{
 const { t } = useI18n()
 
 const text = computed(() => {
-  if (!props.round.guessedFrom || !props.round.guessedTo) return t('roundResult.noGuess')
+  if (!props.round.guessedSan) return t('roundResult.noGuess')
   return t('roundResult.guessResult', {
-    square: props.round.guessedFrom,
+    move: props.round.guessedSan,
     outcome: props.round.guessedCorrectly ? t('roundResult.correct') : t('roundResult.missed'),
   })
 })

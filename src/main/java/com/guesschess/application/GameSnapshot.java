@@ -27,10 +27,13 @@ import java.util.List;
  * roundCount (nombre de rounds deja resolus, y compris les rounds annules) permet
  * au frontend de detecter qu'un nouveau round vient d'etre resolu (donc de refetch
  * l'historique detaille via GET /api/games/{id}/history) sans avoir a diffuser tout
- * cet historique sur chaque message d'etat. inCheck indique si sideToMove est
- * actuellement en echec sur board (Game.isInCheck(), toujours false si la partie
- * n'est plus ONGOING) - permet au frontend de surligner le roi concerne sans
- * dupliquer la detection d'echec cote client. guessRepetitionImminent indique qu'un
+ * cet historique sur chaque message d'etat. checkedColor (Game.checkedColor(), null
+ * si aucun ou partie non ONGOING) est la couleur dont le roi est actuellement en
+ * echec sur board - pas forcement sideToMove : en guesschess un coup qui pare un
+ * echec peut etre devine correctement sans etre reellement joue (variante sans
+ * Guessmate), laissant l'ancien mover en echec alors que le trait est deja passe au
+ * devineur. Permet au frontend de surligner le roi concerne sans dupliquer la
+ * detection d'echec cote client. guessRepetitionImminent indique qu'un
  * seul coup encore devine correctement par sideToMove suffirait a declencher la nulle
  * par "6 guess repetition" (Game.isGuessRepetitionImminent) - permet au frontend
  * d'avertir avant coup plutot que de laisser la nulle surprendre. fastMateResult
@@ -53,10 +56,11 @@ public record GameSnapshot(
         GameStatus status,
         GameResult result,
         RoundResult lastRoundResult,
+        Board lastRoundBoardBefore,
         List<Move> legalMoves,
         List<Game.PlayedMove> playedMoveHistory,
         int roundCount,
-        boolean inCheck,
+        Color checkedColor,
         boolean guessRepetitionImminent,
         boolean fastMateResult,
         Color drawOfferedBy,
@@ -78,10 +82,11 @@ public record GameSnapshot(
                 game.status(),
                 game.result(),
                 game.lastRoundResult(),
+                game.boardBeforeLastRound(),
                 game.legalMoves(),
                 game.playedMoveHistory(),
                 game.roundHistory().size(),
-                game.isInCheck(),
+                game.checkedColor(),
                 game.isGuessRepetitionImminent(),
                 game.isFastMateResult(),
                 game.drawOfferedBy(),

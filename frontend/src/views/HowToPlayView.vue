@@ -83,6 +83,7 @@ const example1LastRound: RoundSummaryMessage = {
   actualTo: 'f3',
   guessedFrom: 'e2',
   guessedTo: 'e4',
+  guessedSan: 'e4',
   guessedCorrectly: false,
 }
 const example1Guess = { from: 'e2', to: 'e4' }
@@ -97,6 +98,7 @@ const example2LastRound: RoundSummaryMessage = {
   actualTo: 'e5',
   guessedFrom: 'e7',
   guessedTo: 'e5',
+  guessedSan: 'e5',
   guessedCorrectly: true,
 }
 const example2Guess = { from: 'e7', to: 'e5' }
@@ -112,6 +114,7 @@ const example3LastRound: RoundSummaryMessage = {
   actualTo: 'f2',
   guessedFrom: 'e1',
   guessedTo: 'f2',
+  guessedSan: 'Kf2#',
   guessedCorrectly: true,
 }
 const example3Guess = { from: 'e1', to: 'f2' }

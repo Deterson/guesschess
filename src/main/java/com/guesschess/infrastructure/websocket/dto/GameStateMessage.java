@@ -16,9 +16,10 @@ import java.util.List;
  * MySubmissionMessage). roundCount est le nombre de rounds deja resolus (y compris
  * les rounds annules) - permet au frontend de detecter qu'un nouveau round vient
  * d'etre resolu et de refetch l'historique detaille (GET /api/games/{id}/history)
- * sans avoir a diffuser cet historique complet sur chaque message d'etat. inCheck
- * indique si sideToMove est actuellement en echec, pour surligner son roi cote
- * frontend (toujours false une fois la partie terminee). drawOfferedBy ("WHITE"/
+ * sans avoir a diffuser cet historique complet sur chaque message d'etat. checkedColor
+ * ("WHITE"/"BLACK"/null) est la couleur dont le roi est actuellement en echec, pour
+ * surligner ce roi cote frontend - pas forcement sideToMove (voir GameSnapshot),
+ * toujours null une fois la partie terminee. drawOfferedBy ("WHITE"/
  * "BLACK"/null) est la couleur ayant une offre de nulle en attente, publique (pas
  * une fuite anti-triche comme mySubmission : les deux joueurs doivent la voir).
  * rematchOfferedBy ("WHITE"/"BLACK"/null) est la couleur ayant propose une revanche
@@ -50,7 +51,7 @@ public record GameStateMessage(
         boolean full,
         MySubmissionMessage mySubmission,
         int roundCount,
-        boolean inCheck,
+        String checkedColor,
         boolean guessRepetitionImminent,
         String drawOfferedBy,
         String rematchOfferedBy,

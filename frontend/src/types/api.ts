@@ -22,6 +22,7 @@ export type GameResultCause =
   | 'DRAW_INSUFFICIENT_MATERIAL'
   | 'DRAW_BY_AGREEMENT'
   | 'TIMEOUT'
+  | 'RESIGNATION'
 
 /** "wP", "bK"... ou null pour une case vide (voir GameMessageMapper.toCode). */
 export type PieceCode = `${'w' | 'b'}${'P' | 'N' | 'B' | 'R' | 'Q' | 'K'}`
@@ -223,6 +224,7 @@ export interface RoundSummaryMessage {
   actualTo: string
   guessedFrom: string | null
   guessedTo: string | null
+  guessedSan: string | null
   guessedCorrectly: boolean
 }
 
@@ -260,7 +262,8 @@ export interface GameStateMessage {
   full: boolean
   mySubmission: MySubmissionMessage
   roundCount: number
-  inCheck: boolean
+  /** Couleur dont le roi est actuellement en echec, ou null - pas forcement sideToMove (voir GameSnapshot.java, cas d'un coup pare-echec devine correctement sans etre joue). */
+  checkedColor: Color | null
   /** Un seul coup encore devine correctement par sideToMove declencherait la nulle par "6 guess repetition". */
   guessRepetitionImminent: boolean
   drawOfferedBy: Color | null

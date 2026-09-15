@@ -70,6 +70,15 @@ public final class Game {
     private static final boolean FAST_MATE_ENABLED = true;
 
     /**
+     * Expose FAST_MATE_ENABLED (voir applyFastMateIfApplicable) pour que d'autres couches -
+     * ComputerPlayerService, qui cherche activement a provoquer un fast_mate plutot que de
+     * simplement le subir - sachent si ca vaut le coup de chercher, sans dupliquer la constante.
+     */
+    public static boolean isFastMateEnabled() {
+        return FAST_MATE_ENABLED;
+    }
+
+    /**
      * Origine d'une entree de positionHistory : MOVE pour un coup reellement joue
      * (y compris la position initiale), GUESS pour un round annule par une devinette
      * correcte (le plateau ne bouge pas, seul le trait passe - voir Game.cancelRound).
@@ -360,6 +369,16 @@ public final class Game {
         }
     }
 
+    /**
+     * Abandon immediat et unilateral de resigner - contrairement a l'offre de nulle,
+     * pas de reponse de l'adversaire a attendre : la partie se termine des cet appel,
+     * victoire de l'autre couleur, cause RESIGNATION.
+     */
+    public void resign(Color resigner) {
+        requireOngoing();
+        finish(GameResult.win(resigner.opposite(), GameResultCause.RESIGNATION));
+    }
+
     public Color rematchOfferedBy() {
         return rematchOfferedBy;
     }
@@ -416,6 +435,16 @@ public final class Game {
 
     public RoundResult lastRoundResult() {
         return roundHistory.isEmpty() ? null : roundHistory.get(roundHistory.size() - 1);
+    }
+
+    /**
+     * Plateau juste avant le dernier round resolu (positionHistory.get(i), voir
+     * roundHistoryWithPositions) - necessaire a GameMessageMapper pour generer le SAN
+     * du coup devine (RoundSummaryMessage.guessedSan), qui n'a de sens que rapporte a
+     * la position ou la devinette a ete faite, jamais la position courante.
+     */
+    public Board boardBeforeLastRound() {
+        return roundHistory.isEmpty() ? null : positionHistory.get(roundHistory.size() - 1).board();
     }
 
     /**
@@ -489,6 +518,24 @@ public final class Game {
             return false;
         }
         return CheckDetector.isInCheck(board, color);
+    }
+
+    /**
+     * Couleur dont le roi est actuellement en echec, ou null si aucune - contrairement
+     * a isInCheck()/isInCheck(Color), ne suppose pas que c'est forcement sideToMove :
+     * en guesschess, un coup qui pare un echec peut etre devine correctement (variante
+     * sans Guessmate) sans etre reellement joue (cancelRound), laissant le roi de
+     * l'ancien mover en echec alors que le trait est deja passe au devineur. Au plus
+     * une couleur a la fois (position issue d'un coup legal ou d'un pass sans coup).
+     */
+    public Color checkedColor() {
+        if (isInCheck(Color.WHITE)) {
+            return Color.WHITE;
+        }
+        if (isInCheck(Color.BLACK)) {
+            return Color.BLACK;
+        }
+        return null;
     }
 
     /**

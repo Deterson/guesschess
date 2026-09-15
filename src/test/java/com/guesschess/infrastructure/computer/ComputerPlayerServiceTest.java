@@ -20,6 +20,8 @@ import com.guesschess.domain.move.Move;
 import com.guesschess.domain.piece.Color;
 import com.guesschess.domain.piece.Piece;
 import com.guesschess.domain.piece.PieceType;
+import com.guesschess.domain.rules.CheckDetector;
+import com.guesschess.domain.rules.MoveGenerator;
 import com.guesschess.infrastructure.persistence.InMemoryGameAccessRepository;
 import com.guesschess.infrastructure.persistence.InMemoryGameRepository;
 import com.guesschess.infrastructure.websocket.GameBroadcastService;
@@ -190,6 +192,51 @@ class ComputerPlayerServiceTest {
             var submission = gameLifecycleService.viewGame(gameId, blackToken).mySubmission();
             org.junit.jupiter.api.Assertions.assertTrue(submission.submitted());
             org.junit.jupiter.api.Assertions.assertEquals(captureKing, submission.move());
+        });
+    }
+
+    @Test
+    void computerPlaysAMoveThatTriggersFastMateEvenIfTheEngineWouldHavePickedSomethingElse() {
+        // Blancs (ordinateur) au trait : Ra1-a8+ met les noirs en echec avec Kh7 pour
+        // seule case de fuite (Kg8 illegal - tour a8 ; Kg7 illegal - roi blanc f6
+        // adjacent) - fast_mate (voir Game.applyFastMateIfApplicable), qui exige la
+        // variante GUESSCHESS. Stockfish n'evalue pas cette regle maison (voir
+        // ComputerPlayerService.findFastMateMoves) : FakeChessEngine est configure
+        // pour choisir un tout autre coup legal, qui ne doit jamais etre consulte des
+        // lors qu'un coup fast_mate existe parmi les coups legaux de l'ordinateur.
+        GameId gameId = GameId.random();
+        Board position = Board.empty()
+                .withPiece(Position.fromAlgebraic("f6"), Piece.of(PieceType.KING, Color.WHITE))
+                .withPiece(Position.fromAlgebraic("a1"), Piece.of(PieceType.ROOK, Color.WHITE))
+                .withPiece(Position.fromAlgebraic("h8"), Piece.of(PieceType.KING, Color.BLACK));
+        Game game = Game.fromPosition(gameId, position, GameVariant.GUESSCHESS);
+        gameRepository.insert(game);
+
+        PlayerToken whiteToken = PlayerToken.random();
+        PlayerToken blackToken = PlayerToken.random();
+        GameAccess access = new GameAccess(gameId, whiteToken, blackToken)
+                .withPlayerLinked(Color.WHITE, new PlayerRef.Computer(ComputerLevel.EASY))
+                .withPlayerLinked(Color.BLACK, new PlayerRef.Anonymous(new AnonymousId(UUID.randomUUID())));
+        gameAccessRepository.save(access);
+
+        // Plusieurs coups blancs declenchent fast_mate ici (Ra1-a8+ comme Ra1-h1+, la
+        // tour parachevant le filet avec le roi blanc f6 des deux facons) - on
+        // n'impose donc pas UN coup precis, seulement que le coup choisi verifie la
+        // condition fast_mate et differe du coup inoffensif force par FakeChessEngine.
+        Move harmless = findMove(game.legalMoves(), "a1", "a2");
+        chessEngine.alwaysChoose((board, legalMoves) -> harmless);
+
+        computerPlayerService.onRoundStarted(gameId);
+
+        await().atMost(Duration.ofSeconds(2)).untilAsserted(() -> {
+            var submission = gameLifecycleService.viewGame(gameId, whiteToken).mySubmission();
+            org.junit.jupiter.api.Assertions.assertTrue(submission.submitted());
+            Move chosen = submission.move();
+            org.junit.jupiter.api.Assertions.assertNotEquals(harmless, chosen);
+            Board afterChosenMove = position.applyMove(chosen);
+            org.junit.jupiter.api.Assertions.assertTrue(CheckDetector.isInCheck(afterChosenMove, Color.BLACK));
+            org.junit.jupiter.api.Assertions.assertEquals(1,
+                    MoveGenerator.generateLegalMoves(afterChosenMove, Color.BLACK).size());
         });
     }
 

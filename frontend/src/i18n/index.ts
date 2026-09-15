@@ -8,7 +8,8 @@ export type Locale = (typeof SUPPORTED_LOCALES)[number]
 
 function initialLocale(): Locale {
   const stored = localStorage.getItem(STORAGE_KEY)
-  return stored === 'en' ? 'en' : 'fr'
+  if (stored === 'en' || stored === 'fr') return stored
+  return navigator.language.startsWith('fr') ? 'fr' : 'en'
 }
 
 export const i18n = createI18n({

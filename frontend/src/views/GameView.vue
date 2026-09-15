@@ -50,6 +50,7 @@ onUnmounted(() => {
   stopTabTitleBlink()
   if (resolvedGuessFlashTimeout) clearTimeout(resolvedGuessFlashTimeout)
   if (connectionLostTimeout) clearTimeout(connectionLostTimeout)
+  if (resignArmedTimeout) clearTimeout(resignArmedTimeout)
 })
 
 /**
@@ -273,10 +274,16 @@ const hoverGuessBoard = computed<Board | null>(() => {
   return applyMoveToBoard(base, round.guessedFrom, round.guessedTo)
 })
 
-/** Roi en echec : uniquement en direct sur le plateau reel (jamais en navigation historique ni pendant l'apercu au survol d'une devinette). */
+/**
+ * Roi en echec : uniquement en direct sur le plateau reel (jamais en navigation
+ * historique ni pendant l'apercu au survol d'une devinette). Pas forcement
+ * sideToMove : un coup qui pare un echec peut avoir ete devine correctement sans
+ * etre reellement joue (variante sans Guessmate), laissant l'ancien mover en echec
+ * alors que le trait est deja passe au devineur - voir GameStateMessage.checkedColor.
+ */
 const checkedColor = computed<ColorLower | null>(() => {
-  if (historyIndex.value !== null || hoveredGuess.value || !state.value?.inCheck) return null
-  return state.value.sideToMove.toLowerCase() as ColorLower
+  if (historyIndex.value !== null || hoveredGuess.value || !state.value?.checkedColor) return null
+  return state.value.checkedColor.toLowerCase() as ColorLower
 })
 
 const myRole = computed(() => {
@@ -284,9 +291,16 @@ const myRole = computed(() => {
   return state.value.sideToMove === myColor.value.toUpperCase() ? 'mover' : 'guesser'
 })
 
-/** Halo blanc "à qui de jouer" : bas si le joueur au trait est en bas du plateau affiché (nous, ou blancs pour un spectateur), haut sinon. Masqué tant que la partie n'a pas commencé/est finie, sideToMove n'ayant alors rien de significatif à indiquer. */
+/**
+ * Halo blanc "à qui de jouer" : positionné en bas ou en haut selon que le joueur au
+ * trait (sideToMove) est affiché en bas ou en haut du plateau (comme à l'origine),
+ * mais indicateur PRIVÉ (jamais pour un spectateur, qui n'a ni myColor ni canAct) et
+ * disparaît dès que MOI j'ai soumis ma propre part de ce round (pendingSubmission),
+ * pas seulement à sa résolution - même logique que GameStatusBar.isMyTurn.
+ */
 const turnIndicator = computed<'top' | 'bottom' | null>(() => {
   if (!state.value?.full || state.value.status === 'FINISHED') return null
+  if (!myColor.value || !canAct.value || pendingSubmission.value) return null
   return state.value.sideToMove.toLowerCase() === bottomPlayerColor.value ? 'bottom' : 'top'
 })
 
@@ -406,6 +420,30 @@ function onDrawButtonClick() {
   }
 }
 
+/**
+ * Confirmation en deux clics (voir TODO) : le premier clic arme le bouton (rouge,
+ * "Abandonner ?") sans rien envoyer au serveur, seul le second clic dans les
+ * RESIGN_CONFIRM_TIMEOUT_MS qui suivent declenche l'abandon reel. Etat partage entre
+ * les boutons desktop et mobile (tous deux presents dans le DOM en permanence, la
+ * bascule entre layouts se faisant par requete de conteneur CSS, pas par v-if).
+ */
+const RESIGN_CONFIRM_TIMEOUT_MS = 3000
+const resignArmed = ref(false)
+let resignArmedTimeout: ReturnType<typeof setTimeout> | null = null
+
+function onResignButtonClick() {
+  if (resignArmed.value) {
+    if (resignArmedTimeout) clearTimeout(resignArmedTimeout)
+    resignArmed.value = false
+    gameStore.resign()
+  } else {
+    resignArmed.value = true
+    resignArmedTimeout = setTimeout(() => {
+      resignArmed.value = false
+    }, RESIGN_CONFIRM_TIMEOUT_MS)
+  }
+}
+
 const rematchOfferedByMe = computed(
   () =>
     Boolean(state.value?.rematchOfferedBy) && myColor.value != null && state.value?.rematchOfferedBy === myColor.value.toUpperCase(),
@@ -520,6 +558,7 @@ const displayLastRound = computed<RoundSummaryMessage | null>(() => {
     actualTo: round.actualTo,
     guessedFrom: round.guessedFrom,
     guessedTo: round.guessedTo,
+    guessedSan: round.guessedSan,
     guessedCorrectly: round.guessedCorrectly,
   }
 })
@@ -702,18 +741,36 @@ function onPromotionSelected(promotion: PromotionPieceType) {
         <div class="order-4 mx-auto w-full max-w-xl @min-[67rem]:order-none @min-[67rem]:col-start-3 @min-[67rem]:mx-0 @min-[67rem]:max-w-none">
           <MoveHistoryList :rounds="historyRounds" :history-index="historyIndex" @select="onHistorySelect" />
 
-          <div v-if="myColor && canAct && state.full" class="mt-2 flex flex-col items-center">
-            <p v-if="drawOfferedByOpponent" class="mb-1 text-xs text-stone-400">{{ t('game.opponentOffersDraw') }}</p>
-            <button
-              type="button"
-              class="rounded-lg px-4 py-2 text-sm disabled:opacity-50"
-              :class="drawOfferedByOpponent ? 'bg-violet-700 hover:bg-violet-600' : 'bg-stone-700 hover:bg-stone-600'"
-              :disabled="drawOfferedByMe || state.status === 'FINISHED'"
-              @click="onDrawButtonClick"
-            >
-              {{ drawOfferedByOpponent ? t('game.acceptDraw') : t('game.offerDraw') }}
-            </button>
-          </div>
+          <template v-if="myColor && canAct && state.full">
+            <div v-if="state.status !== 'FINISHED'" class="mt-2 flex flex-col items-center gap-2">
+              <p v-if="drawOfferedByOpponent" class="text-xs text-stone-400">{{ t('game.opponentOffersDraw') }}</p>
+              <button
+                type="button"
+                class="flex items-center gap-2 rounded-lg px-4 py-2 text-sm disabled:opacity-50"
+                :class="drawOfferedByOpponent ? 'bg-violet-700 hover:bg-violet-600' : 'bg-stone-700 hover:bg-stone-600'"
+                :disabled="drawOfferedByMe"
+                @click="onDrawButtonClick"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 shrink-0" aria-hidden="true">
+                  <g transform="rotate(-22 12 12)"><rect x="2" y="10" width="10" height="4" rx="2" /></g>
+                  <g transform="rotate(22 12 12)"><rect x="12" y="10" width="10" height="4" rx="2" /></g>
+                </svg>
+                {{ drawOfferedByOpponent ? t('game.acceptDraw') : t('game.offerDraw') }}
+              </button>
+              <button
+                type="button"
+                class="flex items-center gap-2 rounded-lg px-4 py-2 text-sm"
+                :class="resignArmed ? 'bg-red-700 hover:bg-red-600' : 'bg-stone-700 hover:bg-stone-600'"
+                @click="onResignButtonClick"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4 shrink-0" aria-hidden="true">
+                  <line x1="5" y1="3" x2="5" y2="21" />
+                  <path d="M5 4h13l-3.5 4.5L18 13H5" />
+                </svg>
+                {{ resignArmed ? t('game.resignConfirm') : t('game.resign') }}
+              </button>
+            </div>
+          </template>
 
           <div v-if="myColor && canAct && state.status === 'FINISHED'" class="mt-2 flex flex-col items-center">
             <p v-if="rematchOfferedByOpponent" class="mb-1 text-xs text-stone-400">{{ t('game.opponentOffersRematch') }}</p>
@@ -771,6 +828,13 @@ function onPromotionSelected(promotion: PromotionPieceType) {
           </div>
         </div>
 
+        <!--
+          Wrapper "relative" englobant tout ce qui n'est ni les bannières du haut ni
+          la barre d'onglets du bas : le panneau historique/chat s'y superpose en
+          overlay (absolute inset-0) plutôt que de rétrécir le plateau en se glissant
+          comme sibling flex-1 (ancien comportement).
+        -->
+        <div class="relative flex min-h-0 flex-1 flex-col">
         <PlayerLabel
           class="w-full shrink-0"
           :color="topPlayerColor"
@@ -837,13 +901,16 @@ function onPromotionSelected(promotion: PromotionPieceType) {
             <div class="flex items-center gap-3">
               <button
                 type="button"
-                class="flex h-11 w-11 items-center justify-center rounded-lg bg-stone-800 text-stone-300 hover:bg-stone-700"
-                :aria-label="t('game.resign')"
+                class="flex h-11 items-center justify-center gap-1 rounded-lg"
+                :class="resignArmed ? 'bg-red-700 px-3 text-white hover:bg-red-600' : 'w-11 bg-stone-800 text-stone-300 hover:bg-stone-700'"
+                :aria-label="resignArmed ? t('game.resignConfirm') : t('game.resign')"
+                @click="onResignButtonClick"
               >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5 shrink-0" aria-hidden="true">
                   <line x1="5" y1="3" x2="5" y2="21" />
                   <path d="M5 4h13l-3.5 4.5L18 13H5" />
                 </svg>
+                <span v-if="resignArmed" class="text-lg font-bold leading-none" aria-hidden="true">?</span>
               </button>
               <button
                 type="button"
@@ -875,10 +942,7 @@ function onPromotionSelected(promotion: PromotionPieceType) {
           </div>
         </template>
 
-        <div
-          class="w-full"
-          :class="mobilePanel ? 'min-h-0 flex-1 overflow-y-auto' : 'h-0 shrink-0 overflow-hidden'"
-        >
+        <div v-if="mobilePanel" class="absolute inset-0 z-10 flex flex-col overflow-y-auto bg-stone-950/95 p-2 backdrop-blur-sm">
           <MoveHistoryList v-if="mobilePanel === 'history'" :rounds="historyRounds" :history-index="historyIndex" @select="onHistorySelect" />
           <ChatPanel
             v-if="mobilePanel === 'chat' && !isVsComputer"
@@ -888,11 +952,12 @@ function onPromotionSelected(promotion: PromotionPieceType) {
             @send="gameStore.sendChat"
           />
         </div>
+        </div>
 
         <div class="flex shrink-0 border-t border-stone-800">
           <button
             type="button"
-            class="flex flex-1 items-center justify-center py-3"
+            class="mobile-tab-btn flex flex-1 items-center justify-center py-3"
             :class="mobilePanel === 'history' ? 'bg-stone-800 text-emerald-400' : 'text-stone-400'"
             :aria-label="t('moveHistory.title')"
             :aria-pressed="mobilePanel === 'history'"
@@ -906,7 +971,7 @@ function onPromotionSelected(promotion: PromotionPieceType) {
           <button
             v-if="!isVsComputer"
             type="button"
-            class="flex flex-1 items-center justify-center border-l border-stone-800 py-3"
+            class="mobile-tab-btn flex flex-1 items-center justify-center border-l border-stone-800 py-3"
             :class="mobilePanel === 'chat' ? 'bg-stone-800 text-emerald-400' : 'text-stone-400'"
             :aria-label="t('chat.title')"
             :aria-pressed="mobilePanel === 'chat'"
@@ -937,3 +1002,18 @@ function onPromotionSelected(promotion: PromotionPieceType) {
     </template>
   </div>
 </template>
+
+<style scoped>
+/*
+ * Affordance de survol sur les onglets historique/chat mobiles, uniquement sur un
+ * vrai pointeur de souris - un ":hover" Tailwind classique resterait "colle" apres
+ * un tap sur beaucoup de navigateurs tactiles. (hover:hover) detecte une souris
+ * quel que soit l'appareil, y compris une fenetre desktop etroite basculee sur ce
+ * layout par requete de conteneur.
+ */
+@media (hover: hover) and (pointer: fine) {
+  .mobile-tab-btn:hover {
+    background-color: var(--color-stone-800);
+  }
+}
+</style>

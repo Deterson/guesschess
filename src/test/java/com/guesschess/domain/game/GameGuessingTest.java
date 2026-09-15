@@ -364,6 +364,28 @@ class GameGuessingTest {
         assertTrue(game.isInCheck(Color.WHITE));
     }
 
+    @Test
+    void checkedColorTracksTheKingLeftInCheckEvenAfterTheTraitPassesToTheGuesser() {
+        Game game = Game.fromPosition(checkWithMultipleEscapesPosition(), GameVariant.GUESSCHESS);
+        Move escape = findMove(game.legalMoves(), "a1", "b1");
+        game.submitGuess(escape);
+
+        RoundResult result = game.submitMove(escape).orElseThrow();
+
+        assertFalse(result.movePlayed());
+        assertEquals(GameStatus.ONGOING, game.status());
+        assertEquals(Color.BLACK, game.sideToMove());
+        assertFalse(game.isInCheck());
+        assertEquals(Color.WHITE, game.checkedColor());
+    }
+
+    @Test
+    void checkedColorIsNullWhenNoKingIsInCheck() {
+        Game game = Game.newGame();
+
+        assertNull(game.checkedColor());
+    }
+
     /**
      * Roi blanc en a1, en echec par la tour noire (colonne a), avec b2 tenu par le
      * cavalier noir : le seul coup legal blanc est Ra1-b1.

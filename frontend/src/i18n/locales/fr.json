@@ -44,6 +44,7 @@
     "resultWinKingCaptured": "Roi capturé",
     "resultWinFastMate": "Roi capturé (un seul coup possible)",
     "resultWinTimeout": "Temps écoulé : victoire {winner}",
+    "resultWinResignation": "Abandon : victoire {winner}",
     "resultDrawGuessRepetition": "Partie terminée : nulle ({link})",
     "guessRepetitionLinkText": "6 guess repetition",
     "guessRepetitionWarning": "Si vous bloquez encore le même coup, la règle du {link} s'appliquera.",
@@ -105,7 +106,7 @@
   },
   "roundResult": {
     "noGuess": "pas de devinette",
-    "guessResult": "Deviné : {square} ({outcome})",
+    "guessResult": "Deviné : {move} ({outcome})",
     "correct": "correct",
     "missed": "raté"
   },
@@ -118,6 +119,7 @@
     "tabTitleYourTurnToPlay": "À vous de jouer",
     "tabTitleYourTurnToGuess": "À vous de deviner",
     "resign": "Abandonner",
+    "resignConfirm": "Abandonner ?",
     "offerDraw": "Proposer la nulle",
     "acceptDraw": "Accepter la nulle",
     "opponentOffersDraw": "Votre adversaire propose la nulle",

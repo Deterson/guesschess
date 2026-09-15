@@ -6,7 +6,8 @@ body {
 
 :root {
   --breathe-base: #292524;
-  --breathe-accent: #381e3b;
+  --breathe-accent: #6d28d9;
+  --breathe-duration: 2.2s;
 }
 
 /*

@@ -175,6 +175,22 @@ public class GameLifecycleService {
     }
 
     /**
+     * Abandon unilateral - meme forme que offerDraw (n'importe quel joueur, a tout
+     * moment), mais sans reponse a attendre : toujours resolu et diffusable
+     * immediatement.
+     */
+    public GameSnapshot resign(PlayerToken token, PlayerRef requester) {
+        GameAccess access = requireAccess(token);
+        requireFull(access);
+        Color color = access.colorOf(token);
+        return gameRepository.withGame(access.gameId(), game -> {
+            requireOwnership(access.gameId(), color, requester);
+            game.resign(color);
+            return GameSnapshot.of(game);
+        });
+    }
+
+    /**
      * Propose une revanche, valable uniquement une fois la partie FINISHED (rejetee
      * par le domaine sinon - voir Game.offerRematch). Un seul et meme appel sert a
      * proposer ET a accepter : si l'AUTRE couleur avait deja propose (previousOffer),

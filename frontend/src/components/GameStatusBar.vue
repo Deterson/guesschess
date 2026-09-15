@@ -57,6 +57,8 @@ const resultText = computed(() => {
       return t('gameStatusBar.resultWinCheckmate')
     case 'KING_CAPTURED':
       return t('gameStatusBar.resultWinKingCaptured')
+    case 'RESIGNATION':
+      return t('gameStatusBar.resultWinResignation', { winner })
     default:
       return t('gameStatusBar.resultWin', { winner })
   }
@@ -136,7 +138,7 @@ function acknowledge() {
 
 <style scoped>
 .animate-breathe {
-  animation: breathe 3000ms ease-in-out infinite;
+  animation: breathe var(--breathe-duration) ease-in-out infinite;
 }
 
 @keyframes breathe {
