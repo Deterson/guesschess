@@ -4,6 +4,7 @@ import com.guesschess.domain.board.Board;
 import com.guesschess.domain.move.Move;
 import com.guesschess.domain.move.MoveType;
 import com.guesschess.domain.piece.Color;
+import com.guesschess.domain.piece.PieceType;
 import com.guesschess.domain.rules.CheckDetector;
 import com.guesschess.domain.rules.MoveGenerator;
 import com.guesschess.domain.rules.PositionEvaluator;
@@ -46,6 +47,21 @@ public final class NegamaxSearch {
     /** Un score dont la magnitude depasse ce seuil represente un mat force. */
     private static final int MATE_THRESHOLD = MATE_SCORE - 1_000;
 
+    /**
+     * Score attribue a un coup qui capture directement un roi - situation qui n'existe
+     * jamais en echecs classiques (MoveGenerator.generateLegalMoves ne genere jamais de
+     * coup laissant son propre roi en echec, donc aucune recursion interne de cette classe
+     * ne peut spontanement produire un tel coup), mais que la mecanique de devinette rend
+     * possible : un round annule qui laisse un roi en echec non resolu (voir CLAUDE.md,
+     * Game.resolveRound) peut faire apparaitre une capture de roi parmi les coups legaux
+     * du plateau RACINE fourni a searchRoot. Volontairement au-dela de tout score de mat
+     * (MATE_SCORE + une profondeur bornee) pour ne jamais etre depasse par un "simple" mat
+     * trouve par ailleurs. Sans ce court-circuit, jouer ce coup produirait un plateau sans
+     * roi que MoveGenerator/CheckDetector ne savent pas interpreter
+     * (CheckDetector.findKing leve IllegalStateException des la recursion suivante).
+     */
+    private static final int KING_CAPTURE_SCORE = MATE_SCORE + 10_000;
+
     public static boolean isMateScore(int score) {
         return Math.abs(score) >= MATE_THRESHOLD;
     }
@@ -73,7 +89,7 @@ public final class NegamaxSearch {
         }
         List<ScoredMove> results = new ArrayList<>(legalMoves.size());
         for (Move move : orderMoves(legalMoves)) {
-            int score = -negamax(board.applyMove(move), depth - 1, -INFINITY, INFINITY);
+            int score = scoreMove(board, move, depth - 1, -INFINITY, INFINITY);
             results.add(new ScoredMove(move, score));
         }
         results.sort(Comparator.comparingInt(ScoredMove::score).reversed());
@@ -101,7 +117,7 @@ public final class NegamaxSearch {
         }
         int best = -INFINITY;
         for (Move move : orderMoves(legalMoves)) {
-            int score = -negamax(board.applyMove(move), depth - 1, -beta, -alpha);
+            int score = scoreMove(board, move, depth - 1, -beta, -alpha);
             if (score > best) {
                 best = score;
             }
@@ -113,6 +129,19 @@ public final class NegamaxSearch {
             }
         }
         return best;
+    }
+
+    /**
+     * Score d'un coup depuis son plateau parent - negamax classique, sauf s'il capture un
+     * roi (voir KING_CAPTURE_SCORE), auquel cas on renvoie directement une victoire
+     * certaine sans jamais construire ni recurser dans le plateau sans roi qui en
+     * resulterait.
+     */
+    private static int scoreMove(Board board, Move move, int depth, int alpha, int beta) {
+        if (move.isCapture() && move.capturedPiece().type() == PieceType.KING) {
+            return KING_CAPTURE_SCORE;
+        }
+        return -negamax(board.applyMove(move), depth, alpha, beta);
     }
 
     private static int perspectiveEval(Board board) {
