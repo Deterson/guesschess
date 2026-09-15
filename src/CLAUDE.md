@@ -279,6 +279,13 @@ tout court (échec rapide voulu au boot Spring, pas seulement au moment du login
     candidat - nécessaire à la couche guess-aware). `application/computer/MinimaxChessEngine`
     implémente `ChessEngine` par-dessus. ~300-400ms à profondeur 4 depuis la position de départ, en
     Java pur, sur un thread virtuel - largement dans le budget d'un appel Stockfish existant.
+    **Piège rencontré (corrigé)** : un round annulé peut laisser un roi en échec non résolu (voir
+    plus bas, court-circuit `ComputerPlayerService`) et faire apparaître une capture de roi parmi
+    les coups légaux du plateau racine - situation qui n'existe jamais en échecs classiques.
+    Explorer ce coup produisait un plateau sans roi que `CheckDetector.findKing` ne sait pas
+    interpréter (`IllegalStateException` dès la récursion suivante). `NegamaxSearch` court-circuite
+    désormais ce cas précis (`KING_CAPTURE_SCORE`, au-delà de tout score de mat) avant même
+    d'appliquer le coup - jamais de plateau sans roi construit.
   - **Sélection du moteur** : propriété `guesschess.engine` (`GUESSCHESS_ENGINE`), `minimax` par
     défaut (`@ConditionalOnProperty` sur les deux implémentations) ou `stockfish` - gardé
     sélectionnable explicitement plutôt que retiré, décision volontaire (voir plus bas).

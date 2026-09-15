@@ -97,4 +97,29 @@ class NegamaxSearchTest {
         assertEquals(Position.fromAlgebraic("d8"), best.move().to());
         assertTrue(best.score() > 400, "expected a large material gain, score=" + best.score());
     }
+
+    /**
+     * Etat degenere propre a guesschess (jamais atteignable en echecs classiques) : un
+     * round annule a laisse le roi blanc en echec non resolu (voir Game.resolveRound),
+     * donnant aux noirs Ra8xa1 parmi leurs coups legaux - une capture de roi. Sans le
+     * court-circuit de NegamaxSearch (voir KING_CAPTURE_SCORE), explorer ce coup produit
+     * un plateau sans roi que CheckDetector.findKing ne sait pas interpreter et leve une
+     * IllegalStateException des la recursion suivante.
+     */
+    @Test
+    void capturingAKingIsAnImmediateWinInsteadOfCrashing() {
+        Board board = Board.empty()
+                .withPiece(Position.fromAlgebraic("a1"), Piece.of(PieceType.KING, Color.WHITE))
+                .withPiece(Position.fromAlgebraic("a8"), Piece.of(PieceType.ROOK, Color.BLACK))
+                .withPiece(Position.fromAlgebraic("h8"), Piece.of(PieceType.KING, Color.BLACK))
+                .withSideToMove(Color.BLACK);
+
+        List<ScoredMove> results = NegamaxSearch.searchRoot(board, 2);
+        ScoredMove best = results.get(0);
+
+        assertEquals(Position.fromAlgebraic("a8"), best.move().from());
+        assertEquals(Position.fromAlgebraic("a1"), best.move().to());
+        assertTrue(best.move().isCapture() && best.move().capturedPiece().type() == PieceType.KING);
+        assertTrue(NegamaxSearch.isMateScore(best.score()), "expected a decisive score, got " + best.score());
+    }
 }
