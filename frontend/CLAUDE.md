@@ -24,6 +24,10 @@
   `allowAnonymousFallback: true`) doit laisser `request()` remonter le code `SESSION_EXPIRED` sur
   un 401 plutôt que d'implémenter son propre retry/log — l'appelant peut alors renvoyer proprement
   vers l'accueil au lieu d'afficher un 401 brut (bug corrigé une fois, voir historique).
+- **`services/stompClient.ts`** : l'identité (compte/anonyme) est figée côté serveur à l'ouverture
+  de la session WebSocket. Un `watch` sur `authStore.token` la ferme et la rouvre à chaque
+  login/logout/401 - sans ça, se déconnecter puis jouer en anonyme sans recharger la page faisait
+  rejeter le premier coup (`NotYourColorException`, "already controlled by another player").
 - **Login affiché** : partout où le login d'un compte est affiché (`PlayerLabel.vue`,
   `ProfileAboutView.vue`, `PublicProfileView.vue`), il est précédé d'un `@` (ex. `@Deterson`) —
   jamais pour un nom d'affichage ou une identité anonyme.

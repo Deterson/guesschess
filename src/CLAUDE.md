@@ -106,6 +106,11 @@ tout court (échec rapide voulu au boot Spring, pas seulement au moment du login
   (`/usr/games/stockfish`, paquet Debian). Dev local Windows : binaire officiel (build "universal",
   Sept. 2025) installé à `C:\Users\drde6\tools\stockfish.exe`, positionné dans `.env` (chemin à
   revoir si l'utilisateur change de machine/emplacement, comme pour le JDK/Node ci-dessus).
+- `GUESSCHESS_ENGINE` / `GUESSCHESS_ENGINE_EASY|MEDIUM|HARD` — (étape 20) **facultatifs**, défaut
+  `minimax@1`. Version de moteur (`nom@version`) qui joue et devine par niveau de "jouer contre
+  l'ordinateur" ; `GUESSCHESS_ENGINE` les change tous d'un coup (alias historiques `minimax`/
+  `stockfish` acceptés), les variantes par niveau en changent un seul. Version inconnue = échec au
+  démarrage. Versions enregistrées : `minimax@1`, `stockfish@1` (nécessite `STOCKFISH_PATH`).
 - `ADMIN_EMAILS` — (étape 18) **facultatif**, défaut vide (page admin inaccessible). Liste
   d'emails séparés par des virgules autorisés sur `/api/admin/**` (`AdminAccessService`, comparaison
   insensible à la casse contre l'email du compte OAuth). Positionné en dev local (`.env`) avec
@@ -286,7 +291,7 @@ tout court (échec rapide voulu au boot Spring, pas seulement au moment du login
     interpréter (`IllegalStateException` dès la récursion suivante). `NegamaxSearch` court-circuite
     désormais ce cas précis (`KING_CAPTURE_SCORE`, au-delà de tout score de mat) avant même
     d'appliquer le coup - jamais de plateau sans roi construit.
-  - **Sélection du moteur** : propriété `guesschess.engine` (`GUESSCHESS_ENGINE`), `minimax` par
+  - **Sélection du moteur** (remplacée à l'étape 20 par le registre de versions, voir plus bas) : propriété `guesschess.engine` (`GUESSCHESS_ENGINE`), `minimax` par
     défaut (`@ConditionalOnProperty` sur les deux implémentations) ou `stockfish` - gardé
     sélectionnable explicitement plutôt que retiré, décision volontaire (voir plus bas).
   - **Niveaux** : profondeur par `ComputerLevel` (facile 2, moyen 3, difficile 4) remplace
@@ -335,6 +340,46 @@ tout court (échec rapide voulu au boot Spring, pas seulement au moment du login
     d'origine, volontairement pas faite) : `guesschess.engine=stockfish` reste un retour en arrière
     possible sans toucher au code, le temps de calibrer `GAP_THRESHOLD_CP`/`REFUTATION_CHECK_DEPTH`
     par l'expérience réelle.
+- **Étape 20 — Registre de versions de moteur** : `application/computer/` — `GuessAgent` (une version,
+  `AgentId` `nom@version`, immuable) crée une `AgentSession` par partie (`move`/`guess` distincts,
+  `onRoundResolved` ; porte la mémoire `BlockedMove`/dernière devinette, qui vivait dans
+  `ComputerPlayerService`). `AgentRegistry` (`nom@version` → fabrique, alias historiques) est le seul
+  endroit qui branche sur une version ; `RegistryAgentProvider` fige une version par `ComputerLevel`
+  au démarrage (échec rapide). `EngineBackedAgent` enveloppe un oracle `ChessEngine` (minimax,
+  Stockfish) en reprenant à l'identique les règles de l'ancien `ComputerPlayerService` (capture de
+  roi non forcée, fast_mate, mémoire). `ComputerPlayerService` ne fait plus que déclencher, soumettre
+  et diffuser. Hasard : `RandomGenerator` injecté par session (`AgentSessionContext.rng`), plus de
+  `ThreadLocalRandom` dans l'agent ni `MinimaxChessEngine` (reste dans `StockfishChessEngine`, non
+  rejouable de toute façon). Câblage Spring : `ComputerAgentsConfiguration` (les deux moteurs sont
+  maintenant toujours des beans, plus de `@ConditionalOnProperty`). Règle : jamais de `if` de version
+  dans un algorithme, une nouvelle idée = une nouvelle version enregistrée. `Minimax1GoldenTest`
+  fige les coups de `minimax@1` (si il casse, créer une version, ne pas changer le test).
+- **Étape 21 — Moteur guess-aware `guessaware@1`** (non validé, jamais le défaut avant le tournoi de
+  l'étape 22) : `GuessAwareSearch` traite chaque nœud (au trait M) comme le jeu matriciel réel : `A[m]`
+  = valeur du coup joué, `B` = valeur après `Board.pass()` (la même pour tous les coups, donc +1 enfant
+  par nœud seulement). Gain de M contre une devinette `g` : `A[m]` si `g != m`, `B` sinon ; valeur
+  d'équilibre calculée côté devineur (bissection sur `V`, `solve`) et côté joueur (`solveMix`, x et y),
+  vérifiée par test contre un balayage brut. Sous les `guessPlies` premiers plis : `NegamaxSearch`
+  classique (méthodes rendues package-private) ; fenêtre alpha-bêta au dernier pli guess-aware (les coups
+  dominés n'ont besoin que d'une borne). `Rules.forVariant` : GUESSMATE = deviné en échec → `B = -MATE` ;
+  GUESSCHESS = récursion par `pass` + `fast_mate` (au trait, en échec, un seul coup légal → défaite, nulle
+  si matériel insuffisant ; vu seulement sur les `guessPlies` premiers plis, limite connue).
+  `GuessAwareAgent` (niveaux profondeur/plis guess-aware : facile 2/1, moyen 3/1, difficile 3/2 ; budget
+  0,5/1/2 s, approfondissement itératif, `SearchTimeoutException` interne) : joue par tirage selon `x`,
+  devine par tirage selon `y`, sans mémoire de coups annulés (le tirage la remplace) ; capture de roi non
+  forcée exclue, capture de son propre roi toujours devinée (comme `minimax@1`).
+  **Pièges rencontrés (corrigés, avec tests)** : (1) quand *tous* les coups valent moins que passer
+  (zugzwang), M veut être deviné et O, obligé de deviner un coup légal, doit répartir sa devinette —
+  « jouer le meilleur coup pur » y est faux (`allNonPositiveValue`) ; (2) GUESSCHESS, mover en échec : à
+  la frontière de la recherche classique, le nœud après `pass` (roi en prise) était évalué comme une
+  capture de roi gagnante certaine, alors que cette capture est *le* coup évident donc deviné — tout
+  échec valait un mat probabiliste (comme GUESSMATE) ; le nœud après `pass` depuis un échec reste donc
+  modélisé comme jeu matriciel (au moins 1 pli guess-aware).
+  **Mesures** (conteneur cloud, pas le Pi, un thread) : ×2 à ×4 le classique sur 2 plis guess-aware,
+  jusqu'à ×12 sur 3 plis (profondeur 4 milieu de partie : 20 s). Partie complète moyen vs `minimax@1`
+  moyen : ~15 s pour ~50 rounds. Test de fumée (8 parties, 4 GUESSCHESS + 4 GUESSMATE, aucune erreur) :
+  `guessaware@1` moyen n'a gagné que 2 parties sur 8 face à `minimax@1` moyen (petit échantillon, pas une
+  mesure de force — c'est le rôle du tournoi).
 - **Étape 18 — Page admin** : lecture seule, pas de mutation. `AdminAccessService` verifie
   l'email du compte (JWT `sub` -> `AccountService.getById`) contre `ADMIN_EMAILS` ; le JWT de
   session ne porte pas l'email en claim (seulement `displayName`), d'ou ce lookup plutot qu'une

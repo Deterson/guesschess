@@ -60,7 +60,7 @@ public final class NegamaxSearch {
      * roi que MoveGenerator/CheckDetector ne savent pas interpreter
      * (CheckDetector.findKing leve IllegalStateException des la recursion suivante).
      */
-    private static final int KING_CAPTURE_SCORE = MATE_SCORE + 10_000;
+    static final int KING_CAPTURE_SCORE = MATE_SCORE + 10_000;
 
     public static boolean isMateScore(int score) {
         return Math.abs(score) >= MATE_THRESHOLD;
@@ -101,7 +101,7 @@ public final class NegamaxSearch {
      * convention negamax standard, chaque niveau de recursion negue le score renvoye par
      * l'appel suivant.
      */
-    private static int negamax(Board board, int depth, int alpha, int beta) {
+    static int negamax(Board board, int depth, int alpha, int beta) {
         Color color = board.sideToMove();
         List<Move> legalMoves = MoveGenerator.generateLegalMoves(board, color);
         if (legalMoves.isEmpty()) {
@@ -144,7 +144,7 @@ public final class NegamaxSearch {
         return -negamax(board.applyMove(move), depth, alpha, beta);
     }
 
-    private static int perspectiveEval(Board board) {
+    static int perspectiveEval(Board board) {
         int whiteEval = PositionEvaluator.evaluate(board);
         return board.sideToMove() == Color.WHITE ? whiteEval : -whiteEval;
     }
@@ -155,7 +155,7 @@ public final class NegamaxSearch {
      * elaguee selon les memes regles), seulement l'efficacite de l'elagage alpha-beta :
      * une bonne capture trouvee tot resserre alpha/beta plus vite pour les freres suivants.
      */
-    private static List<Move> orderMoves(List<Move> moves) {
+    static List<Move> orderMoves(List<Move> moves) {
         return moves.stream()
                 .sorted(Comparator.comparingInt(NegamaxSearch::orderingScore).reversed())
                 .toList();

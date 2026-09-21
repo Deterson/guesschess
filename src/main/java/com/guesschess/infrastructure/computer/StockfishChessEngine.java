@@ -7,7 +7,6 @@ import com.guesschess.domain.board.Position;
 import com.guesschess.domain.move.Move;
 import com.guesschess.domain.piece.PieceType;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.io.BufferedReader;
@@ -45,14 +44,11 @@ import java.util.stream.Collectors;
  * CLAUDE.md), seule la creation d'une partie contre l'ordinateur echoue alors
  * (StockfishUnavailableException, voir GameCreationController).
  *
- * guesschess.engine (etape 17) choisit entre ce moteur et MinimaxChessEngine, le moteur
- * maison guess-aware qui l'a rejoint derriere le meme port ChessEngine et qui est devenu
- * le defaut - ce moteur reste selectionnable explicitement (guesschess.engine=stockfish)
- * plutot que d'etre retire, matchIfMissing servant seulement de filet si la propriete
- * disparaissait un jour de application.properties.
+ * Enregistre comme agent stockfish@1 (etape 20, voir ComputerAgentsConfiguration), selectionnable
+ * par niveau (guesschess.engine.easy/medium/hard=stockfish@1) ; toujours instancie (bean), mais
+ * inerte tant qu'aucun niveau ne le choisit - isAvailable() reste faux sans STOCKFISH_PATH.
  */
 @Component
-@ConditionalOnProperty(name = "guesschess.engine", havingValue = "stockfish", matchIfMissing = true)
 public class StockfishChessEngine implements ChessEngine {
 
     private final String stockfishPath;

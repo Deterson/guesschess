@@ -145,6 +145,50 @@ Jeu d'échecs classique avec une règle additionnelle :
     du Pi (survie à une panne/un vol du Pi lui-même) — prévu plus tard, ex. synchro vers un Google
     Drive via `rclone` (nécessite une autorisation OAuth par navigateur, pas automatisable).
 
+### Moteurs d'IA versionnés et tournoi (étapes 20-23, à faire dans l'ordre)
+
+Objectif : plusieurs versions de moteur qui **cohabitent** dans le code (l'actuelle, la guess-aware,
+puis un réseau de neurones), sélectionnables par configuration, et un tournoi pour les comparer.
+Le tournoi (22) passe avant le réseau (23) : ses données d'entraînement et sa validation en dépendent.
+Règle de versionnage : une version publiée est **immuable** (nouvelle idée = nouvelle version avec un
+nouvel identifiant `nom@version`) ; jamais de `if` de version à l'intérieur d'un algorithme — la
+variation passe par des composants/configurations, le branchement n'a lieu qu'une fois, dans la
+fabrique du registre.
+
+20. ✅ Registre de versions de moteur (fait), sans changement de comportement : port `GuessAgent` /
+    `AgentSession` (jouer ≠ deviner, état par partie dans la session), `Random` injecté, registre
+    `nom@version`, propriétés `guesschess.engine.easy/medium/hard`. `minimax@1` = moteur de l'étape 17
+    gelé (tests dorés). Détail : [`src/CLAUDE.md`](src/CLAUDE.md).
+21. ✅ Moteur guess-aware `guessaware@1` (fait, **non validé** : jamais le défaut avant le tournoi de
+    l'étape 22), cohabite avec `minimax@1` ; sélectionnable par niveau (`GUESSCHESS_ENGINE_HARD=guessaware@1`).
+    Détail : [`src/CLAUDE.md`](src/CLAUDE.md).
+22. ⬜ Système de tournoi entre versions. Exécuteur de parties sans tête sur `Game` (aucune dépendance
+    Spring/BD) dans un `main` autonome tournant depuis le JAR/l'image Docker (PC, VM EC2 de dev, Pi —
+    seule la JVM compte) ; round-robin, couleurs alternées, positions de départ variées (quelques
+    demi-coups aléatoires avec graine), limite de rounds → nulle, variantes GUESSCHESS et GUESSMATE ;
+    budgets en profondeur/nœuds (comparables entre machines) ou en temps par coup (mode « quel moteur
+    est le meilleur sur le Pi ») ; sortie JSONL, une ligne par partie (agents, graine, variante,
+    résultat et cause, rounds, PGGN, temps/nœuds, machine) ; fragments `--shard i/n` fusionnés par un
+    agrégateur, sans coordinateur central ; rapport : victoires/nulles/défaites, score avec intervalle
+    de confiance, Elo, statistiques de devinette par rôle (taux correct, taux d'annulation). Agents de
+    base : `minimax@1`, `guessaware@1`, aléatoire, Stockfish en option. Plus tard : balayages de
+    paramètres (génération de configurations), arrêt anticipé SPRT. Script de lancement distant sur la
+    VM EC2 de dev à la manière de `scripts/test-integration-remote.sh` ; ne pas le lancer sur le Pi de
+    prod en même temps que les joueurs (`nice`, threads limités). Sert aussi à choisir quelle version
+    sert quel niveau en production (propriété de l'étape 20), sans rebuild.
+23. ⬜ Moteur réseau de neurones `nnue@1`, cohabite avec les deux autres. Niveau 1 seulement :
+    évaluation apprise remplaçant `PositionEvaluator` (petit réseau, poids entiers, mise à jour
+    incrémentale, inférence en Java pur sans dépendance, fichier de poids versionné avec la version du
+    moteur) ; la recherche guess-aware (21) reste inchangée. Données : positions d'auto-jeu (22)
+    étiquetées par la valeur de `guessaware` à profondeur 3-4 ; entraînement en Python/PyTorch (absent
+    en local : VM EC2, GPU si besoin) sous un dossier dédié hors du code Java, export binaire lu par
+    Java ; itérations « expert iteration » (réseau réinjecté, données régénérées). **Critère pour
+    lancer cette étape** : le tournoi montre que l'évaluation, et non la profondeur, limite la force
+    (comparer profondeur 3 vs 4). Évaluer contre un groupe d'adversaires figés, pas seulement la
+    dernière version (l'auto-jeu en jeu simultané peut être non transitif). Niveaux plus ambitieux
+    (politique + valeur avec recherche pour jeux simultanés ; modèle d'adversaire humain appris sur
+    les PGGN) : hors périmètre tant que le niveau 1 ne prouve pas un gain.
+
 ## Liaison compte/session ↔ partie (étapes 6-7)
 
 - **Lien immuable, à usage unique** : chaque partie référence, par couleur, un compte (`userId`)

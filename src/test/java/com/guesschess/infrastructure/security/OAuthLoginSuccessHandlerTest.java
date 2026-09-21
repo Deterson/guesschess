@@ -118,7 +118,7 @@ class OAuthLoginSuccessHandlerTest {
      * besoin d'etre fonctionnelles au-dela de compiler, seulement non-null.
      */
     private PlayersBroadcastService playersBroadcastService(AccountService accountService) {
-        var gameLifecycleService = new GameLifecycleService(new InMemoryGameRepository(), new RecordingGameAccessRepository(), new FakeChessEngine());
+        var gameLifecycleService = new GameLifecycleService(new InMemoryGameRepository(), new RecordingGameAccessRepository(), new FakeChessEngine().asAgentProvider());
         var messagingTemplate = new SimpMessagingTemplate(new MessageChannel() {
             @Override
             public boolean send(Message<?> message, long timeout) {

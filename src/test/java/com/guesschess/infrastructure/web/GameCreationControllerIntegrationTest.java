@@ -56,7 +56,7 @@ class GameCreationControllerIntegrationTest {
 
     /**
      * Etape 16 : GET /api/games/default-variant expose le feature flag
-     * guesschess.default-variant (GUESSMATE par defaut, voir application.properties)
+     * guesschess.default-variant (GUESSCHESS par defaut, voir application.properties)
      * pour que la modale de creation cote frontend sache quoi cocher par defaut.
      */
     @Test
@@ -65,18 +65,18 @@ class GameCreationControllerIntegrationTest {
 
         assertEquals(200, response.statusCode());
         JsonNode body = objectMapper.readTree(response.body());
-        assertEquals("GUESSMATE", body.get("variant").asString());
+        assertEquals("GUESSCHESS", body.get("variant").asString());
     }
 
     /**
      * Creer une partie sans preciser de variante doit reprendre ce meme flag plutot
-     * qu'une valeur GUESSMATE codee en dur.
+     * qu'une valeur GUESSCHESS codee en dur.
      */
     @Test
     void creatingAGameWithoutAVariantFallsBackToTheDefaultVariantFlag() throws Exception {
         JsonNode created = post("/api/games", "{\"color\":\"WHITE\"}");
 
-        assertEquals("GUESSMATE", created.get("variant").asString());
+        assertEquals("GUESSCHESS", created.get("variant").asString());
     }
 
     @Test

@@ -1,6 +1,6 @@
 package com.guesschess.application;
 
-import com.guesschess.application.computer.ChessEngine;
+import com.guesschess.application.computer.AgentProvider;
 import com.guesschess.application.computer.ComputerLevel;
 import com.guesschess.application.computer.ComputerUnavailableException;
 import com.guesschess.domain.account.UserId;
@@ -33,12 +33,12 @@ public class GameLifecycleService {
 
     private final GameRepository gameRepository;
     private final GameAccessRepository gameAccessRepository;
-    private final ChessEngine chessEngine;
+    private final AgentProvider agentProvider;
 
-    public GameLifecycleService(GameRepository gameRepository, GameAccessRepository gameAccessRepository, ChessEngine chessEngine) {
+    public GameLifecycleService(GameRepository gameRepository, GameAccessRepository gameAccessRepository, AgentProvider agentProvider) {
         this.gameRepository = gameRepository;
         this.gameAccessRepository = gameAccessRepository;
-        this.chessEngine = chessEngine;
+        this.agentProvider = agentProvider;
     }
 
     public CreatedGame createGame() {
@@ -230,7 +230,7 @@ public class GameLifecycleService {
      */
     public CreatedGame createComputerGame(GameVariant variant, TimeControl timeControl, Color creatorColor,
                                            PlayerRef creator, ComputerLevel level) {
-        if (!chessEngine.isAvailable()) {
+        if (!agentProvider.agentFor(level).isAvailable()) {
             throw new ComputerUnavailableException();
         }
         CreatedGame created = createGame(variant, timeControl, creatorColor, creator);

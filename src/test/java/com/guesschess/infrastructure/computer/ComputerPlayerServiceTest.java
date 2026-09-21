@@ -61,9 +61,9 @@ class ComputerPlayerServiceTest {
         gameAccessRepository = new InMemoryGameAccessRepository();
         gameRepository = new InMemoryGameRepository();
         chessEngine = new FakeChessEngine();
-        gameLifecycleService = new GameLifecycleService(gameRepository, gameAccessRepository, chessEngine);
+        gameLifecycleService = new GameLifecycleService(gameRepository, gameAccessRepository, chessEngine.asAgentProvider());
         gameBroadcastService = mock(GameBroadcastService.class);
-        computerPlayerService = new ComputerPlayerService(gameLifecycleService, gameAccessRepository, chessEngine, gameBroadcastService);
+        computerPlayerService = new ComputerPlayerService(gameLifecycleService, gameAccessRepository, chessEngine.asAgentProvider(), gameBroadcastService);
     }
 
     @Test

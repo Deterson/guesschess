@@ -1,4 +1,5 @@
 import { Client, type StompSubscription } from '@stomp/stompjs'
+import { watch } from 'vue'
 import { useAuthStore } from '../stores/auth'
 
 /**
@@ -17,6 +18,7 @@ export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected'
 let client: Client | null = null
 let status: ConnectionStatus = 'connecting'
 const statusListeners = new Set<(status: ConnectionStatus) => void>()
+let reconnecting: Promise<void> = Promise.resolve()
 let connectWaiters: Array<{ resolve: (client: Client) => void; reject: (error: Error) => void }> = []
 
 function setStatus(next: ConnectionStatus) {
@@ -73,6 +75,23 @@ function ensureClient(): Client {
   }
 
   client.activate()
+
+  // L'identité (compte ou anonyme) est figée côté serveur à l'ouverture de la session
+  // WebSocket (JwtStompChannelInterceptor) : sans ça, une déconnexion (ou un 401) en
+  // cours de session SPA laisse la connexion ouverte avec l'ancien compte, et la
+  // première soumission d'une partie ensuite jouée en anonyme est rejetée
+  // (NotYourColorException). On force donc une nouvelle session dès que le jeton change ;
+  // beforeConnect relit alors le jeton courant, et le listener de statut du store de jeu
+  // ré-abonne la partie affichée le cas échéant.
+  watch(
+    () => useAuthStore().token,
+    () => {
+      reconnecting = reconnecting.then(async () => {
+        await client!.deactivate()
+        client!.activate()
+      })
+    },
+  )
   return client
 }
 

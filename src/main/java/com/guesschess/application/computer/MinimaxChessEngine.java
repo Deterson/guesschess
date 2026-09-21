@@ -6,12 +6,11 @@ import com.guesschess.domain.move.Move;
 import com.guesschess.domain.piece.Color;
 import com.guesschess.domain.piece.PieceType;
 import com.guesschess.domain.rules.MoveGenerator;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.ThreadLocalRandom;
+import java.util.random.RandomGenerator;
+import java.util.random.RandomGeneratorFactory;
 
 /**
  * Implementation maison du port ChessEngine (etape 17 de la roadmap, voir la note de
@@ -19,13 +18,21 @@ import java.util.concurrent.ThreadLocalRandom;
  * meme interface, sans process externe ni protocole UCI : NegamaxSearch fait toute la
  * recherche, cette classe se contente de choisir la profondeur par niveau et d'appliquer
  * les memes regles de selection que StockfishChessEngine (exclusion "si possible" des
- * coups a eviter, aleatoire pondere en facile). Moteur par defaut (guesschess.engine,
- * voir application.properties) - StockfishChessEngine reste selectionnable explicitement
- * (guesschess.engine=stockfish) plutot que d'etre retire.
+ * coups a eviter, aleatoire pondere en facile). Enregistre comme agent minimax@1 (etape 20, voir
+ * BuiltInAgents) ; StockfishChessEngine reste selectionnable (stockfish@1) plutot que retire.
  */
-@Component
-@ConditionalOnProperty(name = "guesschess.engine", havingValue = "minimax")
 public class MinimaxChessEngine implements ChessEngine {
+
+    private final RandomGenerator rng;
+
+    /** rng : seule source de hasard (facile, voir pickByRankWeight) - graine fixe = choix rejouables. */
+    public MinimaxChessEngine(RandomGenerator rng) {
+        this.rng = rng;
+    }
+
+    public MinimaxChessEngine() {
+        this(RandomGeneratorFactory.of("L64X128MixRandom").create());
+    }
 
     /**
      * Profondeur de recherche par niveau (etape 17) - remplace UCI_LimitStrength/UCI_Elo,
@@ -179,12 +186,12 @@ public class MinimaxChessEngine implements ChessEngine {
      * meilleur - meme ponderation que StockfishChessEngine.pickByRankWeight, pour un
      * comportement comparable entre les deux moteurs a ce niveau.
      */
-    private static Move pickByRankWeight(List<ScoredMove> scored) {
+    private Move pickByRankWeight(List<ScoredMove> scored) {
         if (scored.size() == 1) {
             return scored.get(0).move();
         }
         double[] weights = {0.5, 0.3, 0.2};
-        double roll = ThreadLocalRandom.current().nextDouble();
+        double roll = rng.nextDouble();
         double cumulative = 0;
         for (int i = 0; i < scored.size(); i++) {
             cumulative += i < weights.length ? weights[i] : 0;

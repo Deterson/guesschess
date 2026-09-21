@@ -14,6 +14,14 @@ import java.util.function.BiFunction;
  */
 public class FakeChessEngine implements ChessEngine {
 
+    /**
+     * Cet oracle expose comme agent (etape 20) - pour les tests qui construisent
+     * GameLifecycleService/ComputerPlayerService, qui ne connaissent plus que AgentProvider.
+     */
+    public AgentProvider asAgentProvider() {
+        return level -> new EngineBackedAgent(new AgentId("fake", 1), level, rng -> this, this::isAvailable);
+    }
+
     private boolean available = true;
     private BiFunction<Board, List<Move>, Move> strategy = (board, legalMoves) -> legalMoves.get(0);
     private volatile Set<Move> lastMovesToAvoidIfPossible = Set.of();

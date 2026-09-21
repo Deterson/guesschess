@@ -38,7 +38,7 @@ class GameLifecycleServiceTest {
     @BeforeEach
     void setUp() {
         gameAccessRepository = new InMemoryGameAccessRepository();
-        service = new GameLifecycleService(new InMemoryGameRepository(), gameAccessRepository, new FakeChessEngine());
+        service = new GameLifecycleService(new InMemoryGameRepository(), gameAccessRepository, new FakeChessEngine().asAgentProvider());
     }
 
     @Test
@@ -66,7 +66,7 @@ class GameLifecycleServiceTest {
     void createComputerGameFailsWithoutCreatingAGameWhenTheEngineIsUnavailable() {
         FakeChessEngine unavailableEngine = new FakeChessEngine();
         unavailableEngine.setAvailable(false);
-        GameLifecycleService serviceWithoutEngine = new GameLifecycleService(new InMemoryGameRepository(), gameAccessRepository, unavailableEngine);
+        GameLifecycleService serviceWithoutEngine = new GameLifecycleService(new InMemoryGameRepository(), gameAccessRepository, unavailableEngine.asAgentProvider());
         PlayerRef human = new PlayerRef.Anonymous(AnonymousId.random());
 
         assertThrows(ComputerUnavailableException.class,
