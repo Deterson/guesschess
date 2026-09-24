@@ -144,6 +144,78 @@ public final class NegamaxSearch {
         return -negamax(board.applyMove(move), depth, alpha, beta);
     }
 
+    /** Depassement du budget de temps (voir searchRootWithDeadline) - sans pile d'appels, il sert de signal. */
+    public static final class SearchTimeoutException extends RuntimeException {
+        SearchTimeoutException() {
+            super("negamax search timed out", null, false, false);
+        }
+    }
+
+    /**
+     * Comme searchRoot, mais abandonne (SearchTimeoutException) des que deadlineNanos
+     * (System.nanoTime()) est depasse, verifie a CHAQUE noeud de la recursion - contrairement
+     * a searchRoot/negamax (inchangees, utilisees par minimax@1 fige), necessaire pour qu'un
+     * budget de temps reste un budget : sans verification a l'interieur de la recursion, une
+     * seule profondeur peut a elle seule depasser tres largement le budget (croissance
+     * exponentielle du nombre de noeuds par profondeur). Utilisee par NegamaxTimedAgent
+     * (etape 22, tournoi) en approfondissement iteratif - l'appelant est responsable de
+     * garder le dernier resultat complet en cas de timeout.
+     */
+    public static List<ScoredMove> searchRootWithDeadline(Board board, int depth, long deadlineNanos) {
+        if (depth < 1) {
+            throw new IllegalArgumentException("depth must be >= 1, got " + depth);
+        }
+        List<Move> legalMoves = MoveGenerator.generateLegalMoves(board, board.sideToMove());
+        if (legalMoves.isEmpty()) {
+            throw new IllegalArgumentException("no legal move to search from");
+        }
+        List<ScoredMove> results = new ArrayList<>(legalMoves.size());
+        for (Move move : orderMoves(legalMoves)) {
+            int score = scoreMoveWithDeadline(board, move, depth - 1, -INFINITY, INFINITY, deadlineNanos);
+            results.add(new ScoredMove(move, score));
+        }
+        results.sort(Comparator.comparingInt(ScoredMove::score).reversed());
+        return results;
+    }
+
+    private static int negamaxWithDeadline(Board board, int depth, int alpha, int beta, long deadlineNanos) {
+        if (System.nanoTime() > deadlineNanos) {
+            throw new SearchTimeoutException();
+        }
+        Color color = board.sideToMove();
+        List<Move> legalMoves = MoveGenerator.generateLegalMoves(board, color);
+        if (legalMoves.isEmpty()) {
+            if (CheckDetector.isInCheck(board, color)) {
+                return -(MATE_SCORE + depth);
+            }
+            return 0;
+        }
+        if (depth == 0) {
+            return perspectiveEval(board);
+        }
+        int best = -INFINITY;
+        for (Move move : orderMoves(legalMoves)) {
+            int score = scoreMoveWithDeadline(board, move, depth - 1, -beta, -alpha, deadlineNanos);
+            if (score > best) {
+                best = score;
+            }
+            if (best > alpha) {
+                alpha = best;
+            }
+            if (alpha >= beta) {
+                break;
+            }
+        }
+        return best;
+    }
+
+    private static int scoreMoveWithDeadline(Board board, Move move, int depth, int alpha, int beta, long deadlineNanos) {
+        if (move.isCapture() && move.capturedPiece().type() == PieceType.KING) {
+            return KING_CAPTURE_SCORE;
+        }
+        return -negamaxWithDeadline(board.applyMove(move), depth, alpha, beta, deadlineNanos);
+    }
+
     static int perspectiveEval(Board board) {
         int whiteEval = PositionEvaluator.evaluate(board);
         return board.sideToMove() == Color.WHITE ? whiteEval : -whiteEval;

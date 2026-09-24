@@ -829,12 +829,19 @@ function onPromotionSelected(promotion: PromotionPieceType) {
         </div>
 
         <!--
-          Wrapper "relative" englobant tout ce qui n'est ni les bannières du haut ni
-          la barre d'onglets du bas : le panneau historique/chat s'y superpose en
-          overlay (absolute inset-0) plutôt que de rétrécir le plateau en se glissant
-          comme sibling flex-1 (ancien comportement).
+          Wrapper englobant tout ce qui n'est ni les bannières du haut ni la barre
+          d'onglets du bas. Historique et chat se glissent tous deux en panneau latéral
+          (sibling flex, jamais en overlay) : historique à droite du plateau, chat à
+          gauche - le plateau reste toujours visible/jouable au milieu, rétréci mais
+          jamais masqué. `order-2` sur la colonne plateau quand le chat est ouvert
+          l'envoie après le panneau chat (ouvert à gauche) dans l'ordre visuel, sans
+          changer l'ordre du DOM.
         -->
-        <div class="relative flex min-h-0 flex-1 flex-col">
+        <div class="relative flex min-h-0 flex-1" :class="mobilePanel ? 'flex-row' : 'flex-col'">
+        <div
+          class="flex min-h-0 flex-col"
+          :class="[mobilePanel ? 'w-3/5 shrink-0' : 'w-full flex-1', mobilePanel === 'chat' ? 'order-2' : '']"
+        >
         <PlayerLabel
           class="w-full shrink-0"
           :color="topPlayerColor"
@@ -896,9 +903,7 @@ function onPromotionSelected(promotion: PromotionPieceType) {
         </div>
 
         <template v-if="myColor && canAct && state.full">
-          <div v-if="state.status !== 'FINISHED'" class="flex shrink-0 flex-col items-center gap-1 pb-2">
-            <p v-if="drawOfferedByOpponent" class="text-xs text-stone-400">{{ t('game.opponentOffersDraw') }}</p>
-            <div class="flex items-center gap-3">
+          <div v-if="state.status !== 'FINISHED'" class="flex shrink-0 items-center justify-center gap-3 pb-2">
               <button
                 type="button"
                 class="flex h-11 items-center justify-center gap-1 rounded-lg"
@@ -912,20 +917,27 @@ function onPromotionSelected(promotion: PromotionPieceType) {
                 </svg>
                 <span v-if="resignArmed" class="text-lg font-bold leading-none" aria-hidden="true">?</span>
               </button>
-              <button
-                type="button"
-                class="flex h-11 w-11 items-center justify-center rounded-lg disabled:opacity-50"
-                :class="drawOfferedByOpponent ? 'bg-violet-700 hover:bg-violet-600' : 'bg-stone-800 hover:bg-stone-700'"
-                :disabled="drawOfferedByMe"
-                :aria-label="drawOfferedByOpponent ? t('game.acceptDraw') : t('game.offerDraw')"
-                @click="onDrawButtonClick"
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5" aria-hidden="true">
-                  <g transform="rotate(-22 12 12)"><rect x="2" y="10" width="10" height="4" rx="2" /></g>
-                  <g transform="rotate(22 12 12)"><rect x="12" y="10" width="10" height="4" rx="2" /></g>
-                </svg>
-              </button>
-            </div>
+              <div class="relative">
+                <button
+                  type="button"
+                  class="flex h-11 w-11 items-center justify-center rounded-lg disabled:opacity-50"
+                  :class="drawOfferedByOpponent ? 'bg-violet-700 hover:bg-violet-600' : 'bg-stone-800 hover:bg-stone-700'"
+                  :disabled="drawOfferedByMe"
+                  :aria-label="drawOfferedByOpponent ? t('game.acceptDraw') : t('game.offerDraw')"
+                  @click="onDrawButtonClick"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5" aria-hidden="true">
+                    <g transform="rotate(-22 12 12)"><rect x="2" y="10" width="10" height="4" rx="2" /></g>
+                    <g transform="rotate(22 12 12)"><rect x="12" y="10" width="10" height="4" rx="2" /></g>
+                  </svg>
+                </button>
+                <p
+                  v-if="drawOfferedByOpponent"
+                  class="absolute left-full top-1/2 ml-2 w-32 -translate-y-1/2 text-xs leading-tight text-stone-400"
+                >
+                  {{ t('game.opponentOffersDraw') }}
+                </p>
+              </div>
           </div>
 
           <div v-else class="flex shrink-0 flex-col items-center gap-1 pb-2">
@@ -941,11 +953,14 @@ function onPromotionSelected(promotion: PromotionPieceType) {
             </button>
           </div>
         </template>
+        </div>
 
-        <div v-if="mobilePanel" class="absolute inset-0 z-10 flex flex-col overflow-y-auto bg-stone-950/95 p-2 backdrop-blur-sm">
-          <MoveHistoryList v-if="mobilePanel === 'history'" :rounds="historyRounds" :history-index="historyIndex" @select="onHistorySelect" />
+        <div v-if="mobilePanel === 'history'" class="flex min-h-0 w-2/5 shrink-0 flex-col overflow-y-auto border-l border-stone-800 bg-stone-950 p-2">
+          <MoveHistoryList :rounds="historyRounds" :history-index="historyIndex" @select="onHistorySelect" />
+        </div>
+
+        <div v-if="mobilePanel === 'chat' && !isVsComputer" class="order-1 flex min-h-0 w-2/5 shrink-0 flex-col overflow-y-auto border-r border-stone-800 bg-stone-950 p-2">
           <ChatPanel
-            v-if="mobilePanel === 'chat' && !isVsComputer"
             class="h-full"
             :messages="chatMessages"
             :can-send="Boolean(myColor) && canAct"
@@ -956,22 +971,9 @@ function onPromotionSelected(promotion: PromotionPieceType) {
 
         <div class="flex shrink-0 border-t border-stone-800">
           <button
-            type="button"
-            class="mobile-tab-btn flex flex-1 items-center justify-center py-3"
-            :class="mobilePanel === 'history' ? 'bg-stone-800 text-emerald-400' : 'text-stone-400'"
-            :aria-label="t('moveHistory.title')"
-            :aria-pressed="mobilePanel === 'history'"
-            @click="toggleMobilePanel('history')"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6" aria-hidden="true">
-              <circle cx="12" cy="12" r="9" />
-              <path d="M12 7v5l3.5 2" />
-            </svg>
-          </button>
-          <button
             v-if="!isVsComputer"
             type="button"
-            class="mobile-tab-btn flex flex-1 items-center justify-center border-l border-stone-800 py-3"
+            class="mobile-tab-btn flex flex-1 items-center justify-center py-3"
             :class="mobilePanel === 'chat' ? 'bg-stone-800 text-emerald-400' : 'text-stone-400'"
             :aria-label="t('chat.title')"
             :aria-pressed="mobilePanel === 'chat'"
@@ -979,6 +981,19 @@ function onPromotionSelected(promotion: PromotionPieceType) {
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6" aria-hidden="true">
               <path d="M4 5h16v11H8l-4 4V5z" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            class="mobile-tab-btn flex flex-1 items-center justify-center py-3"
+            :class="[mobilePanel === 'history' ? 'bg-stone-800 text-emerald-400' : 'text-stone-400', !isVsComputer ? 'border-l border-stone-800' : '']"
+            :aria-label="t('moveHistory.title')"
+            :aria-pressed="mobilePanel === 'history'"
+            @click="toggleMobilePanel('history')"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" />
+              <path d="M12 7v5l3.5 2" />
             </svg>
           </button>
         </div>

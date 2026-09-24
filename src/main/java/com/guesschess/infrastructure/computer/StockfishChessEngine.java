@@ -6,6 +6,8 @@ import com.guesschess.domain.board.Board;
 import com.guesschess.domain.board.Position;
 import com.guesschess.domain.move.Move;
 import com.guesschess.domain.piece.PieceType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -50,6 +52,8 @@ import java.util.stream.Collectors;
  */
 @Component
 public class StockfishChessEngine implements ChessEngine {
+
+    private static final Logger log = LoggerFactory.getLogger(StockfishChessEngine.class);
 
     private final String stockfishPath;
 
@@ -167,17 +171,20 @@ public class StockfishChessEngine implements ChessEngine {
         };
     }
 
-    private static final int SEARCH_ATTEMPTS = 2;
+    private static final int SEARCH_ATTEMPTS = 3;
 
     /**
      * Un echec de communication UCI (ex. le process ferme stdout avant "bestmove") est
-     * observe occasionnellement en dev local sans cause identifiee (probablement le
-     * lancement/l'arret d'un process par appel, voir javadoc de la classe, qui se prete
-     * a une interference ponctuelle de l'antivirus ou de l'OS) - une nouvelle tentative
-     * avec un process frais resout la grande majorite des cas. Sans ce filet, l'echec
-     * remontait jusqu'a ComputerPlayerService.act qui l'avalait silencieusement,
+     * observe occasionnellement en dev local, cause precise longtemps non identifiee -
+     * suspicion (jamais confirmee faute de transcript UCI conserve jusqu'ici, voir
+     * runUciSession) d'une interference antivirus/OS declenchee par l'enchainement
+     * lancement/kill brutal d'un process par appel (voir stopGracefully) - une nouvelle
+     * tentative avec un process frais resout la grande majorite des cas. Sans ce filet,
+     * l'echec remontait jusqu'a ComputerPlayerService.act qui l'avalait silencieusement,
      * laissant la partie bloquee indefiniment (l'ordinateur ne soumettant jamais son
-     * coup/sa devinette).
+     * coup/sa devinette). Chaque echec est logge (avec le transcript UCI recu, voir
+     * StockfishUnavailableException) avant de retenter, pour ne plus reperdre le contexte
+     * necessaire a un vrai diagnostic la prochaine fois que ca se reproduit.
      */
     private List<Candidate> searchWithRetry(Board board, EngineSettings settings) {
         StockfishUnavailableException lastFailure = null;
@@ -186,6 +193,7 @@ public class StockfishChessEngine implements ChessEngine {
                 return search(board, settings);
             } catch (StockfishUnavailableException e) {
                 lastFailure = e;
+                log.warn("stockfish attempt {}/{} failed", attempt, SEARCH_ATTEMPTS, e);
             }
         }
         throw lastFailure;
@@ -218,18 +226,39 @@ public class StockfishChessEngine implements ChessEngine {
         try {
             return runUciSession(process, board, settings);
         } finally {
+            awaitExitOrKill(process);
+        }
+    }
+
+    /**
+     * "quit" (envoye dans runUciSession, tant que stdin est encore ouvert) laisse le
+     * temps au process de se terminer de lui-meme avant tout destroyForcibly - un
+     * destroyForcibly immediat systematique (ancien comportement) tue le process au lieu
+     * de le laisser sortir proprement, un profil lancement/kill brutal repete a chaque
+     * coup qui ressemble a s'y meprendre a un comportement que la protection temps reel
+     * de l'antivirus surveille specifiquement. destroyForcibly reste le filet de securite
+     * si "quit" n'a pas ete envoye (erreur avant ce point) ou si le process ne repond pas.
+     */
+    private void awaitExitOrKill(Process process) {
+        try {
+            if (!process.waitFor(500, TimeUnit.MILLISECONDS)) {
+                process.destroyForcibly();
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
             process.destroyForcibly();
         }
     }
 
     private List<Candidate> runUciSession(Process process, Board board, EngineSettings settings) {
+        List<String> transcript = new ArrayList<>();
         try (Writer stdin = new OutputStreamWriter(process.getOutputStream(), StandardCharsets.US_ASCII);
              BufferedReader stdout = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.US_ASCII))) {
 
             long deadline = System.currentTimeMillis() + settings.movetimeMillis() + 5000;
 
             send(stdin, "uci");
-            awaitLine(stdout, "uciok", deadline);
+            awaitLine(stdout, "uciok", deadline, transcript);
 
             send(stdin, "setoption name UCI_LimitStrength value " + settings.limitStrength());
             if (settings.limitStrength()) {
@@ -238,15 +267,24 @@ public class StockfishChessEngine implements ChessEngine {
             send(stdin, "setoption name MultiPV value " + settings.multiPv());
 
             send(stdin, "isready");
-            awaitLine(stdout, "readyok", deadline);
+            awaitLine(stdout, "readyok", deadline, transcript);
 
             send(stdin, "position fen " + board.toFen());
             send(stdin, "go movetime " + settings.movetimeMillis());
 
-            return awaitBestMove(stdout, settings.multiPv(), deadline);
+            List<Candidate> result = awaitBestMove(stdout, settings.multiPv(), deadline, transcript);
+            send(stdin, "quit");
+            return result;
         } catch (IOException e) {
-            throw new StockfishUnavailableException("stockfish UCI communication failed", e);
+            throw new StockfishUnavailableException(
+                    "stockfish UCI communication failed, transcript: " + formatTranscript(transcript), e);
         }
+    }
+
+    /** Dernieres lignes recues avant l'echec (voir runUciSession) - le contexte utile pour diagnostiquer un futur echec plutot que de deviner. */
+    private static String formatTranscript(List<String> transcript) {
+        int from = Math.max(0, transcript.size() - 20);
+        return String.join(" | ", transcript.subList(from, transcript.size()));
     }
 
     private void send(Writer stdin, String command) throws IOException {
@@ -255,15 +293,17 @@ public class StockfishChessEngine implements ChessEngine {
         stdin.flush();
     }
 
-    private void awaitLine(BufferedReader stdout, String expected, long deadline) throws IOException {
+    private void awaitLine(BufferedReader stdout, String expected, long deadline, List<String> transcript) throws IOException {
         readWithDeadline(deadline, () -> {
             String line;
             while ((line = stdout.readLine()) != null) {
+                transcript.add(line);
                 if (line.trim().equals(expected)) {
                     return null;
                 }
             }
-            throw new StockfishUnavailableException("stockfish closed its output before sending '" + expected + "'");
+            throw new StockfishUnavailableException("stockfish closed its output before sending '" + expected
+                    + "', transcript: " + formatTranscript(transcript));
         });
     }
 
@@ -277,11 +317,12 @@ public class StockfishChessEngine implements ChessEngine {
      * null. L'ordre du resultat suit l'index MultiPV (1 = meilleur), pas l'ordre
      * d'arrivee des lignes.
      */
-    private List<Candidate> awaitBestMove(BufferedReader stdout, int multiPv, long deadline) throws IOException {
+    private List<Candidate> awaitBestMove(BufferedReader stdout, int multiPv, long deadline, List<String> transcript) throws IOException {
         Map<Integer, Candidate> byMultiPv = new HashMap<>();
         return readWithDeadline(deadline, () -> {
             String line;
             while ((line = stdout.readLine()) != null) {
+                transcript.add(line);
                 if (line.startsWith("bestmove")) {
                     String[] tokens = line.trim().split("\\s+");
                     if (tokens.length < 2 || "(none)".equals(tokens[1])) {
@@ -301,7 +342,8 @@ public class StockfishChessEngine implements ChessEngine {
                     parseMultiPvLine(line, byMultiPv);
                 }
             }
-            throw new StockfishUnavailableException("stockfish closed its output before sending 'bestmove'");
+            throw new StockfishUnavailableException("stockfish closed its output before sending 'bestmove', transcript: "
+                    + formatTranscript(transcript));
         });
     }
 

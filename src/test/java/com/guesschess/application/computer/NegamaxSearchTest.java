@@ -14,6 +14,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class NegamaxSearchTest {
@@ -121,5 +122,40 @@ class NegamaxSearchTest {
         assertEquals(Position.fromAlgebraic("a1"), best.move().to());
         assertTrue(best.move().isCapture() && best.move().capturedPiece().type() == PieceType.KING);
         assertTrue(NegamaxSearch.isMateScore(best.score()), "expected a decisive score, got " + best.score());
+    }
+
+    /**
+     * searchRootWithDeadline (etape 22, tournoi - voir NegamaxTimedAgent) doit renvoyer le
+     * meme resultat que searchRoot quand la deadline est large - une deadline qui n'entrave
+     * jamais la recherche ne doit rien changer au resultat.
+     */
+    @Test
+    void searchRootWithDeadlineMatchesSearchRootWhenDeadlineIsFar() {
+        long farDeadline = System.nanoTime() + 10_000_000_000L;
+        List<ScoredMove> withoutDeadline = NegamaxSearch.searchRoot(Board.initial(), 3);
+        List<ScoredMove> withDeadline = NegamaxSearch.searchRootWithDeadline(Board.initial(), 3, farDeadline);
+
+        assertEquals(withoutDeadline, withDeadline);
+    }
+
+    /**
+     * Une deadline deja depassee avant meme de commencer doit interrompre la recherche
+     * rapidement (SearchTimeoutException) plutot que d'explorer l'arbre entier - c'est ce
+     * qui rend un "budget de temps par coup" (etape 22) reellement borne, contrairement a
+     * searchRoot qui n'a aucune notion de deadline.
+     */
+    @Test
+    void searchRootWithDeadlineTimesOutQuicklyWhenTheDeadlineIsAlreadyPast() {
+        long pastDeadline = System.nanoTime() - 1_000_000_000L;
+
+        assertTrue(elapsedMillis(() -> assertThrows(NegamaxSearch.SearchTimeoutException.class,
+                () -> NegamaxSearch.searchRootWithDeadline(Board.initial(), 6, pastDeadline))) < 500,
+                "a search whose deadline is already past should abort almost immediately, not explore depth 6");
+    }
+
+    private static long elapsedMillis(Runnable action) {
+        long start = System.nanoTime();
+        action.run();
+        return (System.nanoTime() - start) / 1_000_000;
     }
 }

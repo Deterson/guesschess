@@ -32,6 +32,9 @@ bin/
 ### Maven ###
 target/
 
+### Tournoi (etape 22) ###
+/results/
+
 ### Secrets ###
 .env
 !.env

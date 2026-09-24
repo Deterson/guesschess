@@ -12,6 +12,8 @@ public final class BuiltInAgents {
 
     public static final AgentId MINIMAX_V1 = new AgentId("minimax", 1);
     public static final AgentId GUESSAWARE_V1 = new AgentId("guessaware", 1);
+    public static final AgentId NEGAMAX_TIMED_V1 = new AgentId("negamax-timed", 1);
+    public static final AgentId RANDOM_V1 = new AgentId("random", 1);
 
     private BuiltInAgents() {
     }
@@ -28,5 +30,21 @@ public final class BuiltInAgents {
     public static AgentRegistry registerGuessAwareV1(AgentRegistry registry) {
         return registry.register(GUESSAWARE_V1,
                 level -> new GuessAwareAgent(GUESSAWARE_V1, GuessAwareAgent.Config.forLevel(level)));
+    }
+
+    /**
+     * Enregistre negamax-timed@1 (etape 22, tournoi) : meme recherche que minimax@1, mais
+     * approfondissement iteratif borne par un budget de temps par coup au lieu d'une
+     * profondeur fixe par niveau - voir NegamaxTimedAgent. Nouvelle version a part entiere,
+     * minimax@1 reste inchange.
+     */
+    public static AgentRegistry registerNegamaxTimedV1(AgentRegistry registry) {
+        return registry.register(NEGAMAX_TIMED_V1,
+                level -> new NegamaxTimedAgent(NEGAMAX_TIMED_V1, NegamaxTimedAgent.Config.forLevel(level)));
+    }
+
+    /** Enregistre random@1 (etape 22, tournoi) : adversaire de reference minimal, voir RandomAgent. */
+    public static AgentRegistry registerRandomV1(AgentRegistry registry) {
+        return registry.register(RANDOM_V1, level -> new RandomAgent(RANDOM_V1));
     }
 }

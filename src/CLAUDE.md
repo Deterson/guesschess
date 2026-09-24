@@ -389,6 +389,43 @@ tout court (échec rapide voulu au boot Spring, pas seulement au moment du login
   plutot que de passer par `UserRepository`/`GameRepository` (ports concus pour un acces cible, pas
   un listing admin). `AdminController` resout le login d'un joueur `ACCOUNT` via `AccountService`
   (un lookup par compte affiche, volume interne trop faible pour justifier un batch).
+- **Étape 22 (runner + rapport faits) — Système de tournoi** : package `com.guesschess.tournament`,
+  aucune dépendance Spring/BD (comme `application.computer`) - `Tournament.main` (sous-commandes
+  `run`/`report`) tourne depuis les classes compilées OU depuis le jar Spring Boot repackagé via le
+  `PropertiesLauncher` :
+  `java -cp target/guesschess-*.jar -Dloader.main=com.guesschess.tournament.Tournament org.springframework.boot.loader.launch.PropertiesLauncher run --agents "..." ...`.
+  `HeadlessGameRunner` joue une partie via `GuessAgent`/`AgentSession` directement (pas de Spring) ;
+  `RoundRobinScheduler` genere les fixtures (chaque paire d'agents, les deux couleurs, par position de
+  depart) ; `OpeningPositionGenerator` genere les positions (demi-coups aleatoires, graine fixe) ;
+  sortie JSONL (`GameRecord`, un par partie, Jackson `tools.jackson`) ; `TournamentReport` agrege en
+  texte (V/N/D, score + IC 95%, Elo approxime - **pas** un vrai Bradley-Terry multi-joueurs, juste une
+  performance logistique a partir du score global, suffisant pour classer mais pas pour un Elo absolu -
+  stats de devinette par role). `--threads N` parallelise les parties (independantes), pas de
+  sharding/agregateur multi-machines (reste a faire).
+  **Agents du tournoi** : `minimax@1`/`guessaware@1`/`stockfish@1` existants (par niveau, via le
+  registre de l'etape 20) ; deux nouveaux, `random@1` (coup uniforme, aucune recherche - adversaire de
+  reference) et `negamax-timed@1` (meme recherche que minimax@1 mais approfondissement iteratif borne
+  par un budget de temps par coup au lieu d'une profondeur fixe par niveau - permet un "budget custom"
+  independant des niveaux EASY/MEDIUM/HARD sans toucher a minimax@1, fige). Spec en ligne de commande :
+  `nom@version` | `nom@version:easy|medium|hard` | `nom@version:cle=valeur,...` (ex.
+  `guessaware@1:depth=4,guessPlies=2,budgetMillis=1500` ou `negamax-timed@1:maxDepth=6,budgetMillis=1200`
+  - seuls `guessaware@1` et `negamax-timed@1` supportent un budget custom) ; plusieurs agents separes
+  par `;` (`,` etant deja pris par les parametres d'une spec).
+  **Piège rencontré (corrige)** : un budget de temps ne veut rien dire si la deadline n'est verifiee
+  qu'ENTRE deux profondeurs completes d'un approfondissement iteratif - une seule profondeur peut a
+  elle seule depasser tres largement le budget (croissance exponentielle du nombre de noeuds), constate
+  en pratique (budget de 300ms, ~300ms sur le premier essai naïf... en fait jusqu'à 100x de depassement
+  mesure). Corrige en ajoutant `NegamaxSearch.searchRootWithDeadline` (et son propre
+  `negamax`/`scoreMove` internes), qui verifie la deadline a CHAQUE noeud de la recursion - nouvelle
+  methode, additive uniquement : `searchRoot`/`negamax` d'origine restent inchangees (minimax@1 reste
+  fige, `Minimax1GoldenTest` passe toujours). `NegamaxTimedAgent` verifie desormais un budget de 300ms
+  a moins de 1ms pres en pratique (teste isolement). Deuxieme piège du même run (corrigé) : le premier
+  calcul de "temps de reflexion moyen" dans `TournamentReport` divisait le total par le nombre de
+  PARTIES plutôt que par le nombre de ROUNDS (chaque round = un appel `move()`/`guess()` par couleur,
+  voir `HeadlessGameRunner`) - faisait apparaître un budget de 300ms comme ~11 secondes de moyenne des
+  qu'une partie durait plusieurs dizaines de rounds. Tableau comparatif des moteurs (capacités,
+  profondeur max, temps moyen, efficacité indicative) : [`engines.md`](../engines.md) à la racine
+  du repo.
 - **Étape 14 — Identifiant unique de compte (login)** : pseudonyme immuable, 3-20 caractères,
   unique insensible à la casse (index `lower(login)`, migration V9), interdit sur
   "Anonymous"/"Anonyme". `login` nullable en SQL pour les comptes créés avant cette étape ; un

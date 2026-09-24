@@ -122,63 +122,49 @@ const example3Guess = { from: 'e1', to: 'f2' }
 
 <template>
   <div class="relative mx-auto max-w-4xl px-4 py-12">
-    <!--
-      L'encart PGGN ne doit jamais déplacer la colonne centrale (toujours centrée sur
-      l'écran, indépendamment de sa présence) : à partir de l'écran assez large pour
-      accueillir les deux sans chevauchement, il sort donc du flux (absolute) et
-      s'accroche par son bord droit à la gauche de la colonne (right-full), pour ne
-      grandir que vers la gauche si son contenu en a besoin. Le seuil (min-[1560px])
-      est calculé pour que la colonne (max-w-4xl = 896px) laisse, de chaque côté, au
-      moins la largeur de l'encart (w-75 = 300px) + sa marge (mr-8 = 32px) ; en dessous,
-      l'encart reste dans le flux normal et s'affiche au-dessus de la colonne (mobile
-      compris). `h-full` sur cet encart lui donne la même hauteur que la colonne centrale
-      (qui définit la hauteur du conteneur relatif), ce qui laisse de la place au
-      `sticky` interne pour rester visible pendant le défilement sans déborder sous le
-      dernier exemple.
-    -->
     <div class="flex flex-col gap-10">
       <div class="flex flex-col gap-3 text-center">
         <h1 class="text-3xl font-bold">{{ t('howToPlay.title') }}</h1>
         <p class="text-stone-400">{{ t('howToPlay.intro') }}</p>
       </div>
 
-      <div class="rounded-lg bg-stone-800 px-4 py-3 text-sm text-stone-300">
-        <p class="mb-2 font-semibold text-stone-200">{{ t('howToPlay.legendTitle') }}</p>
-        <ul class="flex flex-col gap-1.5">
-          <li class="flex items-center gap-2">
-            <span class="h-4 w-4 shrink-0 rounded ring-4 ring-violet-400 ring-inset"></span>
-            {{ t('howToPlay.legendGuess') }}
-          </li>
-          <li class="flex items-center gap-2">
-            <span class="h-4 w-4 shrink-0 rounded bg-sky-500/50"></span>
-            {{ t('howToPlay.legendPlayed') }}
-          </li>
-          <li class="flex items-center gap-2">
-            <span class="h-4 w-4 shrink-0 rounded bg-red-500/50"></span>
-            {{ t('howToPlay.legendCancelled') }}
-          </li>
-        </ul>
-      </div>
-
       <!--
-        L'encart PGGN ne doit jamais déplacer la colonne centrale (toujours centrée sur
-        l'écran, indépendamment de sa présence) : à partir de l'écran assez large pour
-        accueillir les deux sans chevauchement, il sort donc du flux (absolute, ancré au
-        conteneur `relative` racine malgré son imbrication ici) et s'accroche par son bord
-        droit à la gauche de la colonne (right-full), pour ne grandir que vers la gauche si
-        son contenu en a besoin. Le seuil (min-[1560px]) est calculé pour que la colonne
+        Encart combiné PGGN + légende, dans cet ordre (légende sous PGGN). Il ne doit
+        jamais déplacer la colonne centrale (toujours centrée sur l'écran, indépendamment
+        de sa présence) : à partir de l'écran assez large pour accueillir les deux sans
+        chevauchement, il sort donc du flux (absolute) et s'accroche par son bord droit à
+        la gauche de la colonne (right-full), pour ne grandir que vers la gauche si son
+        contenu en a besoin. Le seuil (min-[1560px]) est calculé pour que la colonne
         (max-w-4xl = 896px) laisse, de chaque côté, au moins la largeur de l'encart
         (w-75 = 300px) + sa marge (mr-8 = 32px) ; en dessous, l'encart reste dans le flux
-        normal, sous la légende des plateaux (mobile compris) plutôt qu'en haut de la page.
-        `h-full` sur cet encart lui donne la même hauteur que la colonne centrale (qui
-        définit la hauteur du conteneur relatif), ce qui laisse de la place au `sticky`
-        interne pour rester visible pendant le défilement sans déborder sous le dernier
-        exemple.
+        normal, mais tout en bas de la page (order-last) plutôt qu'en haut - sans effet à
+        partir du seuil puisqu'il devient absolute (donc hors flux). `h-full` sur cet
+        encart lui donne la même hauteur que la colonne centrale (qui définit la hauteur
+        du conteneur relatif), ce qui laisse de la place au `sticky` interne (les deux
+        blocs collés ensemble) pour rester visible pendant le défilement sans déborder
+        sous le dernier exemple.
       -->
-      <aside class="min-[1560px]:absolute min-[1560px]:top-0 min-[1560px]:right-full min-[1560px]:mr-8 min-[1560px]:h-full min-[1560px]:w-75">
+      <aside class="order-last flex flex-col gap-6 min-[1560px]:absolute min-[1560px]:top-0 min-[1560px]:right-full min-[1560px]:mr-8 min-[1560px]:h-full min-[1560px]:w-75">
         <div class="rounded-lg bg-stone-800 px-4 py-3 text-sm text-stone-300 min-[1560px]:sticky min-[1560px]:top-8">
           <p class="mb-2 font-semibold text-stone-200">{{ t('howToPlay.pggnTitle') }}</p>
           <p class="text-stone-400">{{ t('howToPlay.pggnText') }}</p>
+        </div>
+        <div class="rounded-lg bg-stone-800 px-4 py-3 text-sm text-stone-300">
+          <p class="mb-2 font-semibold text-stone-200">{{ t('howToPlay.legendTitle') }}</p>
+          <ul class="flex flex-col gap-1.5">
+            <li class="flex items-center gap-2">
+              <span class="h-4 w-4 shrink-0 rounded ring-4 ring-violet-400 ring-inset"></span>
+              {{ t('howToPlay.legendGuess') }}
+            </li>
+            <li class="flex items-center gap-2">
+              <span class="h-4 w-4 shrink-0 rounded bg-sky-500/50"></span>
+              {{ t('howToPlay.legendPlayed') }}
+            </li>
+            <li class="flex items-center gap-2">
+              <span class="h-4 w-4 shrink-0 rounded bg-red-500/50"></span>
+              {{ t('howToPlay.legendCancelled') }}
+            </li>
+          </ul>
         </div>
       </aside>
 

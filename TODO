@@ -1,15 +1,16 @@
 ne rien implémenter dans ce TODO à moins que cela ait été explicitement demandé
 
 - utiliser HeidiSQL
+- classement ELO
 
 --- BACK
+- débugger pourquoi Stockfish plante parfois en dev local (StockfishUnavailableException: "stockfish closed its output before sending 'bestmove'") - voir src/CLAUDE.md étape 15, cause non identifiée (suspecté : lancement répété d'un process par l'antivirus/l'OS)
 - réfléchir au volume des données : quelle taille fait une partie dans la db ? imaginons que 10 000 joueurs jouent une partie par jour, combien de Mo par jour ?
 - protéger contre les abus (empêcher de créer 1000000 de parties, empêcher de spammer de coups en mode DDoS)
 - JUSTE UN DELAI de X secondes (X = le nombre de minutes de la partie de base) pour le guess, si le temps est écoulé, le guess n'est pas fait
 - avoir des tests E2E avec Cypress playwright etc
 
 --- FRONT
-- bouton "abandonner", avec une confirmation.
 - "Parties en ce moment"
 - changelog
 - proposer de changer de style (change la couleur des cases, et adapte les couleurs du code couleur des coups joués / devinés sur les parties ET dans le tutoriel)

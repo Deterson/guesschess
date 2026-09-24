@@ -93,10 +93,7 @@ Jeu d'échecs classique avec une règle additionnelle :
 
 ## Fonctionnalités prévues (pas forcément dans la v1)
 
-- **Comptes joueurs** : déjà couvert par l'étape 4 de la roadmap.
-- **Historique de matchs** : quasi gratuit vu que l'état des parties est déjà persisté en base pour l'asynchrone — il suffit de ne pas supprimer les parties terminées.
 - **Classement ELO** : prévu comme un module séparé, ajouté plus tard, qui lit l'historique de matchs et calcule les scores sans toucher au moteur d'échecs ni à la mécanique de devinette.
-- **OAuth** (Google/GitHub, etc.) : authentification, en plus ou à la place de comptes email/mot de passe classiques.
 - **Variante "devinette cachée"** (idée, pas encore développée) : le coup deviné ne serait jamais
   révélé à l'adversaire (seul le résultat annulé/non-annulé le serait), contrairement au
   comportement actuel. S'ajouterait vraisemblablement à `GameVariant` (`GUESSCHESS`/`GUESSMATE`
@@ -153,7 +150,11 @@ Le tournoi (22) passe avant le réseau (23) : ses données d'entraînement et sa
 Règle de versionnage : une version publiée est **immuable** (nouvelle idée = nouvelle version avec un
 nouvel identifiant `nom@version`) ; jamais de `if` de version à l'intérieur d'un algorithme — la
 variation passe par des composants/configurations, le branchement n'a lieu qu'une fois, dans la
-fabrique du registre.
+fabrique du registre. **À chaque nouveau moteur enregistré, l'ajouter aussi aux agents par défaut de
+[`scripts/run-tournament.ps1`](scripts/run-tournament.ps1)** (paramètre `-Agents`), pour qu'un
+tournoi lancé sans argument reste représentatif de tous les moteurs disponibles, **et mettre à jour
+le tableau comparatif des moteurs** dans [`engines.md`](engines.md) (capacités distinctives,
+profondeur/plis max, temps moyen par coup, efficacité indicative).
 
 20. ✅ Registre de versions de moteur (fait), sans changement de comportement : port `GuessAgent` /
     `AgentSession` (jouer ≠ deviner, état par partie dans la session), `Random` injecté, registre
@@ -162,20 +163,10 @@ fabrique du registre.
 21. ✅ Moteur guess-aware `guessaware@1` (fait, **non validé** : jamais le défaut avant le tournoi de
     l'étape 22), cohabite avec `minimax@1` ; sélectionnable par niveau (`GUESSCHESS_ENGINE_HARD=guessaware@1`).
     Détail : [`src/CLAUDE.md`](src/CLAUDE.md).
-22. ⬜ Système de tournoi entre versions. Exécuteur de parties sans tête sur `Game` (aucune dépendance
-    Spring/BD) dans un `main` autonome tournant depuis le JAR/l'image Docker (PC, VM EC2 de dev, Pi —
-    seule la JVM compte) ; round-robin, couleurs alternées, positions de départ variées (quelques
-    demi-coups aléatoires avec graine), limite de rounds → nulle, variantes GUESSCHESS et GUESSMATE ;
-    budgets en profondeur/nœuds (comparables entre machines) ou en temps par coup (mode « quel moteur
-    est le meilleur sur le Pi ») ; sortie JSONL, une ligne par partie (agents, graine, variante,
-    résultat et cause, rounds, PGGN, temps/nœuds, machine) ; fragments `--shard i/n` fusionnés par un
-    agrégateur, sans coordinateur central ; rapport : victoires/nulles/défaites, score avec intervalle
-    de confiance, Elo, statistiques de devinette par rôle (taux correct, taux d'annulation). Agents de
-    base : `minimax@1`, `guessaware@1`, aléatoire, Stockfish en option. Plus tard : balayages de
-    paramètres (génération de configurations), arrêt anticipé SPRT. Script de lancement distant sur la
-    VM EC2 de dev à la manière de `scripts/test-integration-remote.sh` ; ne pas le lancer sur le Pi de
-    prod en même temps que les joueurs (`nice`, threads limités). Sert aussi à choisir quelle version
-    sert quel niveau en production (propriété de l'étape 20), sans rebuild.
+22. 🟡 Système de tournoi entre versions (runner + rapport faits, sharding/agrégateur/script distant
+    restent à faire). Détail : [`src/CLAUDE.md`](src/CLAUDE.md). Reste : fragments `--shard i/n` +
+    agrégateur, script de lancement distant sur la VM EC2 (à la manière de
+    `scripts/test-integration-remote.sh`), balayages de paramètres, arrêt anticipé SPRT.
 23. ⬜ Moteur réseau de neurones `nnue@1`, cohabite avec les deux autres. Niveau 1 seulement :
     évaluation apprise remplaçant `PositionEvaluator` (petit réseau, poids entiers, mise à jour
     incrémentale, inférence en Java pur sans dépendance, fichier de poids versionné avec la version du
@@ -188,6 +179,52 @@ fabrique du registre.
     dernière version (l'auto-jeu en jeu simultané peut être non transitif). Niveaux plus ambitieux
     (politique + valeur avec recherche pour jeux simultanés ; modèle d'adversaire humain appris sur
     les PGGN) : hors périmètre tant que le niveau 1 ne prouve pas un gain.
+
+### Techniques classiques façon Stockfish à imiter (étapes 24-27, indépendantes du tournoi)
+
+Générique : profitent à `minimax@1` et `guessaware@1` (voir `NegamaxSearch`, partagé par les deux).
+Contrairement aux étapes 20-23, ce ne sont pas de nouvelles versions d'agent mais des accélérations
+internes — à mesurer au tournoi (22) une fois en place (même force de jeu, recherche plus profonde à
+budget de temps égal), pas une raison de changer de version.
+
+24. ⬜ Table de transposition (hachage de Zobrist) : mémorise la valeur déjà calculée d'une position
+    (profondeur, borne) pour éviter de la recalculer si elle est atteinte par un autre ordre de coups —
+    gain classique important, et en guesschess `pass(pass(x))` retombe exactement sur `x`, donc les
+    chaînes de rounds annulés s'y prêtent particulièrement bien. Piège à anticiper : la valeur d'une
+    position dépend aussi de si elle est traitée comme nœud classique ou comme jeu matriciel
+    (`GuessAwareSearch`) — la clé de cache doit distinguer les deux, pas seulement `(position, profondeur)`.
+25. ⬜ Qualité de recherche à profondeur égale : recherche de quiescence (étendre les échanges de
+    captures à l'horizon plutôt que d'évaluer une position "au milieu d'une prise", qui fausse
+    `PositionEvaluator` et donc aussi les `A[]`/`B` du guess-aware) ; meilleur tri des coups (killer
+    moves, historique) au-delà du MVV-LVA actuel (`NegamaxSearch.orderMoves`) ; fenêtres d'aspiration
+    et recherche à fenêtre nulle (PVS) pour les coups non-PV ; approfondissement itératif pour
+    `minimax@1` aussi (aujourd'hui profondeur fixe par niveau, contrairement à `guessaware@1`).
+    Attention à ne pas confondre le "coup nul" classique (heuristique d'élagage : "et si je passais
+    mon tour, suis-je déjà gagnant ?", jamais un vrai coup) avec `Board.pass()`, qui est un vrai
+    résultat de la règle de devinette — deux concepts différents malgré le nom proche.
+26. ⬜ Parallélisation de la recherche sur les cœurs du Pi (4 cœurs) : threads **plateforme** (pas les
+    threads virtuels du projet, faits pour l'attente I/O des connexions WebSocket, pas pour du calcul
+    CPU-bound) ou `ForkJoinPool`, un par coup racine — les coups racine de `searchRoot`/`solveRoot`
+    sont déjà indépendants. Borner le parallélisme pour laisser du CPU à Postgres/au reste du backend.
+27. ⬜ Évaluation plus riche dans `PositionEvaluator` : structure de pions (doublés, isolés, passés),
+    sécurité du roi (pions devant, colonnes ouvertes proches), paire de fous, tour sur colonne ouverte,
+    éval "tapered" (pondération ouverture/finale plutôt que tables positionnelles fixes). Mesurer le
+    coût (la mobilité domine déjà le temps par nœud, voir `src/CLAUDE.md`) avant d'empiler des termes.
+    Hors périmètre pour l'instant : tablebases de fin de partie (utilité faible pour ce projet).
+
+### Exécutable graphique pour le tournoi (étape 28, indépendante, extension de l'étape 22)
+
+28. ⬜ `mvn package` doit aussi produire un exécutable graphique Windows autonome qui embarque le jar
+    Spring Boot du tournoi (`com.guesschess.tournament.Tournament`, étape 22) - une fenêtre minimale
+    (cases à cocher/listes déroulantes par agent enregistré dans `AgentRegistry`, champs pour
+    variante/ouvertures/seed/round-limit/threads) plutôt qu'une spec en ligne de commande à taper à la
+    main, pour un usage occasionnel sans terminal. Piste envisagée : `jpackage` (déjà dans le JDK,
+    aucune dépendance supplémentaire) piloté par un plugin Maven (`jpackage-maven-plugin` ou exécution
+    directe en `exec-maven-plugin`) en profil dédié (`-P gui`, pas le build par défaut - jpackage
+    n'est pas disponible/pertinent sur le Pi de prod), pour produire un `.exe` avec JRE embarqué à
+    partir du jar déjà repackagé. La fenêtre elle-même (Swing, sans dépendance supplémentaire) ne fait
+    que construire les arguments CLI et lancer `Tournament.main` en interne - aucune logique dupliquée
+    avec `TournamentAgentFactory`/`HeadlessGameRunner`/`TournamentReport`, déjà pures Java sans Spring.
 
 ## Liaison compte/session ↔ partie (étapes 6-7)
 
