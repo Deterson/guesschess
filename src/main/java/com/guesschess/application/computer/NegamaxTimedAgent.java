@@ -128,17 +128,21 @@ public final class NegamaxTimedAgent implements GuessAgent {
          * Approfondissement iteratif jusqu'a config.maxDepth() ou config.budgetMillis(), le
          * premier atteint - la deadline est verifiee a l'INTERIEUR de chaque profondeur
          * (searchRootWithDeadline), pas seulement entre deux profondeurs completes : sans ca,
-         * une seule profondeur peut a elle seule largement depasser le budget.
+         * une seule profondeur peut a elle seule largement depasser le budget. Une seule
+         * TranspositionTable (etape 24) partagee entre toutes les profondeurs de cette
+         * decision : les profondeurs courtes deja resolues accelerent les profondeurs
+         * suivantes des qu'une transposition est retrouvee, sans changer aucun score.
          */
         private Move think(Board board, List<Move> candidates, List<Move> legalMoves) {
             if (candidates.size() == 1) {
                 return candidates.get(0);
             }
+            TranspositionTable tt = new TranspositionTable();
             long deadline = System.nanoTime() + config.budgetMillis() * 1_000_000L;
-            List<ScoredMove> best = NegamaxSearch.searchRoot(board, 1);
+            List<ScoredMove> best = NegamaxSearch.searchRoot(board, 1, tt);
             for (int depth = 2; depth <= config.maxDepth() && System.nanoTime() < deadline; depth++) {
                 try {
-                    best = NegamaxSearch.searchRootWithDeadline(board, depth, deadline);
+                    best = NegamaxSearch.searchRootWithDeadline(board, depth, deadline, tt);
                 } catch (NegamaxSearch.SearchTimeoutException timeout) {
                     break;
                 }

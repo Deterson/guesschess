@@ -8,6 +8,8 @@ import com.guesschess.domain.rules.MoveGenerator;
  * Micro-benchmark autonome (main, pas un test JUnit) du prototype GuessAwareSearch contre
  * NegamaxSearch : temps par (profondeur, guessPlies), JIT rechauffe par une passe a blanc.
  * Lancement : voir la note de la session (java -cp target/classes:target/test-classes ...).
+ * Affiche aussi le taux de hit de la table de transposition (etape 24) pour observer le gain
+ * reel plutot que de le supposer ("mesurer avant d'optimiser").
  */
 public final class GuessAwareSearchBenchmark {
 
@@ -28,17 +30,21 @@ public final class GuessAwareSearchBenchmark {
             Board board = (Board) named[1];
             System.out.println("== " + named[0]);
             for (int depth = 2; depth <= maxDepth; depth++) {
+                TranspositionTable tt = new TranspositionTable();
                 long t0 = System.nanoTime();
-                NegamaxSearch.searchRoot(board, depth);
+                NegamaxSearch.searchRoot(board, depth, tt);
                 double classicalMs = (System.nanoTime() - t0) / 1e6;
-                System.out.printf("depth %d classique (alpha-beta)         : %8.0f ms%n", depth, classicalMs);
+                System.out.printf("depth %d classique (alpha-beta)         : %8.0f ms  (TT hits %d/%d)%n",
+                        depth, classicalMs, tt.hits(), tt.probes());
                 for (int guessPlies = 1; guessPlies <= depth; guessPlies++) {
                     GuessAwareSearch search = new GuessAwareSearch();
                     long start0 = System.nanoTime();
                     GuessAwareSearch.RootSolution solution = search.solveRoot(board, depth, guessPlies);
                     double ms = (System.nanoTime() - start0) / 1e6;
-                    System.out.printf("depth %d guessPlies=%d (%5d noeuds jeu) : %8.0f ms  (x%.1f)  valeur=%d B=%d%n",
-                            depth, guessPlies, search.guessNodes(), ms, ms / classicalMs,
+                    TranspositionTable classicalTt = search.classicalTranspositions();
+                    System.out.printf("depth %d guessPlies=%d (%5d noeuds jeu, %5d noeuds matriciels distincts en cache, TT classique hits %d/%d) : %8.0f ms  (x%.1f)  valeur=%d B=%d%n",
+                            depth, guessPlies, search.guessNodes(), search.nodeCacheSize(),
+                            classicalTt.hits(), classicalTt.probes(), ms, ms / classicalMs,
                             solution.value(), solution.passScore());
                 }
             }

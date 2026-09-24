@@ -1,6 +1,7 @@
 package com.guesschess.application.computer;
 
 import com.guesschess.domain.board.Board;
+import com.guesschess.domain.board.ZobristHash;
 import com.guesschess.domain.move.Move;
 import com.guesschess.domain.move.MoveType;
 import com.guesschess.domain.piece.Color;
@@ -80,6 +81,20 @@ public final class NegamaxSearch {
      * PositionEvaluator.evaluate directement dans ce cas).
      */
     public static List<ScoredMove> searchRoot(Board board, int depth) {
+        return searchRoot(board, depth, new TranspositionTable());
+    }
+
+    /**
+     * Comme searchRoot(Board, int), mais partage tt (etape 24, table de transposition)
+     * entre tous les coups racine explores - et, si l'appelant la reutilise entre plusieurs
+     * appels (ex. NegamaxTimedAgent entre deux profondeurs d'un approfondissement iteratif,
+     * GuessAwareSearch entre ses delegations classiques), entre plusieurs recherches
+     * successives. Ne change jamais une valeur retournee (voir TranspositionTable) - tt
+     * n'est utilisee que pour eviter de recalculer une valeur deja prouvee, jamais pour
+     * reordonner les coups : searchRoot(Board, int) reste donc un cas particulier strictement
+     * equivalent, seulement plus lent (table jetable a chaque appel).
+     */
+    public static List<ScoredMove> searchRoot(Board board, int depth, TranspositionTable tt) {
         if (depth < 1) {
             throw new IllegalArgumentException("depth must be >= 1, got " + depth);
         }
@@ -89,7 +104,7 @@ public final class NegamaxSearch {
         }
         List<ScoredMove> results = new ArrayList<>(legalMoves.size());
         for (Move move : orderMoves(legalMoves)) {
-            int score = scoreMove(board, move, depth - 1, -INFINITY, INFINITY);
+            int score = scoreMove(board, move, depth - 1, -INFINITY, INFINITY, tt);
             results.add(new ScoredMove(move, score));
         }
         results.sort(Comparator.comparingInt(ScoredMove::score).reversed());
@@ -99,25 +114,36 @@ public final class NegamaxSearch {
     /**
      * @return le score de board du point de vue du joueur au trait (board.sideToMove()) -
      * convention negamax standard, chaque niveau de recursion negue le score renvoye par
-     * l'appel suivant.
+     * l'appel suivant. tt (etape 24) cache les valeurs deja prouvees par hash Zobrist +
+     * profondeur restante : un hit renvoie directement le score sans jamais reexplorer ni
+     * changer l'ordre des coups (probe/store de TranspositionTable), equivalent en valeur a
+     * un alpha-beta sans table, seulement plus rapide en presence de transpositions - dont
+     * la mecanique de devinette produit beaucoup (Board.pass(pass(x)) == x, voir CLAUDE.md).
      */
-    static int negamax(Board board, int depth, int alpha, int beta) {
+    static int negamax(Board board, int depth, int alpha, int beta, TranspositionTable tt) {
+        long hash = ZobristHash.hash(board);
+        Integer cached = tt.probe(hash, depth, alpha, beta);
+        if (cached != null) {
+            return cached;
+        }
         Color color = board.sideToMove();
         List<Move> legalMoves = MoveGenerator.generateLegalMoves(board, color);
         if (legalMoves.isEmpty()) {
-            if (CheckDetector.isInCheck(board, color)) {
-                // Mat : tres negatif pour le joueur au trait (il vient d'etre mate). +depth
-                // (plis encore disponibles) pour preferer un mat trouve plus tot dans l'arbre.
-                return -(MATE_SCORE + depth);
-            }
-            return 0; // pat
+            // Mat : tres negatif pour le joueur au trait (il vient d'etre mate). +depth
+            // (plis encore disponibles) pour preferer un mat trouve plus tot dans l'arbre.
+            int value = CheckDetector.isInCheck(board, color) ? -(MATE_SCORE + depth) : 0; // pat
+            tt.store(hash, depth, value, TranspositionTable.Bound.EXACT);
+            return value;
         }
         if (depth == 0) {
-            return perspectiveEval(board);
+            int value = perspectiveEval(board);
+            tt.store(hash, depth, value, TranspositionTable.Bound.EXACT);
+            return value;
         }
+        int originalAlpha = alpha;
         int best = -INFINITY;
         for (Move move : orderMoves(legalMoves)) {
-            int score = scoreMove(board, move, depth - 1, -beta, -alpha);
+            int score = scoreMove(board, move, depth - 1, -beta, -alpha, tt);
             if (score > best) {
                 best = score;
             }
@@ -128,7 +154,19 @@ public final class NegamaxSearch {
                 break; // elagage
             }
         }
+        tt.store(hash, depth, best, boundFor(best, originalAlpha, beta));
         return best;
+    }
+
+    /** Classification standard alpha-beta+TT : cutoff = seulement une borne inf/sup prouvee, sinon exacte. */
+    private static TranspositionTable.Bound boundFor(int value, int alpha, int beta) {
+        if (value <= alpha) {
+            return TranspositionTable.Bound.UPPERBOUND;
+        }
+        if (value >= beta) {
+            return TranspositionTable.Bound.LOWERBOUND;
+        }
+        return TranspositionTable.Bound.EXACT;
     }
 
     /**
@@ -137,11 +175,11 @@ public final class NegamaxSearch {
      * certaine sans jamais construire ni recurser dans le plateau sans roi qui en
      * resulterait.
      */
-    private static int scoreMove(Board board, Move move, int depth, int alpha, int beta) {
+    private static int scoreMove(Board board, Move move, int depth, int alpha, int beta, TranspositionTable tt) {
         if (move.isCapture() && move.capturedPiece().type() == PieceType.KING) {
             return KING_CAPTURE_SCORE;
         }
-        return -negamax(board.applyMove(move), depth, alpha, beta);
+        return -negamax(board.applyMove(move), depth, alpha, beta, tt);
     }
 
     /** Depassement du budget de temps (voir searchRootWithDeadline) - sans pile d'appels, il sert de signal. */
@@ -162,6 +200,16 @@ public final class NegamaxSearch {
      * garder le dernier resultat complet en cas de timeout.
      */
     public static List<ScoredMove> searchRootWithDeadline(Board board, int depth, long deadlineNanos) {
+        return searchRootWithDeadline(board, depth, deadlineNanos, new TranspositionTable());
+    }
+
+    /**
+     * Comme searchRootWithDeadline(Board, int, long), mais partage tt (etape 24) entre
+     * plusieurs appels - NegamaxTimedAgent en cree une seule par decision et la reutilise a
+     * chaque profondeur de son approfondissement iteratif : les profondeurs courtes deja
+     * calculees accelerent les profondeures suivantes des qu'une transposition est retrouvee.
+     */
+    public static List<ScoredMove> searchRootWithDeadline(Board board, int depth, long deadlineNanos, TranspositionTable tt) {
         if (depth < 1) {
             throw new IllegalArgumentException("depth must be >= 1, got " + depth);
         }
@@ -171,31 +219,38 @@ public final class NegamaxSearch {
         }
         List<ScoredMove> results = new ArrayList<>(legalMoves.size());
         for (Move move : orderMoves(legalMoves)) {
-            int score = scoreMoveWithDeadline(board, move, depth - 1, -INFINITY, INFINITY, deadlineNanos);
+            int score = scoreMoveWithDeadline(board, move, depth - 1, -INFINITY, INFINITY, deadlineNanos, tt);
             results.add(new ScoredMove(move, score));
         }
         results.sort(Comparator.comparingInt(ScoredMove::score).reversed());
         return results;
     }
 
-    private static int negamaxWithDeadline(Board board, int depth, int alpha, int beta, long deadlineNanos) {
+    private static int negamaxWithDeadline(Board board, int depth, int alpha, int beta, long deadlineNanos, TranspositionTable tt) {
         if (System.nanoTime() > deadlineNanos) {
             throw new SearchTimeoutException();
+        }
+        long hash = ZobristHash.hash(board);
+        Integer cached = tt.probe(hash, depth, alpha, beta);
+        if (cached != null) {
+            return cached;
         }
         Color color = board.sideToMove();
         List<Move> legalMoves = MoveGenerator.generateLegalMoves(board, color);
         if (legalMoves.isEmpty()) {
-            if (CheckDetector.isInCheck(board, color)) {
-                return -(MATE_SCORE + depth);
-            }
-            return 0;
+            int value = CheckDetector.isInCheck(board, color) ? -(MATE_SCORE + depth) : 0;
+            tt.store(hash, depth, value, TranspositionTable.Bound.EXACT);
+            return value;
         }
         if (depth == 0) {
-            return perspectiveEval(board);
+            int value = perspectiveEval(board);
+            tt.store(hash, depth, value, TranspositionTable.Bound.EXACT);
+            return value;
         }
+        int originalAlpha = alpha;
         int best = -INFINITY;
         for (Move move : orderMoves(legalMoves)) {
-            int score = scoreMoveWithDeadline(board, move, depth - 1, -beta, -alpha, deadlineNanos);
+            int score = scoreMoveWithDeadline(board, move, depth - 1, -beta, -alpha, deadlineNanos, tt);
             if (score > best) {
                 best = score;
             }
@@ -206,14 +261,15 @@ public final class NegamaxSearch {
                 break;
             }
         }
+        tt.store(hash, depth, best, boundFor(best, originalAlpha, beta));
         return best;
     }
 
-    private static int scoreMoveWithDeadline(Board board, Move move, int depth, int alpha, int beta, long deadlineNanos) {
+    private static int scoreMoveWithDeadline(Board board, Move move, int depth, int alpha, int beta, long deadlineNanos, TranspositionTable tt) {
         if (move.isCapture() && move.capturedPiece().type() == PieceType.KING) {
             return KING_CAPTURE_SCORE;
         }
-        return -negamaxWithDeadline(board.applyMove(move), depth, alpha, beta, deadlineNanos);
+        return -negamaxWithDeadline(board.applyMove(move), depth, alpha, beta, deadlineNanos, tt);
     }
 
     static int perspectiveEval(Board board) {

@@ -187,12 +187,10 @@ Contrairement aux étapes 20-23, ce ne sont pas de nouvelles versions d'agent ma
 internes — à mesurer au tournoi (22) une fois en place (même force de jeu, recherche plus profonde à
 budget de temps égal), pas une raison de changer de version.
 
-24. ⬜ Table de transposition (hachage de Zobrist) : mémorise la valeur déjà calculée d'une position
-    (profondeur, borne) pour éviter de la recalculer si elle est atteinte par un autre ordre de coups —
-    gain classique important, et en guesschess `pass(pass(x))` retombe exactement sur `x`, donc les
-    chaînes de rounds annulés s'y prêtent particulièrement bien. Piège à anticiper : la valeur d'une
-    position dépend aussi de si elle est traitée comme nœud classique ou comme jeu matriciel
-    (`GuessAwareSearch`) — la clé de cache doit distinguer les deux, pas seulement `(position, profondeur)`.
+24. ✅ Table de transposition (hachage de Zobrist) (fait) — mémorise la valeur déjà calculée d'une
+    position pour éviter de la recalculer si elle est atteinte par un autre ordre de coups ; deux
+    tables séparées (nœud classique / jeu matriciel guess-aware) plutôt qu'une clé composite unique.
+    Détail : [`src/CLAUDE.md`](src/CLAUDE.md).
 25. ⬜ Qualité de recherche à profondeur égale : recherche de quiescence (étendre les échanges de
     captures à l'horizon plutôt que d'évaluer une position "au milieu d'une prise", qui fausse
     `PositionEvaluator` et donc aussi les `A[]`/`B` du guess-aware) ; meilleur tri des coups (killer

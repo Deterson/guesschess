@@ -254,9 +254,14 @@ tout court (échec rapide voulu au boot Spring, pas seulement au moment du login
   closed its output before sending 'bestmove'`), cause précise non identifiée (suspecté : lancement
   répété d'un process par l'antivirus/l'OS). `ComputerPlayerService.act` avalait cette exception sans
   filet, laissant le round bloqué indéfiniment (l'ordinateur ne soumettant plus jamais rien).
-  Corrigé : `StockfishChessEngine` retente une fois avec un process frais avant d'abandonner, et
-  `ComputerPlayerService` retombe sur un coup légal aléatoire si le moteur échoue quand même -
-  dégrade la qualité d'un seul coup plutôt que de bloquer la partie.
+  Corrigé (étape 15) : `StockfishChessEngine` retente avec un process frais avant d'abandonner
+  (`SEARCH_ATTEMPTS`), et `ComputerPlayerService` retombe sur un coup légal aléatoire si le moteur
+  échoue quand même - dégrade la qualité d'un seul coup plutôt que de bloquer la partie.
+  Amélioré depuis (toujours pas root-causé avec certitude) : `awaitExitOrKill` laisse le process
+  sortir de lui-même sur `quit` au lieu d'un `destroyForcibly` immédiat à chaque appel - profil
+  lancement/kill brutal répété, suspecté déclencheur de l'interférence antivirus ci-dessus - et les
+  exceptions embarquent désormais le transcript UCI reçu avant l'échec, pour diagnostiquer la vraie
+  cause si ça se reproduit plutôt que de deviner. `SEARCH_ATTEMPTS` passé à 3.
   **Piège rencontré (corrigé)** : en variante GUESSCHESS (sans Guessmate), quand l'ordinateur
   devine (n'est pas au trait) et que son propre roi est resté en échec non résolu suite à une
   devinette adverse correcte au round précédent (voir `Game.resolveRound`/`applyRealMove`), les
@@ -433,3 +438,19 @@ tout court (échec rapide voulu au boot Spring, pas seulement au moment du login
   "pending_registration", `RegistrationController`/`POST /api/registration/complete`). Backend :
   `GET /api/players/{login}` et `/api/players/{login}/games`, en dehors de `/api/account/**` donc
   jamais authentifiés (`PlayerProfileController`, `UserRepository.findByLoginIgnoreCase`).
+- **Étape 24 — Table de transposition (Zobrist)** : `ZobristHash` (domain/board, recalculé à chaque
+  nœud plutôt que maintenu incrémentalement par `Board.applyMove` — coût marginal face à la
+  génération de coups, zéro changement à `Board`) + `TranspositionTable` (application/computer,
+  `HashMap` simple jetée à la fin de chaque appel racine — pas de bornage ni de thread-safety à
+  écrire, le tournoi lance des parties en parallèle par thread). Deux tables séparées plutôt qu'une
+  clé composite : celle de `NegamaxSearch` (nœuds classiques, surcharges additives, signatures
+  existantes inchangées) et, propre à `GuessAwareSearch` (déjà instanciée fraîche par décision), une
+  pour ses nœuds matriciels (clé hash + profondeur + `guessPlies`, qui ne décroît pas toujours en
+  lockstep avec `depth` à cause du `Math.max` dans `guessedScore`) plus une `TranspositionTable`
+  classique partagée pour ses délégations à `NegamaxSearch.negamax`. Jamais utilisée pour réordonner
+  les coups (value-cache pur, bornes EXACT/LOWERBOUND/UPPERBOUND standard) : `Minimax1GoldenTest`
+  reste inchangé et vert. `NegamaxTimedAgent` partage une seule table entre les profondeurs de son
+  approfondissement itératif (plus gros gain, les profondeurs courtes accélèrent les suivantes).
+  Mesuré (`GuessAwareSearchBenchmark`) : jusqu'à ~36% de hits sur les nœuds classiques délégués à
+  profondeur 3/`guessPlies` 3 en milieu de partie — plus la chaîne de rounds annulés est longue, plus
+  le gain est net, comme attendu.

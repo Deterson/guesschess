@@ -1,6 +1,7 @@
 package com.guesschess.application.computer;
 
 import com.guesschess.domain.board.Board;
+import com.guesschess.domain.board.ZobristHash;
 import com.guesschess.domain.game.Game;
 import com.guesschess.domain.game.GameVariant;
 import com.guesschess.domain.move.Move;
@@ -13,7 +14,9 @@ import com.guesschess.domain.rules.MoveGenerator;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Recherche "guess-aware a chaque noeud" (etape 21, agent guessaware@1) - en parallele de
@@ -73,6 +76,29 @@ public final class GuessAwareSearch {
     /** Nombre de noeuds internes resolus par le jeu matriciel (pour le benchmark). */
     private long guessNodes;
 
+    /**
+     * Table de transposition (etape 24) pour les delegations classiques (guessPlies == 0,
+     * voir value() et la branche fenetree de playedScores) - une instance par recherche
+     * (cette classe est deja instanciee fraiche a chaque decision, voir GuessAwareAgent),
+     * partagee entre tous les appels a NegamaxSearch.negamax faits par CETTE recherche.
+     */
+    private final TranspositionTable classicalTt = new TranspositionTable();
+
+    /**
+     * Cle de cache d'un noeud "jeu matriciel" (guessPlies > 0) : hash Zobrist + profondeur
+     * + guessPlies restants. guessPlies ne decroit pas toujours en lockstep avec depth
+     * (guessedScore plafonne passGuessPlies a 1 via Math.max, voir plus bas) - deux chemins
+     * peuvent donc atteindre la meme position a la meme profondeur avec un guessPlies
+     * different ; les distinguer evite de confondre un noeud classique (delegue a
+     * NegamaxSearch, cle differente par construction : table separee) avec un noeud
+     * matriciel, et deux noeuds matriciels entre eux (voir CLAUDE.md, etape 24).
+     */
+    private record NodeKey(long hash, int depth, int guessPlies) {
+    }
+
+    /** Cache des valeurs de noeud "jeu matriciel" deja resolues par cette recherche (voir NodeKey). */
+    private final Map<NodeKey, Integer> nodeCache = new HashMap<>();
+
     public GuessAwareSearch(Rules rules) {
         this(rules, true);
     }
@@ -96,6 +122,15 @@ public final class GuessAwareSearch {
 
     public long guessNodes() {
         return guessNodes;
+    }
+
+    /** Statistiques de cache pour le benchmark (etape 24) - jamais consultees par la recherche elle-meme. */
+    TranspositionTable classicalTranspositions() {
+        return classicalTt;
+    }
+
+    long nodeCacheSize() {
+        return nodeCache.size();
     }
 
     /**
@@ -139,27 +174,42 @@ public final class GuessAwareSearch {
         return new RootSolution((int) Math.round(solution.value()), b == NOT_MODELLED ? 0 : b, result);
     }
 
-    /** Valeur du noeud du point de vue du joueur au trait. */
+    /**
+     * Valeur du noeud du point de vue du joueur au trait. Memoisee par NodeKey (etape 24) -
+     * un hit renvoie directement la valeur deja resolue par cette meme recherche sans
+     * jamais changer le resultat (aucune fenetre alpha/beta a ce niveau, contrairement a
+     * NegamaxSearch : la valeur d'un noeud matriciel ne depend jamais du contexte d'appel,
+     * seulement de (position, depth, guessPlies), donc toujours exacte, voir la javadoc de
+     * la classe).
+     */
     int value(Board board, int depth, int guessPlies) {
         if (guessPlies <= 0) {
-            return NegamaxSearch.negamax(board, depth, -INFINITY, INFINITY);
+            return NegamaxSearch.negamax(board, depth, -INFINITY, INFINITY, classicalTt);
+        }
+        long hash = ZobristHash.hash(board);
+        NodeKey key = new NodeKey(hash, depth, guessPlies);
+        Integer cached = nodeCache.get(key);
+        if (cached != null) {
+            return cached;
         }
         Color color = board.sideToMove();
         List<Move> moves = NegamaxSearch.orderMoves(MoveGenerator.generateLegalMoves(board, color));
         boolean inCheck = CheckDetector.isInCheck(board, color);
+        int result;
         if (moves.isEmpty()) {
-            return inCheck ? -(NegamaxSearch.MATE_SCORE + depth) : 0;
+            result = inCheck ? -(NegamaxSearch.MATE_SCORE + depth) : 0;
+        } else if (inCheck && rules.fastMate() && moves.size() == 1) {
+            result = MaterialEvaluator.isInsufficientMaterial(board) ? 0 : -(NegamaxSearch.MATE_SCORE + depth);
+        } else if (depth == 0) {
+            result = NegamaxSearch.perspectiveEval(board);
+        } else {
+            int b = guessedScore(board, color, depth, guessPlies);
+            int[] a = playedScores(board, moves, depth, guessPlies, b);
+            guessNodes++;
+            result = (int) Math.round(solve(a, b));
         }
-        if (inCheck && rules.fastMate() && moves.size() == 1) {
-            return MaterialEvaluator.isInsufficientMaterial(board) ? 0 : -(NegamaxSearch.MATE_SCORE + depth);
-        }
-        if (depth == 0) {
-            return NegamaxSearch.perspectiveEval(board);
-        }
-        int b = guessedScore(board, color, depth, guessPlies);
-        int[] a = playedScores(board, moves, depth, guessPlies, b);
-        guessNodes++;
-        return (int) Math.round(solve(a, b));
+        nodeCache.put(key, result);
+        return result;
     }
 
     /**
@@ -181,7 +231,7 @@ public final class GuessAwareSearch {
             if (move.isCapture() && move.capturedPiece().type() == PieceType.KING) {
                 a[i] = NegamaxSearch.KING_CAPTURE_SCORE;
             } else if (windowed) {
-                a[i] = -NegamaxSearch.negamax(board.applyMove(move), depth - 1, -INFINITY, -bestNonPositive);
+                a[i] = -NegamaxSearch.negamax(board.applyMove(move), depth - 1, -INFINITY, -bestNonPositive, classicalTt);
                 if (a[i] <= b && a[i] > bestNonPositive) {
                     bestNonPositive = a[i];
                 }
