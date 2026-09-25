@@ -102,9 +102,10 @@ public final class NegamaxSearch {
         if (legalMoves.isEmpty()) {
             throw new IllegalArgumentException("no legal move to search from");
         }
+        SearchHeuristics heuristics = new SearchHeuristics();
         List<ScoredMove> results = new ArrayList<>(legalMoves.size());
         for (Move move : orderMoves(legalMoves)) {
-            int score = scoreMove(board, move, depth - 1, -INFINITY, INFINITY, tt);
+            int score = scoreMove(board, move, depth - 1, -INFINITY, INFINITY, tt, heuristics);
             results.add(new ScoredMove(move, score));
         }
         results.sort(Comparator.comparingInt(ScoredMove::score).reversed());
@@ -119,8 +120,13 @@ public final class NegamaxSearch {
      * changer l'ordre des coups (probe/store de TranspositionTable), equivalent en valeur a
      * un alpha-beta sans table, seulement plus rapide en presence de transpositions - dont
      * la mecanique de devinette produit beaucoup (Board.pass(pass(x)) == x, voir CLAUDE.md).
+     * heuristics (etape 25, tri killer/historique + PVS) n'agit que sur les coups FRERES
+     * d'un meme appel - jamais sur l'enumeration des coups racine (voir searchRoot, qui
+     * garde son propre orderMoves(List) MVV-LVA d'origine) : aucun impact sur la valeur
+     * retournee, seulement sur l'efficacite de l'elagage a l'interieur d'un coup racine deja
+     * fixe.
      */
-    static int negamax(Board board, int depth, int alpha, int beta, TranspositionTable tt) {
+    static int negamax(Board board, int depth, int alpha, int beta, TranspositionTable tt, SearchHeuristics heuristics) {
         long hash = ZobristHash.hash(board);
         Integer cached = tt.probe(hash, depth, alpha, beta);
         if (cached != null) {
@@ -142,8 +148,22 @@ public final class NegamaxSearch {
         }
         int originalAlpha = alpha;
         int best = -INFINITY;
-        for (Move move : orderMoves(legalMoves)) {
-            int score = scoreMove(board, move, depth - 1, -beta, -alpha, tt);
+        boolean first = true;
+        for (Move move : orderMoves(legalMoves, heuristics, depth)) {
+            int score;
+            if (first) {
+                score = scoreMove(board, move, depth - 1, -beta, -alpha, tt, heuristics);
+                first = false;
+            } else {
+                // PVS : fenetre nulle d'abord (ce coup n'est suppose pas meilleur que alpha
+                // deja trouve) ; re-recherche en fenetre complete seulement si le resultat
+                // est ambigu (alpha < score < beta) - protocole standard, ne change jamais
+                // la valeur finale, seulement le nombre de noeuds explores.
+                score = scoreMove(board, move, depth - 1, -alpha - 1, -alpha, tt, heuristics);
+                if (score > alpha && score < beta) {
+                    score = scoreMove(board, move, depth - 1, -beta, -alpha, tt, heuristics);
+                }
+            }
             if (score > best) {
                 best = score;
             }
@@ -151,6 +171,9 @@ public final class NegamaxSearch {
                 alpha = best;
             }
             if (alpha >= beta) {
+                if (!move.isCapture() && move.type() != MoveType.PROMOTION) {
+                    heuristics.recordCutoff(move, depth);
+                }
                 break; // elagage
             }
         }
@@ -175,11 +198,11 @@ public final class NegamaxSearch {
      * certaine sans jamais construire ni recurser dans le plateau sans roi qui en
      * resulterait.
      */
-    private static int scoreMove(Board board, Move move, int depth, int alpha, int beta, TranspositionTable tt) {
+    private static int scoreMove(Board board, Move move, int depth, int alpha, int beta, TranspositionTable tt, SearchHeuristics heuristics) {
         if (move.isCapture() && move.capturedPiece().type() == PieceType.KING) {
             return KING_CAPTURE_SCORE;
         }
-        return -negamax(board.applyMove(move), depth, alpha, beta, tt);
+        return -negamax(board.applyMove(move), depth, alpha, beta, tt, heuristics);
     }
 
     /** Depassement du budget de temps (voir searchRootWithDeadline) - sans pile d'appels, il sert de signal. */
@@ -217,16 +240,17 @@ public final class NegamaxSearch {
         if (legalMoves.isEmpty()) {
             throw new IllegalArgumentException("no legal move to search from");
         }
+        SearchHeuristics heuristics = new SearchHeuristics();
         List<ScoredMove> results = new ArrayList<>(legalMoves.size());
         for (Move move : orderMoves(legalMoves)) {
-            int score = scoreMoveWithDeadline(board, move, depth - 1, -INFINITY, INFINITY, deadlineNanos, tt);
+            int score = scoreMoveWithDeadline(board, move, depth - 1, -INFINITY, INFINITY, deadlineNanos, tt, heuristics);
             results.add(new ScoredMove(move, score));
         }
         results.sort(Comparator.comparingInt(ScoredMove::score).reversed());
         return results;
     }
 
-    private static int negamaxWithDeadline(Board board, int depth, int alpha, int beta, long deadlineNanos, TranspositionTable tt) {
+    private static int negamaxWithDeadline(Board board, int depth, int alpha, int beta, long deadlineNanos, TranspositionTable tt, SearchHeuristics heuristics) {
         if (System.nanoTime() > deadlineNanos) {
             throw new SearchTimeoutException();
         }
@@ -249,8 +273,18 @@ public final class NegamaxSearch {
         }
         int originalAlpha = alpha;
         int best = -INFINITY;
-        for (Move move : orderMoves(legalMoves)) {
-            int score = scoreMoveWithDeadline(board, move, depth - 1, -beta, -alpha, deadlineNanos, tt);
+        boolean first = true;
+        for (Move move : orderMoves(legalMoves, heuristics, depth)) {
+            int score;
+            if (first) {
+                score = scoreMoveWithDeadline(board, move, depth - 1, -beta, -alpha, deadlineNanos, tt, heuristics);
+                first = false;
+            } else {
+                score = scoreMoveWithDeadline(board, move, depth - 1, -alpha - 1, -alpha, deadlineNanos, tt, heuristics);
+                if (score > alpha && score < beta) {
+                    score = scoreMoveWithDeadline(board, move, depth - 1, -beta, -alpha, deadlineNanos, tt, heuristics);
+                }
+            }
             if (score > best) {
                 best = score;
             }
@@ -258,6 +292,9 @@ public final class NegamaxSearch {
                 alpha = best;
             }
             if (alpha >= beta) {
+                if (!move.isCapture() && move.type() != MoveType.PROMOTION) {
+                    heuristics.recordCutoff(move, depth);
+                }
                 break;
             }
         }
@@ -265,11 +302,11 @@ public final class NegamaxSearch {
         return best;
     }
 
-    private static int scoreMoveWithDeadline(Board board, Move move, int depth, int alpha, int beta, long deadlineNanos, TranspositionTable tt) {
+    private static int scoreMoveWithDeadline(Board board, Move move, int depth, int alpha, int beta, long deadlineNanos, TranspositionTable tt, SearchHeuristics heuristics) {
         if (move.isCapture() && move.capturedPiece().type() == PieceType.KING) {
             return KING_CAPTURE_SCORE;
         }
-        return -negamaxWithDeadline(board.applyMove(move), depth, alpha, beta, deadlineNanos, tt);
+        return -negamaxWithDeadline(board.applyMove(move), depth, alpha, beta, deadlineNanos, tt, heuristics);
     }
 
     static int perspectiveEval(Board board) {
@@ -285,7 +322,19 @@ public final class NegamaxSearch {
      */
     static List<Move> orderMoves(List<Move> moves) {
         return moves.stream()
-                .sorted(Comparator.comparingInt(NegamaxSearch::orderingScore).reversed())
+                .sorted(Comparator.comparingInt((Move move) -> orderingScore(move)).reversed())
+                .toList();
+    }
+
+    /**
+     * Comme orderMoves(List), plus un bonus killer/historique (etape 25) sur les coups
+     * tranquilles (score MVV-LVA nul, jamais les captures/promotions) - reservee a la boucle
+     * interne de negamax/negamaxWithDeadline, jamais a l'enumeration des coups racine (voir
+     * la javadoc de la classe SearchHeuristics).
+     */
+    private static List<Move> orderMoves(List<Move> moves, SearchHeuristics heuristics, int depth) {
+        return moves.stream()
+                .sorted(Comparator.comparingInt((Move move) -> orderingScore(move, heuristics, depth)).reversed())
                 .toList();
     }
 
@@ -298,6 +347,17 @@ public final class NegamaxSearch {
         }
         if (move.type() == MoveType.PROMOTION) {
             score += 5_000 + PositionEvaluator.pieceValue(move.promotionType());
+        }
+        return score;
+    }
+
+    private static int orderingScore(Move move, SearchHeuristics heuristics, int depth) {
+        int score = orderingScore(move);
+        if (score == 0) {
+            if (heuristics.isKiller(move, depth)) {
+                score += 9_000;
+            }
+            score += heuristics.historyScore(move);
         }
         return score;
     }

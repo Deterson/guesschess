@@ -454,3 +454,19 @@ tout court (échec rapide voulu au boot Spring, pas seulement au moment du login
   Mesuré (`GuessAwareSearchBenchmark`) : jusqu'à ~36% de hits sur les nœuds classiques délégués à
   profondeur 3/`guessPlies` 3 en milieu de partie — plus la chaîne de rounds annulés est longue, plus
   le gain est net, comme attendu.
+- **Étape 25 (partie 1/2, fait)** — tri killer/historique + PVS (recherche à fenêtre nulle) +
+  approfondissement itératif pour `minimax@1` : `SearchHeuristics` (application/computer, killer
+  moves par profondeur restante + historique par case départ/arrivée), utilisée uniquement par la
+  boucle interne de `NegamaxSearch.negamax`/`negamaxWithDeadline` — jamais par l'énumération des
+  coups racine de `searchRoot`/`searchRootWithDeadline` (restée sur l'`orderMoves(List)` MVV-LVA
+  d'origine), qui doit de toute façon garder sa fenêtre complète par coup pour le guess-aware. PVS
+  threadé dans la même boucle (premier coup en fenêtre complète comme avant, suivants en fenêtre
+  nulle puis re-recherche si ambigu — protocole standard, ne change jamais la valeur retournée).
+  `MinimaxChessEngine.chooseMove` cherche désormais 1..profondeur en partageant une
+  `TranspositionTable`, ne garde que le dernier résultat (strictement identique à l'appel direct
+  d'origine). Vérifié : suite complète verte, `Minimax1GoldenTest` inchangé, et les valeurs/`B`/
+  compteurs de nœuds du benchmark restent bit-pour-bit identiques à avant à toutes les profondeurs
+  testées. Gain de vitesse non concluant sur ce micro-benchmark `main` (bruit JIT/JVM sur des
+  workloads courtes) — à confirmer via le tournoi (étape 22) plutôt qu'une mesure ponctuelle.
+  Reste (partie 2/2) : recherche de quiescence, reportée (changerait des coups de `minimax@1`,
+  décision utilisateur à reprendre séparément).

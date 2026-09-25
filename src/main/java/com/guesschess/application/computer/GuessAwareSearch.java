@@ -84,6 +84,9 @@ public final class GuessAwareSearch {
      */
     private final TranspositionTable classicalTt = new TranspositionTable();
 
+    /** Tri killer/historique (etape 25) pour ces memes delegations classiques - voir SearchHeuristics. */
+    private final SearchHeuristics classicalHeuristics = new SearchHeuristics();
+
     /**
      * Cle de cache d'un noeud "jeu matriciel" (guessPlies > 0) : hash Zobrist + profondeur
      * + guessPlies restants. guessPlies ne decroit pas toujours en lockstep avec depth
@@ -184,7 +187,7 @@ public final class GuessAwareSearch {
      */
     int value(Board board, int depth, int guessPlies) {
         if (guessPlies <= 0) {
-            return NegamaxSearch.negamax(board, depth, -INFINITY, INFINITY, classicalTt);
+            return NegamaxSearch.negamax(board, depth, -INFINITY, INFINITY, classicalTt, classicalHeuristics);
         }
         long hash = ZobristHash.hash(board);
         NodeKey key = new NodeKey(hash, depth, guessPlies);
@@ -231,7 +234,7 @@ public final class GuessAwareSearch {
             if (move.isCapture() && move.capturedPiece().type() == PieceType.KING) {
                 a[i] = NegamaxSearch.KING_CAPTURE_SCORE;
             } else if (windowed) {
-                a[i] = -NegamaxSearch.negamax(board.applyMove(move), depth - 1, -INFINITY, -bestNonPositive, classicalTt);
+                a[i] = -NegamaxSearch.negamax(board.applyMove(move), depth - 1, -INFINITY, -bestNonPositive, classicalTt, classicalHeuristics);
                 if (a[i] <= b && a[i] > bestNonPositive) {
                     bestNonPositive = a[i];
                 }

@@ -62,7 +62,7 @@ public class MinimaxChessEngine implements ChessEngine {
             throw new IllegalArgumentException("no legal move to choose from");
         }
         int depth = EngineSettings.forLevel(level).depth();
-        List<ScoredMove> scored = NegamaxSearch.searchRoot(board, depth);
+        List<ScoredMove> scored = searchRootIteratively(board, depth);
         List<ScoredMove> withoutAvoidableKingCapture = excludeKingCaptureUnlessForced(scored);
         List<ScoredMove> preferred = excludeIfAlternativeExists(withoutAvoidableKingCapture, movesToAvoidIfPossible);
         Move chosen = switch (level) {
@@ -71,6 +71,25 @@ public class MinimaxChessEngine implements ChessEngine {
             case HARD -> pickPreferringGuessableRefutation(board, preferred);
         };
         return resolveAgainstLegalMoves(chosen, legalMoves);
+    }
+
+    /**
+     * Approfondissement iteratif jusqu'a depth (etape 25) : cherche 1, 2, ..., depth en
+     * partageant une seule TranspositionTable entre les profondeurs (meme pattern que
+     * NegamaxTimedAgent.think, etape 22) - une profondeur courte deja resolue accelere les
+     * suivantes des qu'une transposition est retrouvee (etape 24). Le dernier appel
+     * (searchRoot(board, depth, tt)) est strictement equivalent a l'appel direct
+     * NegamaxSearch.searchRoot(board, depth) d'origine - la table ne change jamais une
+     * valeur retournee (voir TranspositionTable) - donc minimax@1 reste bit-pour-bit
+     * identique (Minimax1GoldenTest inchange).
+     */
+    private static List<ScoredMove> searchRootIteratively(Board board, int depth) {
+        TranspositionTable tt = new TranspositionTable();
+        List<ScoredMove> result = NegamaxSearch.searchRoot(board, 1, tt);
+        for (int d = 2; d <= depth; d++) {
+            result = NegamaxSearch.searchRoot(board, d, tt);
+        }
+        return result;
     }
 
     /**

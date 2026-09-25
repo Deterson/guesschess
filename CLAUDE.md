@@ -191,15 +191,13 @@ budget de temps égal), pas une raison de changer de version.
     position pour éviter de la recalculer si elle est atteinte par un autre ordre de coups ; deux
     tables séparées (nœud classique / jeu matriciel guess-aware) plutôt qu'une clé composite unique.
     Détail : [`src/CLAUDE.md`](src/CLAUDE.md).
-25. ⬜ Qualité de recherche à profondeur égale : recherche de quiescence (étendre les échanges de
-    captures à l'horizon plutôt que d'évaluer une position "au milieu d'une prise", qui fausse
-    `PositionEvaluator` et donc aussi les `A[]`/`B` du guess-aware) ; meilleur tri des coups (killer
-    moves, historique) au-delà du MVV-LVA actuel (`NegamaxSearch.orderMoves`) ; fenêtres d'aspiration
-    et recherche à fenêtre nulle (PVS) pour les coups non-PV ; approfondissement itératif pour
-    `minimax@1` aussi (aujourd'hui profondeur fixe par niveau, contrairement à `guessaware@1`).
-    Attention à ne pas confondre le "coup nul" classique (heuristique d'élagage : "et si je passais
-    mon tour, suis-je déjà gagnant ?", jamais un vrai coup) avec `Board.pass()`, qui est un vrai
-    résultat de la règle de devinette — deux concepts différents malgré le nom proche.
+25. 🟡 Qualité de recherche à profondeur égale : tri des coups killer/historique, recherche à
+    fenêtre nulle (PVS), approfondissement itératif pour `minimax@1` aussi — faits, tous
+    transparents (aucune valeur retournée changée, voir tests). Reste : recherche de quiescence
+    (étendre les échanges de captures à l'horizon plutôt que d'évaluer une position "au milieu
+    d'une prise", qui fausse `PositionEvaluator` et donc aussi les `A[]`/`B` du guess-aware) —
+    reportée car elle changerait réellement des coups de `minimax@1` (gelé), à trancher séparément.
+    Détail : [`src/CLAUDE.md`](src/CLAUDE.md).
 26. ⬜ Parallélisation de la recherche sur les cœurs du Pi (4 cœurs) : threads **plateforme** (pas les
     threads virtuels du projet, faits pour l'attente I/O des connexions WebSocket, pas pour du calcul
     CPU-bound) ou `ForkJoinPool`, un par coup racine — les coups racine de `searchRoot`/`solveRoot`
