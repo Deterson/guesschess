@@ -497,10 +497,19 @@ tout court (échec rapide voulu au boot Spring, pas seulement au moment du login
   réfutation devinable, aléatoire pondéré en facile), paramétrée uniquement par la recherche racine
   à utiliser — seul `BuiltInAgents` choisit entre les deux, jamais un `if` de version dans
   l'algorithme. Enregistrés dans `ComputerAgentsConfiguration`/`TournamentAgentFactory` à côté de
-  `minimax@1` (jamais le défaut). **Tournoi local** (conteneur cloud, 4 cœurs) : à profondeur fixe
-  égale (MEDIUM/HARD), `minimax@1`/`minimax@2`/`minimax@3` restent proches en score global face à
-  face — les deux nouvelles versions gagnent surtout en fiabilité tactique (`minimax@2` ne se fait
-  plus piéger par une suite de captures juste après l'horizon) plutôt qu'en score brut à profondeur
-  égale, au prix d'un temps par coup ~2x plus long (coût de la quiescence et du scan supplémentaire
-  de `EnrichedPositionEvaluator`) — cohérent avec un gain qui se manifesterait surtout à profondeur
-  effective comparable en temps, pas à profondeur fixe identique. Détail : [`engines.md`](../engines.md).
+  `minimax@1` (jamais le défaut). **Tournoi local** (conteneur cloud, 4 cœurs, seed fixe) : en MEDIUM
+  (120 parties, round-robin `minimax@1`/`minimax@2`/`minimax@3`/`random@1`), les trois versions minimax
+  restent proches (67.5%/66.7%/65.8%, IC95% qui se chevauchent) — à cette profondeur, beaucoup de
+  parties finissent en `DRAW_THREE_GUESS_REPETITION` avant qu'une différence de qualité de recherche
+  ne se manifeste. En HARD (36 parties, `minimax@1`/`minimax@2`/`minimax@3` seuls, round-limit 150) le
+  signal diverge nettement : `minimax@2` en tête (58.3%, +58 Elo approx.), `minimax@1` au milieu
+  (47.9%, -14), `minimax@3` dernier (43.8%, -44) — la quiescence seule aide (surtout perceptible à
+  profondeur de recherche plus élevée, où les séquences de captures mal jugées à l'horizon coûtent
+  plus cher), mais empiler l'éval enrichie par-dessus (`minimax@3`) ne montre pour l'instant aucun
+  gain, plutôt une régression — poids ad hoc de `EnrichedPositionEvaluator`
+  (`DOUBLED_PAWN_PENALTY`/`ISOLATED_PAWN_PENALTY`/`KING_SHIELD_FILE_PENALTY`/etc.) jamais calibrés
+  empiriquement, cause la plus probable. **`minimax@3` reste donc non validé** (même statut que
+  `guessaware@1` avant son propre tournoi) : IC95% encore larges (échantillon de 36 parties), à
+  reproduire à plus grande échelle avant de retravailler les poids ou de conclure. Coût : ~2x le temps
+  par coup de `minimax@1` en HARD (quiescence + scan de plateau supplémentaire pour la structure de
+  pions/sécurité du roi). Détail et chiffres complets : [`engines.md`](../engines.md).
