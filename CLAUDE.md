@@ -223,6 +223,21 @@ versions (`minimax@2`, `minimax@3`) plutôt qu'un changement sur `minimax@1` gel
     que construire les arguments CLI et lancer `Tournament.main` en interne - aucune logique dupliquée
     avec `TournamentAgentFactory`/`HeadlessGameRunner`/`TournamentReport`, déjà pures Java sans Spring.
 
+### Prévisibilité "humaine" dans guessaware (étape 29, indépendante)
+
+29. ⬜ `guessaware@2` (nouvelle version, `guessaware@1` reste inchangé, non-régression du golden/
+    des tests d'équilibre) : dans `GuessAwareSearch`, la probabilité de devinette `y[m]` dérive
+    aujourd'hui uniquement de l'écart de score classique entre coups (`d[m] = a[m] - b`) — un coup
+    "facile à deviner" y est confondu avec "un coup nettement meilleur que les autres". Ça rate le
+    cas inverse, cité en exemple : manger une dame avec un pion saute aux yeux d'un humain même si
+    l'écart de score n'est pas énorme, alors qu'un coup de fou sans but apparent peut être excellent
+    sans être du tout devinable. Idée : une fonction de "prévisibilité" séparée du gain en
+    centipawns (captures, échecs, seul coup de développement raisonnable, menace visible... vs
+    repositionnement discret) qui pondère `y[m]` en plus de (ou à la place de) `d[m]` - reste à
+    trancher comment l'intégrer dans `solveMix`/`solve` sans casser l'équilibre du jeu matriciel.
+    À mener une fois `guessaware@1` lui-même validé par un vrai tournoi (étape 21/22, pas encore
+    fait) - pas la peine d'empiler de l'incertitude sur de l'incertitude.
+
 ## Liaison compte/session ↔ partie (étapes 6-7)
 
 - **Lien immuable, à usage unique** : chaque partie référence, par couleur, un compte (`userId`)
