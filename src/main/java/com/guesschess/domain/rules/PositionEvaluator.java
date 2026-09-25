@@ -108,6 +108,16 @@ public final class PositionEvaluator {
             {20, 30, 10, 0, 0, 10, 30, 20},
     };
 
+    /**
+     * Valeur positionnelle du roi seule, table milieu de partie (etape 27) - ajout additif,
+     * n'affecte pas evaluate() (minimax@1/minimax@2 restent inchanges). Expose pour
+     * EnrichedPositionEvaluator (minimax@3), qui l'interpole avec sa propre table de finale
+     * (eval tapered) plutot que de dupliquer KING_PST.
+     */
+    public static int kingMidgamePositionalValue(int file, int rank, Color color) {
+        return positionalValue(PieceType.KING, file, rank, color);
+    }
+
     public static int pieceValue(PieceType type) {
         return switch (type) {
             case PAWN -> PAWN_VALUE;

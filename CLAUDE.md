@@ -183,30 +183,31 @@ profondeur/plis max, temps moyen par coup, efficacité indicative).
 ### Techniques classiques façon Stockfish à imiter (étapes 24-27, indépendantes du tournoi)
 
 Générique : profitent à `minimax@1` et `guessaware@1` (voir `NegamaxSearch`, partagé par les deux).
-Contrairement aux étapes 20-23, ce ne sont pas de nouvelles versions d'agent mais des accélérations
-internes — à mesurer au tournoi (22) une fois en place (même force de jeu, recherche plus profonde à
-budget de temps égal), pas une raison de changer de version.
+Contrairement aux étapes 20-23, la plupart ne sont pas censées être de nouvelles versions d'agent
+mais des accélérations internes transparentes — à mesurer au tournoi (22) une fois en place (même
+force de jeu, recherche plus profonde à budget de temps égal). Exception tranchée aux étapes 25/27
+(voir ci-dessous) : quiescence et éval enrichie changent réellement des coups, donc deux nouvelles
+versions (`minimax@2`, `minimax@3`) plutôt qu'un changement sur `minimax@1` gelé.
 
 24. ✅ Table de transposition (hachage de Zobrist) (fait) — mémorise la valeur déjà calculée d'une
     position pour éviter de la recalculer si elle est atteinte par un autre ordre de coups ; deux
     tables séparées (nœud classique / jeu matriciel guess-aware) plutôt qu'une clé composite unique.
     Détail : [`src/CLAUDE.md`](src/CLAUDE.md).
-25. 🟡 Qualité de recherche à profondeur égale : tri des coups killer/historique, recherche à
-    fenêtre nulle (PVS), approfondissement itératif pour `minimax@1` aussi — faits, tous
-    transparents (aucune valeur retournée changée, voir tests). Reste : recherche de quiescence
-    (étendre les échanges de captures à l'horizon plutôt que d'évaluer une position "au milieu
-    d'une prise", qui fausse `PositionEvaluator` et donc aussi les `A[]`/`B` du guess-aware) —
-    reportée car elle changerait réellement des coups de `minimax@1` (gelé), à trancher séparément.
-    Détail : [`src/CLAUDE.md`](src/CLAUDE.md).
+25. ✅ Qualité de recherche à profondeur égale : tri des coups killer/historique, recherche à
+    fenêtre nulle (PVS), approfondissement itératif pour `minimax@1` — faits, tous transparents
+    (aucune valeur retournée changée, voir tests). Recherche de quiescence (partie 2/2, fait) :
+    plutôt que de la rendre transparente pour `minimax@1` (gelé, ça aurait changé ses coups),
+    nouvelle version `minimax@2` qui l'ajoute par-dessus (`NegamaxSearch.searchRootQuiescent`) —
+    voir `SearchBackedMinimaxEngine`. Détail : [`src/CLAUDE.md`](src/CLAUDE.md).
 26. ⬜ Parallélisation de la recherche sur les cœurs du Pi (4 cœurs) : threads **plateforme** (pas les
     threads virtuels du projet, faits pour l'attente I/O des connexions WebSocket, pas pour du calcul
     CPU-bound) ou `ForkJoinPool`, un par coup racine — les coups racine de `searchRoot`/`solveRoot`
     sont déjà indépendants. Borner le parallélisme pour laisser du CPU à Postgres/au reste du backend.
-27. ⬜ Évaluation plus riche dans `PositionEvaluator` : structure de pions (doublés, isolés, passés),
-    sécurité du roi (pions devant, colonnes ouvertes proches), paire de fous, tour sur colonne ouverte,
-    éval "tapered" (pondération ouverture/finale plutôt que tables positionnelles fixes). Mesurer le
-    coût (la mobilité domine déjà le temps par nœud, voir `src/CLAUDE.md`) avant d'empiler des termes.
-    Hors périmètre pour l'instant : tablebases de fin de partie (utilité faible pour ce projet).
+27. ✅ Évaluation plus riche (fait) : structure de pions (doublés, isolés, passés), sécurité du roi
+    (bouclier de pions), paire de fous, tour sur colonne ouverte/semi-ouverte, éval tapered (table du
+    roi seulement, voir `src/CLAUDE.md`) — `EnrichedPositionEvaluator`, nouvelle classe à côté de
+    `PositionEvaluator` (inchangé), utilisée par une nouvelle version `minimax@3` (= `minimax@2` +
+    cette éval). Tablebases de fin de partie restent hors périmètre (utilité faible pour ce projet).
 
 ### Exécutable graphique pour le tournoi (étape 28, indépendante, extension de l'étape 22)
 

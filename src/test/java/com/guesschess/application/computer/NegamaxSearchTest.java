@@ -8,6 +8,7 @@ import com.guesschess.domain.piece.Piece;
 import com.guesschess.domain.piece.PieceType;
 import com.guesschess.domain.rules.CheckDetector;
 import com.guesschess.domain.rules.MoveGenerator;
+import com.guesschess.domain.rules.PositionEvaluator;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -157,5 +158,86 @@ class NegamaxSearchTest {
         long start = System.nanoTime();
         action.run();
         return (System.nanoTime() - start) / 1_000_000;
+    }
+
+    /**
+     * Meme position que avoidsHangingTheQueenToAVisibleRecapture, mais a profondeur 1 : trop
+     * peu profond pour voir la reprise (Txd8) avec une recherche classique - Dxd8 y ressemble a
+     * un gain de materiel gratuit. searchRootQuiescent (etape 25, minimax@2) doit prolonger
+     * cette branche jusqu'a la reprise et donc l'eviter, contrairement a searchRoot.
+     */
+    @Test
+    void quiescenceSeesThroughARecaptureThatDepthOneMisses() {
+        Board board = Board.empty()
+                .withPiece(Position.fromAlgebraic("g1"), Piece.of(PieceType.KING, Color.WHITE))
+                .withPiece(Position.fromAlgebraic("d1"), Piece.of(PieceType.QUEEN, Color.WHITE))
+                .withPiece(Position.fromAlgebraic("g8"), Piece.of(PieceType.KING, Color.BLACK))
+                .withPiece(Position.fromAlgebraic("a8"), Piece.of(PieceType.ROOK, Color.BLACK))
+                .withPiece(Position.fromAlgebraic("d8"), Piece.of(PieceType.KNIGHT, Color.BLACK));
+
+        ScoredMove plainBest = NegamaxSearch.searchRoot(board, 1).get(0);
+        assertEquals(Position.fromAlgebraic("d1"), plainBest.move().from());
+        assertEquals(Position.fromAlgebraic("d8"), plainBest.move().to(),
+                "sanity check: a plain depth-1 search should fall for the recapture, got " + plainBest);
+
+        ScoredMove quiescentBest = NegamaxSearch.searchRootQuiescent(board, 1, new TranspositionTable(), PositionEvaluator::evaluate).get(0);
+        boolean capturesTheDefendedKnight = quiescentBest.move().from().equals(Position.fromAlgebraic("d1"))
+                && quiescentBest.move().to().equals(Position.fromAlgebraic("d8"));
+        assertFalse(capturesTheDefendedKnight, "quiescence should see the recapture and avoid hanging the queen: " + quiescentBest);
+    }
+
+    /**
+     * Position volontairement depourvue de toute capture possible, quel que soit le coup
+     * choisi (rois eloignes, un seul pion) : searchRootQuiescent doit renvoyer exactement le
+     * meme resultat que searchRoot quand aucune branche n'atteint jamais de position
+     * "bruyante" (stand pat systematique, aucun ecart introduit dans le cas calme). Note :
+     * depuis la position de depart, ce n'est PAS vrai a partir de la profondeur 2 - plusieurs
+     * des 20 reponses noires possibles (ex. 1.d4 e5, 1.d4 c5) laissent une prise immediate
+     * pour les blancs, precisement ce que la quiescence est censee voir contrairement a
+     * searchRoot (voir quiescenceSeesThroughARecaptureThatDepthOneMisses).
+     */
+    @Test
+    void quiescentSearchMatchesPlainSearchWhenNoCaptureIsEverReachable() {
+        Board board = Board.empty()
+                .withPiece(Position.fromAlgebraic("a1"), Piece.of(PieceType.KING, Color.WHITE))
+                .withPiece(Position.fromAlgebraic("h8"), Piece.of(PieceType.KING, Color.BLACK))
+                .withPiece(Position.fromAlgebraic("a4"), Piece.of(PieceType.PAWN, Color.WHITE));
+
+        List<ScoredMove> plain = NegamaxSearch.searchRoot(board, 1);
+        List<ScoredMove> quiescent = NegamaxSearch.searchRootQuiescent(board, 1, new TranspositionTable(), PositionEvaluator::evaluate);
+
+        assertEquals(plain, quiescent);
+    }
+
+    /** Le mat force reste trouve a travers la recherche de quiescence (meme position que findsForcedMateInOne). */
+    @Test
+    void quiescentSearchStillFindsForcedMateInOne() {
+        Board board = Board.empty()
+                .withPiece(Position.fromAlgebraic("c6"), Piece.of(PieceType.KING, Color.WHITE))
+                .withPiece(Position.fromAlgebraic("b1"), Piece.of(PieceType.QUEEN, Color.WHITE))
+                .withPiece(Position.fromAlgebraic("a8"), Piece.of(PieceType.KING, Color.BLACK));
+
+        ScoredMove best = NegamaxSearch.searchRootQuiescent(board, 2, new TranspositionTable(), PositionEvaluator::evaluate).get(0);
+
+        assertEquals(Position.fromAlgebraic("b1"), best.move().from());
+        assertEquals(Position.fromAlgebraic("b7"), best.move().to());
+        assertTrue(NegamaxSearch.isMateScore(best.score()), "expected a mate score, got " + best.score());
+    }
+
+    /** Le court-circuit KING_CAPTURE_SCORE (etat degenere propre a guesschess) reste actif a travers searchRootQuiescent. */
+    @Test
+    void quiescentSearchAlsoHandlesTheKingCaptureShortCircuit() {
+        Board board = Board.empty()
+                .withPiece(Position.fromAlgebraic("a1"), Piece.of(PieceType.KING, Color.WHITE))
+                .withPiece(Position.fromAlgebraic("a8"), Piece.of(PieceType.ROOK, Color.BLACK))
+                .withPiece(Position.fromAlgebraic("h8"), Piece.of(PieceType.KING, Color.BLACK))
+                .withSideToMove(Color.BLACK);
+
+        ScoredMove best = NegamaxSearch.searchRootQuiescent(board, 2, new TranspositionTable(), PositionEvaluator::evaluate).get(0);
+
+        assertEquals(Position.fromAlgebraic("a8"), best.move().from());
+        assertEquals(Position.fromAlgebraic("a1"), best.move().to());
+        assertTrue(best.move().isCapture() && best.move().capturedPiece().type() == PieceType.KING);
+        assertTrue(NegamaxSearch.isMateScore(best.score()), "expected a decisive score, got " + best.score());
     }
 }

@@ -58,7 +58,7 @@
 
 [CmdletBinding()]
 param(
-    [string]$Agents = "minimax@1:hard;guessaware@1:hard;negamax-timed@1:maxDepth=6,budgetMillis=1500;stockfish@1:hard",
+    [string]$Agents = "minimax@1:hard;minimax@2:hard;minimax@3:hard;guessaware@1:hard;negamax-timed@1:maxDepth=6,budgetMillis=1500;stockfish@1:hard",
     [ValidateSet('GUESSCHESS', 'GUESSMATE')]
     [string]$Variant = "GUESSCHESS",
     [int]$Openings = 6,

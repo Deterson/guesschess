@@ -468,5 +468,39 @@ tout court (échec rapide voulu au boot Spring, pas seulement au moment du login
   compteurs de nœuds du benchmark restent bit-pour-bit identiques à avant à toutes les profondeurs
   testées. Gain de vitesse non concluant sur ce micro-benchmark `main` (bruit JIT/JVM sur des
   workloads courtes) — à confirmer via le tournoi (étape 22) plutôt qu'une mesure ponctuelle.
-  Reste (partie 2/2) : recherche de quiescence, reportée (changerait des coups de `minimax@1`,
-  décision utilisateur à reprendre séparément).
+  Reste (partie 2/2, fait) — recherche de quiescence : jamais rendue transparente pour `minimax@1`
+  (aurait changé ses coups, `Minimax1GoldenTest`), nouvelle version `minimax@2` à la place.
+  `NegamaxSearch.searchRootQuiescent`/`negamaxQuiescent`/`quiescence` (méthodes additives,
+  paramétrées par l'évaluateur statique via `ToIntFunction<Board>` plutôt que fixées sur
+  `PositionEvaluator` — seul `BuiltInAgents` choisit lequel) : au dernier pli, prolonge uniquement
+  les captures/promotions (MVV-LVA, `QUIESCENCE_MAX_PLIES` = 8 en garde-fou) jusqu'à une position
+  calme plutôt que d'évaluer statiquement en pleine séquence de prises. Simplification assumée :
+  jamais d'extension "toutes les réponses" quand le camp au trait est en échec (coût CPU du Pi
+  en tête). **Piège rencontré (corrigé)** : la première version renvoyait `alpha`/`beta` (fail-hard)
+  au lieu de `best` (fail-soft, déjà la convention de `negamax`) — un nœud sans capture disponible
+  renvoyait alors la borne héritée du parent (fenêtre nulle du PVS) plutôt que l'éval statique
+  exacte, faussant même les positions calmes. Détecté par un test qui supposait à tort qu'aucune
+  capture n'est jamais atteignable dès la profondeur 2 depuis la position de départ (faux :
+  plusieurs réponses noires, ex. `1.d4 e5`/`1.d4 c5`, laissent une prise immédiate que la
+  quiescence doit justement voir, contrairement à `minimax@1` — voir `NegamaxSearchTest`).
+- **Étape 27 (fait)** — `minimax@3` = `minimax@2` + éval enrichie : `EnrichedPositionEvaluator`
+  (domain/rules, nouvelle classe à côté de `PositionEvaluator`, inchangé) reprend
+  `PositionEvaluator.evaluate` tel quel et ajoute par-dessus structure de pions
+  (doublés/isolés/passés), sécurité du roi (bouclier de pions, pondérée par la phase de partie),
+  paire de fous, tour sur colonne ouverte/semi-ouverte, et un éval tapered limité à la table du roi
+  (`KING_ENDGAME_PST` interpolée avec la table milieu de partie de `PositionEvaluator`, exposée par
+  une nouvelle méthode publique additive `kingMidgamePositionalValue`) — jamais retablé
+  pions/pièces mineures/tour/dame, pour borner le coût par nœud (déjà ~2x celui de
+  `PositionEvaluator` seul, un scan de plateau supplémentaire). `SearchBackedMinimaxEngine`
+  (nouvelle classe, jamais un refactor de `MinimaxChessEngine`) porte l'orchestration partagée par
+  `minimax@2`/`minimax@3` (mêmes heuristiques que `minimax@1` : capture de roi non forcée,
+  réfutation devinable, aléatoire pondéré en facile), paramétrée uniquement par la recherche racine
+  à utiliser — seul `BuiltInAgents` choisit entre les deux, jamais un `if` de version dans
+  l'algorithme. Enregistrés dans `ComputerAgentsConfiguration`/`TournamentAgentFactory` à côté de
+  `minimax@1` (jamais le défaut). **Tournoi local** (conteneur cloud, 4 cœurs) : à profondeur fixe
+  égale (MEDIUM/HARD), `minimax@1`/`minimax@2`/`minimax@3` restent proches en score global face à
+  face — les deux nouvelles versions gagnent surtout en fiabilité tactique (`minimax@2` ne se fait
+  plus piéger par une suite de captures juste après l'horizon) plutôt qu'en score brut à profondeur
+  égale, au prix d'un temps par coup ~2x plus long (coût de la quiescence et du scan supplémentaire
+  de `EnrichedPositionEvaluator`) — cohérent avec un gain qui se manifesterait surtout à profondeur
+  effective comparable en temps, pas à profondeur fixe identique. Détail : [`engines.md`](../engines.md).

@@ -29,6 +29,8 @@ class ComputerAgentsConfiguration {
     AgentRegistry agentRegistry(StockfishChessEngine stockfish) {
         AgentRegistry registry = new AgentRegistry();
         BuiltInAgents.registerMinimaxV1(registry);
+        BuiltInAgents.registerMinimaxV2(registry);
+        BuiltInAgents.registerMinimaxV3(registry);
         BuiltInAgents.registerGuessAwareV1(registry);
         registry.register(STOCKFISH_V1,
                 level -> new EngineBackedAgent(STOCKFISH_V1, level, rng -> stockfish, stockfish::isAvailable));

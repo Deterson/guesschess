@@ -13,6 +13,7 @@ import com.guesschess.domain.rules.PositionEvaluator;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.function.ToIntFunction;
 
 /**
  * Recherche negamax + elagage alpha-beta, moteur maison (etape 17 de la roadmap, voir la
@@ -311,6 +312,154 @@ public final class NegamaxSearch {
 
     static int perspectiveEval(Board board) {
         int whiteEval = PositionEvaluator.evaluate(board);
+        return board.sideToMove() == Color.WHITE ? whiteEval : -whiteEval;
+    }
+
+    /**
+     * Etape 25 (partie 2/2, minimax@2) : recherche de quiescence. Plutot que d'evaluer une
+     * position statiquement des que depth atteint 0 (perspectiveEval, ce que fait
+     * negamax/negamaxWithDeadline pour minimax@1, gele), continue a explorer uniquement les
+     * captures/promotions jusqu'a une position "calme" (ou QUIESCENCE_MAX_PLIES) - evite
+     * l'effet d'horizon ou l'evaluateur statique juge une position "au milieu d'une prise",
+     * qui fausserait aussi bien PositionEvaluator qu'un futur evaluateur enrichi.
+     *
+     * Additive uniquement, comme searchRootWithDeadline/negamaxWithDeadline avant elle : ne
+     * touche a aucune methode existante (searchRoot/negamax restent bit-pour-bit identiques,
+     * minimax@1 reste gele et Minimax1GoldenTest inchange). Parametree par l'evaluateur
+     * statique a utiliser (evaluator, applique cote blancs comme PositionEvaluator.evaluate)
+     * plutot que fixee sur PositionEvaluator - minimax@2 lui passe PositionEvaluator::evaluate,
+     * minimax@3 EnrichedPositionEvaluator::evaluate (voir SearchBackedMinimaxEngine) : le seul
+     * endroit qui choisit entre les deux est BuiltInAgents, jamais un "if" ici.
+     *
+     * Simplification assumee : seules les captures/promotions sont explorees, jamais une
+     * extension "toutes les reponses" quand le joueur au trait est en echec - un echec non
+     * resolu par une prise reste donc evalue par le stand pat comme une position calme,
+     * limitation connue des implementations simples de quiescence (cout CPU du Pi 4 en tete,
+     * voir CLAUDE.md "mesurer avant d'optimiser").
+     */
+    private static final int QUIESCENCE_MAX_PLIES = 8;
+
+    public static List<ScoredMove> searchRootQuiescent(Board board, int depth, TranspositionTable tt, ToIntFunction<Board> evaluator) {
+        if (depth < 1) {
+            throw new IllegalArgumentException("depth must be >= 1, got " + depth);
+        }
+        List<Move> legalMoves = MoveGenerator.generateLegalMoves(board, board.sideToMove());
+        if (legalMoves.isEmpty()) {
+            throw new IllegalArgumentException("no legal move to search from");
+        }
+        SearchHeuristics heuristics = new SearchHeuristics();
+        List<ScoredMove> results = new ArrayList<>(legalMoves.size());
+        for (Move move : orderMoves(legalMoves)) {
+            int score = scoreMoveQuiescent(board, move, depth - 1, -INFINITY, INFINITY, tt, heuristics, evaluator);
+            results.add(new ScoredMove(move, score));
+        }
+        results.sort(Comparator.comparingInt(ScoredMove::score).reversed());
+        return results;
+    }
+
+    private static int negamaxQuiescent(Board board, int depth, int alpha, int beta, TranspositionTable tt, SearchHeuristics heuristics, ToIntFunction<Board> evaluator) {
+        long hash = ZobristHash.hash(board);
+        Integer cached = tt.probe(hash, depth, alpha, beta);
+        if (cached != null) {
+            return cached;
+        }
+        Color color = board.sideToMove();
+        List<Move> legalMoves = MoveGenerator.generateLegalMoves(board, color);
+        if (legalMoves.isEmpty()) {
+            int value = CheckDetector.isInCheck(board, color) ? -(MATE_SCORE + depth) : 0;
+            tt.store(hash, depth, value, TranspositionTable.Bound.EXACT);
+            return value;
+        }
+        if (depth == 0) {
+            int value = quiescence(board, alpha, beta, 0, evaluator);
+            tt.store(hash, depth, value, TranspositionTable.Bound.EXACT);
+            return value;
+        }
+        int originalAlpha = alpha;
+        int best = -INFINITY;
+        boolean first = true;
+        for (Move move : orderMoves(legalMoves, heuristics, depth)) {
+            int score;
+            if (first) {
+                score = scoreMoveQuiescent(board, move, depth - 1, -beta, -alpha, tt, heuristics, evaluator);
+                first = false;
+            } else {
+                score = scoreMoveQuiescent(board, move, depth - 1, -alpha - 1, -alpha, tt, heuristics, evaluator);
+                if (score > alpha && score < beta) {
+                    score = scoreMoveQuiescent(board, move, depth - 1, -beta, -alpha, tt, heuristics, evaluator);
+                }
+            }
+            if (score > best) {
+                best = score;
+            }
+            if (best > alpha) {
+                alpha = best;
+            }
+            if (alpha >= beta) {
+                if (!move.isCapture() && move.type() != MoveType.PROMOTION) {
+                    heuristics.recordCutoff(move, depth);
+                }
+                break;
+            }
+        }
+        tt.store(hash, depth, best, boundFor(best, originalAlpha, beta));
+        return best;
+    }
+
+    private static int scoreMoveQuiescent(Board board, Move move, int depth, int alpha, int beta, TranspositionTable tt, SearchHeuristics heuristics, ToIntFunction<Board> evaluator) {
+        if (move.isCapture() && move.capturedPiece().type() == PieceType.KING) {
+            return KING_CAPTURE_SCORE;
+        }
+        return -negamaxQuiescent(board.applyMove(move), depth, alpha, beta, tt, heuristics, evaluator);
+    }
+
+    /**
+     * Evaluation "au repos" d'un noeud : stand pat (la position est deja au moins aussi bonne
+     * que ce que dit l'evaluateur statique, sauf preuve du contraire par une suite de
+     * captures) puis continue uniquement les captures/promotions, triees MVV-LVA
+     * (orderMoves(List), memes conventions que la recherche principale), jusqu'a une position
+     * calme ou QUIESCENCE_MAX_PLIES. Convention negamax standard (valeur du point de vue du
+     * joueur au trait), fenetre alpha-beta classique - jamais de table de transposition ici
+     * (profondeur negative, hors de la convention de TranspositionTable.store, pas la peine
+     * vu le peu de noeuds ajoutes par rapport a la recherche principale).
+     */
+    static int quiescence(Board board, int alpha, int beta, int plies, ToIntFunction<Board> evaluator) {
+        int best = perspectiveEval(board, evaluator);
+        if (best >= beta) {
+            return best;
+        }
+        if (best > alpha) {
+            alpha = best;
+        }
+        if (plies >= QUIESCENCE_MAX_PLIES) {
+            return best;
+        }
+        Color color = board.sideToMove();
+        List<Move> noisyMoves = MoveGenerator.generateLegalMoves(board, color).stream()
+                .filter(move -> move.isCapture() || move.type() == MoveType.PROMOTION)
+                .toList();
+        for (Move move : orderMoves(noisyMoves)) {
+            int score;
+            if (move.isCapture() && move.capturedPiece().type() == PieceType.KING) {
+                score = KING_CAPTURE_SCORE;
+            } else {
+                score = -quiescence(board.applyMove(move), -beta, -alpha, plies + 1, evaluator);
+            }
+            if (score > best) {
+                best = score;
+            }
+            if (best > alpha) {
+                alpha = best;
+            }
+            if (alpha >= beta) {
+                break;
+            }
+        }
+        return best;
+    }
+
+    private static int perspectiveEval(Board board, ToIntFunction<Board> evaluator) {
+        int whiteEval = evaluator.applyAsInt(board);
         return board.sideToMove() == Color.WHITE ? whiteEval : -whiteEval;
     }
 

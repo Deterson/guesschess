@@ -26,6 +26,8 @@ public final class TournamentAgentFactory {
     public static AgentRegistry defaultRegistry(String stockfishPath) {
         AgentRegistry registry = new AgentRegistry();
         BuiltInAgents.registerMinimaxV1(registry);
+        BuiltInAgents.registerMinimaxV2(registry);
+        BuiltInAgents.registerMinimaxV3(registry);
         BuiltInAgents.registerGuessAwareV1(registry);
         BuiltInAgents.registerNegamaxTimedV1(registry);
         BuiltInAgents.registerRandomV1(registry);

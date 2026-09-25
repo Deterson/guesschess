@@ -1,5 +1,8 @@
 package com.guesschess.application.computer;
 
+import com.guesschess.domain.rules.EnrichedPositionEvaluator;
+import com.guesschess.domain.rules.PositionEvaluator;
+
 import java.util.function.Function;
 import java.util.random.RandomGenerator;
 
@@ -11,6 +14,8 @@ import java.util.random.RandomGenerator;
 public final class BuiltInAgents {
 
     public static final AgentId MINIMAX_V1 = new AgentId("minimax", 1);
+    public static final AgentId MINIMAX_V2 = new AgentId("minimax", 2);
+    public static final AgentId MINIMAX_V3 = new AgentId("minimax", 3);
     public static final AgentId GUESSAWARE_V1 = new AgentId("guessaware", 1);
     public static final AgentId NEGAMAX_TIMED_V1 = new AgentId("negamax-timed", 1);
     public static final AgentId RANDOM_V1 = new AgentId("random", 1);
@@ -24,6 +29,34 @@ public final class BuiltInAgents {
         return registry
                 .register(MINIMAX_V1, level -> new EngineBackedAgent(MINIMAX_V1, level, engines, () -> true))
                 .alias("minimax", MINIMAX_V1);
+    }
+
+    /**
+     * Enregistre minimax@2 (etape 25 partie 2/2) : minimax@1 + recherche de quiescence
+     * (NegamaxSearch.searchRootQuiescent) sur les captures/promotions a l'horizon, evaluateur
+     * classique inchange (PositionEvaluator) - isole l'effet de la quiescence seule, mesurable
+     * au tournoi independamment de l'eval enrichie de minimax@3. minimax@1 reste gele
+     * (SearchBackedMinimaxEngine est une classe a part, jamais un refactor de MinimaxChessEngine).
+     */
+    public static AgentRegistry registerMinimaxV2(AgentRegistry registry) {
+        Function<RandomGenerator, ChessEngine> engines = rng -> new SearchBackedMinimaxEngine(
+                (board, depth, tt) -> NegamaxSearch.searchRootQuiescent(board, depth, tt, PositionEvaluator::evaluate),
+                rng);
+        return registry.register(MINIMAX_V2, level -> new EngineBackedAgent(MINIMAX_V2, level, engines, () -> true));
+    }
+
+    /**
+     * Enregistre minimax@3 (etape 27) : minimax@2 (quiescence) + eval enrichie
+     * (EnrichedPositionEvaluator - structure de pions, securite du roi, paire de fous, tour
+     * colonne ouverte/semi-ouverte, eval tapered sur la table du roi) - empile les deux gains
+     * plutot que de repartir de minimax@1, la quiescence evitant que l'eval enrichie soit
+     * jugee en pleine sequence de captures (voir NegamaxSearch.quiescence).
+     */
+    public static AgentRegistry registerMinimaxV3(AgentRegistry registry) {
+        Function<RandomGenerator, ChessEngine> engines = rng -> new SearchBackedMinimaxEngine(
+                (board, depth, tt) -> NegamaxSearch.searchRootQuiescent(board, depth, tt, EnrichedPositionEvaluator::evaluate),
+                rng);
+        return registry.register(MINIMAX_V3, level -> new EngineBackedAgent(MINIMAX_V3, level, engines, () -> true));
     }
 
     /** Enregistre guessaware@1 (etape 21), a cote de minimax@1 - jamais le defaut tant que le tournoi (etape 22) ne l a pas valide. */
